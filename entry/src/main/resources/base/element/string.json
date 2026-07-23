@@ -1,0 +1,24 @@
+{
+  "string": [
+    {
+      "name": "music_card_name",
+      "value": "云音乐播放器"
+    },
+    {
+      "name": "music_card_description",
+      "value": "查看当前歌曲并快速打开播放器"
+    },
+    {
+      "name": "module_desc",
+      "value": "module description"
+    },
+    {
+      "name": "EntryAbility_desc",
+      "value": "description"
+    },
+    {
+      "name": "EntryAbility_label",
+      "value": "label"
+    }
+  ]
+}

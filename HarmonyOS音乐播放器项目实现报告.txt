@@ -1,0 +1,442 @@
+四、实习过程
+
+4.1  项目背景与意义
+
+4.1.1  项目背景
+
+随着移动互联网、智能终端和流媒体技术的发展，用户获取音乐的方式已经由本地文件播放逐渐转向在线搜索、个性化推荐、歌单管理、社交互动和多设备连续播放。音乐应用不再只是简单的音频播放器，而是集内容发现、用户体系、媒体播放、社区互动、个人资料管理和系统级媒体控制于一体的综合应用。
+
+HarmonyOS 采用面向多设备的应用模型和 ArkUI 声明式界面框架，为手机、平板等终端提供统一的开发能力。本项目以 HarmonyOS Stage 模型为基础，使用 ArkTS 和 ArkUI 构建一款仿网易云音乐风格的移动端音乐播放器。项目包名为 com.harmonyos.cloudmusic，当前版本为 1.0.0，目标及兼容 SDK 版本均为 26.0.0，支持 phone 和 tablet 两类设备。
+
+本项目的工作重点是客户端前端和终端能力实现，没有自行开发传统意义上的业务后端、后台管理系统和业务数据库。登录、用户、歌曲、歌单、专辑、歌手、排行榜、播客、动态、评论等在线数据主要通过网易云音乐 NodeJS API Enhanced 提供的 HTTP 接口获取。客户端负责网络请求封装、接口参数组织、响应数据建模、状态管理、页面渲染、交互反馈以及音视频播放。换言之，本项目采用“HarmonyOS 客户端加第三方音乐 API 服务”的结构，网易云音乐 API 是业务数据源，HarmonyOS 应用是主要实现成果。
+
+从项目规模看，entry/src/main/ets 下的 ArkTS 和 TypeScript 源文件约 25248 行，代码按 pages、components、services、stores、models、constants、musiccard、entryability 和 entrybackupability 等目录组织。项目包含发现、推荐、搜索、登录、我的音乐、歌单、专辑、歌手、MV、动态、消息、个人主页、播放详情、音乐百科、设置、桌面音乐卡片等多个模块，形成了较完整的在线音乐客户端前端体系。
+
+4.1.2  意义
+
+第一，本项目能够验证 ArkTS、ArkUI 和 HarmonyOS Stage 模型在复杂移动应用中的实际应用。项目不是单页演示，而是包含多页面导航、异步网络请求、全局状态共享、媒体播放、文件下载、系统分享、Preferences 持久化、后台音频模式、Live View 和桌面卡片等综合能力，具有较强的工程实践价值。
+
+第二，本项目能够体现前后端分离思想。客户端不直接维护服务器数据库，而是通过统一 ApiClient 对接网易云音乐 NodeJS API。接口响应被转换为明确的 ArkTS 数据模型，再由页面状态驱动界面更新。这种结构使界面层、数据访问层和播放控制层的职责相对清晰，也便于替换 API 地址、调试网络问题和扩展新功能。
+
+第三，本项目能够提升对媒体类应用核心问题的理解。音乐播放不仅需要获取歌曲地址，还涉及播放队列、当前索引、进度、时长、暂停与恢复、上一首与下一首、顺序播放、列表循环、单曲循环、随机播放、音质切换、播放完成后的自动调度，以及系统媒体控制与应用界面的状态同步。本项目通过 PlayerStore 和 PlayerController 对这些问题进行了集中处理。
+
+第四，本项目具有良好的用户体验实践意义。应用实现了底部主导航、侧边栏、悬浮迷你播放器、播放详情页、半屏弹窗、加载和错误提示、登录拦截、分页加载、图片裁剪、资源分享、关系确认等常见交互，可作为 HarmonyOS 音乐类应用设计与开发的参考。
+
+第五，本项目能够帮助认识第三方 API 依赖的边界。由于数据来自非自建的网易云音乐接口，接口可用性、登录 Cookie、版权、音质、会员权限、部分接口版本差异和服务器部署地址都会影响应用功能。报告据此将客户端已实现能力与依赖外部服务才能完成的能力分开说明，避免把前端界面误写成自建后端功能。
+
+4.2  可行性分析
+
+4.2.1  技术可行性
+
+本项目采用 HarmonyOS Stage 模型，主模块类型为 entry，主 Ability 为 EntryAbility。ArkTS 具有静态类型约束，ArkUI 提供声明式 UI、状态装饰器、Navigation、NavPathStack、Tabs、List、Grid、Swiper、Sheet、Dialog 等组件，能够满足音乐应用多页面和复杂交互界面的实现要求。
+
+网络访问方面，项目申请了 ohos.permission.INTERNET 权限，使用 NetworkKit 的 http 能力发起请求。ApiClient 对基础地址、查询参数、Cookie、GET、JSON POST、表单 POST、文件上传和请求资源释放进行了统一封装。服务器地址不是硬编码在每个页面中，而是由 AppSettings 通过 Preferences 保存，并同步到 ApiClient，因此可以根据本机预览器、模拟器或真机网络环境切换地址。
+
+媒体播放方面，项目使用 MediaKit 的 AVPlayer 完成真实音频播放，并使用 AVSessionKit 建立系统媒体会话。PlayerController 负责创建和释放播放器、设置播放源、监听状态、更新进度、处理完成事件、切换队列和音质。module.json5 中声明 KEEP_BACKGROUND_RUNNING 权限和 audioPlayback 后台模式，为后台音频能力提供配置基础。LiveViewController 和 PlaybackControlBridge 进一步承接系统控制入口和实况窗状态更新。
+
+数据管理方面，AuthStore 保存用户登录、账号和 Cookie 状态，PlayerStore 保存播放队列、当前歌曲、播放状态、进度、时长、模式和音质。AppSettings 使用 Preferences 持久化 API 地址、Cookie、用户资料、播放模式、音质、播放队列、当前索引和播放进度等数据，并能够向桌面卡片同步当前音乐信息。因此项目在技术上具备完成目标功能的条件。
+
+项目没有引入额外第三方 HarmonyOS 库，业务依赖主要来自系统 Kit 和网易云音乐 API。根目录依赖中仅包含 Hypium 与 Hamock 测试开发依赖，减少了第三方客户端库的兼容风险。综上，项目在界面、网络、媒体、状态和持久化等方面均具备技术可行性。
+
+4.2.2  经济可行性
+
+项目使用 DevEco Studio、HarmonyOS SDK、ArkTS 和 ArkUI 等开发工具与框架，不需要购买商业 UI 框架。客户端本身不建设独立数据库、用户中心、音乐资源库和内容管理后台，而是调用已有的网易云音乐 NodeJS API 服务，降低了课程或实习项目阶段的服务器开发成本和数据准备成本。
+
+开发和调试阶段可以在本地计算机运行 API 服务，默认常用端口为 3000。预览器可使用本机地址，模拟器通常通过 10.0.2.2 访问宿主机，真机则通过局域网地址访问开发计算机。若正式部署，只需考虑 API 服务主机、域名、带宽和维护费用。对教学、实习和个人项目而言，整体成本较低，经济上可行。
+
+需要说明的是，网易云音乐内容存在版权和会员限制。部分高音质、付费专辑或受版权保护的歌曲不能因为客户端完成了接口调用就免费使用。正式商业化还需要合法授权、隐私合规、安全审查和稳定的服务部署，这些不属于本次纯前端实习项目的实现范围。
+
+4.2.3  操作可行性
+
+应用采用用户熟悉的音乐客户端布局。首页由发现、推荐、漫游和我的等主要内容区域组成，侧边栏提供个人信息、会员入口、消息中心、听歌统计、AI 写歌、设置等功能入口，底部或悬浮音乐卡片展示当前歌曲并可快速进入播放页。页面之间统一通过 Navigation、NavPathStack 和 navDestination 管理，不混用旧式 router 跳转，导航关系清晰。
+
+登录页面支持手机号密码、手机号验证码和二维码三种方式。需要身份的收藏、评论、关注、私信、歌单编辑等操作会先检查 AuthStore 登录状态，未登录时引导进入登录页。搜索、播放、列表选择、分页、下拉或按钮刷新、半屏弹窗确认等操作符合移动应用常见习惯。
+
+设置页面允许修改 API 服务地址、播放模式和音质，便于不同调试环境使用。应用支持手机和平板，界面主要使用自适应宽高、滚动容器和声明式布局。总体上，用户不需要理解网易云 API 或网络请求细节即可使用主要功能，操作上具有可行性。
+
+4.3  需求分析
+
+4.3.1  数据需求
+
+由于本项目没有自建业务数据库，数据需求不应描述为本地数据库表，而应描述为客户端状态、接口响应实体和持久化配置。主要数据如下。
+
+1、用户与登录数据。包括用户编号、账号编号、昵称、头像、签名、性别、生日、地区、关注数、粉丝数、动态数、用户等级、会员等级、达人或歌手身份标识、登录 Cookie 和二维码登录状态等。
+
+2、歌曲数据。包括歌曲编号、歌曲名称、歌手列表、专辑编号与名称、封面地址、歌曲时长、播放地址、音质、码率、费用与版权信息、是否喜欢、歌词、翻译歌词、逐字歌词、评论数和红心数量等。
+
+3、播放状态数据。包括播放队列、当前索引、当前歌曲、是否播放、当前进度、总时长、缓冲或准备状态、播放模式、音质等级、错误提示和队列变更状态等。
+
+4、歌单数据。包括歌单编号、名称、封面、简介、标签、创建者、歌曲数量、播放次数、收藏数、分享数、评论数、是否已收藏、是否属于当前用户以及歌单内歌曲列表等。
+
+5、专辑数据。包括专辑编号、名称、封面、歌手、发行时间、公司、简介、歌曲列表、收藏状态、评论数、分享数和数字专辑价格、销量等。
+
+6、歌手数据。包括歌手编号、名称、头像、别名、简介、身份认证、排名信息、热门歌曲、专辑、MV 和相似歌手等。
+
+7、搜索数据。包括默认关键词、热搜榜、搜索建议和搜索结果。搜索结果支持单曲、歌词、专辑、歌手、歌单、用户、MV、视频、播客声音等多种类型，并需要保存当前关键词、搜索类型、分页偏移量、加载状态和分组结果。
+
+8、推荐与发现数据。包括首页区块、轮播图、每日推荐歌曲、每日推荐歌单、个性化歌单、推荐新歌、私人 FM、独家放送、推荐节目、榜单和歌手榜等。
+
+9、播客与声音数据。包括播客分类、播客 Banner、节目、主播、电台、节目详情、订阅状态和播放信息等。
+
+10、动态与社交数据。包括动态编号、发布用户、文本内容、图片、转发内容、关联歌曲、专辑、MV 或视频、点赞数、评论数、转发数、发布时间和点赞状态等。
+
+11、评论数据。包括评论编号、评论用户、内容、时间、点赞数、是否已点赞、回复对象、热评列表和普通评论分页信息。评论资源可以是歌曲、歌单、专辑、MV 或动态。
+
+12、消息数据。包括私信会话、发送者和接收者、最近消息、未读数量、评论通知、系统通知、最近联系人、私信历史和发送结果等。
+
+13、关系数据。包括关注列表、粉丝列表、互相关注状态、当前用户与目标用户的关系、关注或取消关注的操作结果等。
+
+14、音乐百科数据。包括歌曲百科标题、文字描述、图片、标签、跳转动作、创作信息、首次收听记录、累计播放数据、相关歌曲、相关歌单、歌手和乐谱列表、乐谱预览等。
+
+15、应用设置数据。包括 API 基础地址、Cookie、登录用户信息、播放模式、音质、播放队列、当前歌曲索引、进度、桌面卡片状态和卡片实例编号等。这部分数据由 Preferences 和应用沙箱文件保存。
+
+16、静态展示数据。MusicConstants 中保留了部分页签、发现入口、推荐卡片、示例歌曲、收藏列表、动态和用户歌单静态数据。这些数据主要用于界面初始展示、接口异常时的占位或早期开发样例，正式业务数据仍以接口响应为主。
+
+4.3.2  事务需求
+
+1、应用启动。EntryAbility 创建时初始化设置和播放控制桥接，窗口创建后加载 pages/Index，并根据系统深浅色模式设置状态栏和导航栏样式。
+
+2、用户登录。用户可以选择密码、验证码或二维码方式登录。手机号流程会检查账号是否存在；未注册号码可进入验证码、昵称和密码补全过程。登录成功后解析账号、用户资料和 Cookie，更新 AuthStore 并持久化。
+
+3、用户退出。客户端调用 logout 接口，清除 AuthStore 中的 Cookie、账号和用户信息，并同步清除持久化登录状态。
+
+4、首页内容获取。发现页调用 homepage/block/page 和 banner 接口获取区块与轮播内容；推荐页获取每日歌单、每日歌曲、个性化歌单、新歌、私人 FM、节目、榜单和歌手榜数据。
+
+5、音乐搜索。用户输入关键词后先获取联想建议，再按照选定类型调用 search 接口。综合结果按歌曲、专辑、歌手、歌单、用户、MV、视频、播客等分组展示，点击结果跳转到对应详情或立即播放。
+
+6、歌曲播放。用户从推荐、搜索、歌单、专辑、歌手、排行榜、私人 FM、动态或百科页面选择歌曲，客户端将歌曲集合写入 PlayerStore 队列，由 PlayerController 获取可用播放地址并交给 AVPlayer 播放。
+
+7、播放控制。用户可以播放或暂停、拖动进度、切换上一首或下一首、循环切换播放模式、切换音质、删除队列歌曲、清空队列。歌曲自然播放结束后按当前模式自动选择下一首。
+
+8、播放详情。播放页获取新版歌词、歌曲详情、歌曲红心数量和音乐质量信息，支持唱片与歌词视图、歌词滚动、音质选择、评论、点赞、收藏到歌单、下载、分享、打开歌手、专辑和歌曲百科等操作。
+
+9、歌单管理。用户可以查看歌单详情、播放全部、查看评论与动态统计、收藏或取消收藏、创建歌单、编辑名称与简介、上传封面、删除歌单、向歌单添加或移除歌曲、调整歌曲顺序以及导入外部歌单名称任务。
+
+10、专辑与数字专辑。用户可以查看专辑信息和歌曲、收藏或取消收藏、查看和发布评论、点赞评论、分享专辑。数字专辑页提供新碟、畅销和风格分类，并可进入数字专辑详情。
+
+11、歌手与 MV。歌手页获取热门歌曲、专辑、MV、详细资料和相似歌手。MV 页获取播放地址和详情，用视频组件播放，支持点赞、评论、分享和下载到应用缓存。
+
+12、我的音乐。我的页面展示登录资料、会员信息、用户等级、创建歌单、收藏歌单、收藏专辑、喜欢的歌曲、听歌统计、订阅电台和个人动态等，并提供对应详情入口。
+
+13、用户与关系。用户主页展示资料、歌单和动态，可关注、取消关注、私信、分享主页，并进入关注列表或粉丝列表。关系列表支持分页加载和取消关注确认。
+
+14、动态与消息。动态页获取关注流、热门话题和话题动态，支持打开用户、歌曲、专辑、MV 与转发动态，支持动态点赞和评论。消息中心展示私信、评论通知和系统通知，并可进入私聊页面。
+
+15、资料修改与内容发布。资料编辑页支持修改昵称、签名、性别、生日、地区和头像。发布动态页提供文本与资源分享入口，但最终能力取决于第三方 API 对发布接口和账号权限的支持。
+
+16、设置与卡片。设置页面保存 API 地址、播放模式和音质。桌面音乐卡片显示当前歌曲、歌手、封面和播放状态，可通过卡片事件向 EntryAbility 发送播放、暂停、上一首或下一首指令。
+
+4.3.3  数据流图
+
+本报告使用文字方式描述数据流，后续排版到 Word 时可据此绘制图形。
+
+图 1：顶层数据流图
+
+用户向 HarmonyOS 音乐播放器输入登录信息、搜索关键词、播放命令、收藏评论和资料修改操作；客户端通过 HTTP 向网易云音乐 NodeJS API 发送请求；API 返回用户、音乐和社区数据；客户端通过 ArkUI 展示结果，并通过 AVPlayer 向用户输出音频或视频。
+
+图 2：应用启动与状态恢复数据流图
+
+EntryAbility启动应用→AppSettings读取Preferences→恢复API地址、Cookie、用户信息、播放模式、音质和队列→绑定PlayerStore与PlayerController→加载Index页面→同步桌面卡片和系统播放状态。
+
+图 3：登录数据流图
+
+用户输入手机号与密码或验证码→Login页面进行格式校验→ApiClient调用登录接口→网易云API返回Cookie、账号和用户资料→AuthStore更新内存状态→AppSettings写入Preferences→各业务页面根据登录状态刷新。
+
+二维码登录流程为：客户端申请二维码Key→生成网易云登录链接→页面显示二维码→定时轮询二维码状态→扫码确认后取得Cookie→刷新账号资料并持久化。
+
+图 4：音乐播放数据流图
+
+列表页面选择歌曲→页面将歌曲列表和索引传给PlayerController→PlayerStore保存播放队列→PlayerController按音质请求song/url/v1或备用地址→AVPlayer加载网络音频→状态和进度回写PlayerStore→播放页、迷你播放器、系统媒体会话、Live View和桌面卡片同步显示。
+
+图 5：内容浏览数据流图
+
+用户进入发现、推荐、歌单、专辑、歌手、排行榜、风格或播客页面→页面组织接口参数→ApiClient附加Cookie和时间戳→API返回JSON→models中的接口类型约束数据→页面转换为显示模型→ArkUI列表、网格、轮播和卡片渲染。
+
+图 6：互动操作数据流图
+
+用户发起点赞、评论、收藏、关注、分享或歌单编辑→页面检查登录状态→调用对应操作接口→根据响应码更新局部状态或重新拉取详情→通过Toast、气泡或半屏弹窗反馈结果。未登录时跳转登录页，接口失败时保留原状态并显示错误信息。
+
+4.3.4  数据字典
+
+本项目无自建数据库表，以下数据字典描述客户端核心数据对象和数据流。
+
+（1）数据存储字典
+
+数据存储名称：AuthStore登录状态
+描述：应用运行期间共享的认证信息。
+数据组成：是否登录＋Cookie＋账号信息＋用户编号＋昵称＋头像＋用户资料。
+
+数据存储名称：PlayerStore播放状态
+描述：页面、播放器和系统控制共同使用的响应式播放数据。
+数据组成：播放队列＋当前索引＋当前歌曲＋播放状态＋进度＋时长＋播放模式＋音质＋错误信息。
+
+数据存储名称：Preferences应用设置
+描述：跨应用启动保存的轻量配置和恢复状态。
+数据组成：API基础地址＋Cookie＋用户资料序列化数据＋播放队列＋当前索引＋播放进度＋播放模式＋音质。
+
+数据存储名称：应用沙箱缓存
+描述：保存用户下载或临时处理的资源。
+数据组成：歌曲音频文件＋MV视频文件＋歌曲封面＋歌单封面＋百科或乐谱相关图片。
+
+数据存储名称：桌面卡片状态
+描述：向MusicCardAbility提供当前音乐的显示数据。
+数据组成：歌曲名称＋歌手名称＋封面地址＋是否播放＋卡片实例编号。
+
+（2）主要业务实体字典
+
+数据实体名称：songItemType歌曲显示模型
+数据组成：id＋name＋artist＋artists＋albumId＋albumName＋cover＋url＋duration＋fee等。
+
+数据实体名称：playlistType歌单显示模型
+数据组成：id＋name＋coverImgUrl＋trackCount＋playCount＋creator＋description＋subscribed等。
+
+数据实体名称：ApiUser用户模型
+数据组成：userId＋nickname＋avatarUrl＋signature＋gender＋followeds＋follows＋eventCount＋artistId等。
+
+数据实体名称：ApiSong接口歌曲模型
+数据组成：id＋name＋ar歌手数组＋al专辑对象＋dt时长＋fee＋版权及音质信息。
+
+数据实体名称：MusicComment评论模型
+数据组成：commentId＋user＋content＋time＋likedCount＋liked＋beReplied等。
+
+数据实体名称：UserEventItem动态模型
+数据组成：id＋user＋json内容＋pics图片＋forward转发＋likedCount＋commentCount＋shareCount＋showTime等。
+
+（3）数据流字典
+
+数据处理名称：统一GET请求
+来源：业务页面或服务。
+去向：网易云音乐NodeJS API。
+数据组成：基础地址＋接口路径＋查询参数＋Cookie请求头＋Cookie查询参数。
+
+数据处理名称：统一POST请求
+来源：登录、评论或播放地址等业务。
+去向：网易云音乐NodeJS API。
+数据组成：接口路径＋JSON或表单请求体＋Cookie＋Content-Type。
+
+数据处理名称：接口响应解析
+来源：网易云音乐NodeJS API。
+去向：页面状态、AuthStore或PlayerStore。
+数据组成：HTTP状态码＋JSON业务码＋data、result、profile、account或playlist等响应字段。
+
+数据处理名称：播放地址解析
+来源：当前歌曲和音质设置。
+去向：AVPlayer。
+数据组成：歌曲编号＋音质等级＋码率＋Cookie＋返回歌曲编号＋音频URL。
+
+数据处理名称：播放状态同步
+来源：AVPlayer状态回调和定时进度。
+去向：PlayerStore、AVSession、Live View、桌面卡片。
+数据组成：是否播放＋当前歌曲＋进度＋时长＋播放模式＋封面。
+
+4.4  概要设计
+
+4.4.1  概念模型
+
+系统概念模型由用户、歌曲、歌手、专辑、歌单、评论、动态、消息、播放队列和设置等实体构成。
+
+一个用户可以创建多个歌单，也可以收藏多个歌单和专辑；一个歌单包含多首歌曲，一首歌曲可以存在于多个歌单；一首歌曲属于一个专辑并关联一个或多个歌手；歌曲、歌单、专辑、MV和动态均可关联多条评论；用户之间形成关注、粉丝或互相关注关系；用户可以发布或转发动态，动态可以引用歌曲、专辑、MV、视频或其他动态；播放队列由多首歌曲组成，并通过当前索引确定当前播放项。
+
+客户端并不维护这些实体的权威数据库关系，而是使用 models/api.ets、models/music.ets、models/home.ets、models/style.ets、models/radio.ets、models/sati.ets 和 models/digitalAlbum.ets 中的接口对第三方API响应进行类型映射。其中api.ets覆盖用户、登录、搜索、歌单、歌曲地址、评论、歌词、百科、消息、动态、会员和听歌报告等大量响应结构，是项目主要的数据契约文件。
+
+4.4.2  逻辑结构
+
+项目采用分层和按业务页面组合的逻辑结构。
+
+第一层为应用入口层。EntryAbility负责生命周期、窗口加载、系统主题和播放控制Want；EntryBackupAbility提供备份扩展能力；MusicCardAbility负责桌面卡片创建、更新和事件接收。
+
+第二层为页面导航层。Index是唯一主入口页面，创建并提供NavPathStack，组合主要页签、侧边栏和悬浮播放器，通过PageMap统一建立页面名称与具体NavDestination页面之间的映射。
+
+第三层为页面表现层。pages目录中的各ArkUI页面负责业务状态、接口调用、数据转换和界面构建。页面按发现推荐、播放内容、用户社交、个人中心和设置工具等类别组织。
+
+第四层为复用组件层。Sidebar实现侧边抽屉与会员信息，FloatingMusicCard实现悬浮迷你播放器，ShareSheet实现系统分享与私信联系人选择，playerNav和MusicCard实现播放导航与桌面卡片界面。
+
+第五层为服务层。ApiClient负责网络；PlayerController负责音频播放；AppSettings负责持久化和卡片同步；LiveViewController负责实况窗；PlaybackControlBridge负责系统播放操作Want；ImageUrl负责图片尺寸参数；VipService负责会员信息转换；BubbleTip负责轻量提示。
+
+第六层为状态层。AuthStore集中管理登录用户，PlayerStore集中管理播放状态。页面通过共享实例访问状态，PlayerController与PlayerStore绑定，避免每个页面创建独立播放器。
+
+第七层为模型与常量层。models定义接口实体和页面参数，constants保存页签、入口和示例数据，resources保存颜色、字符串、图标、应用图标和卡片配置。
+
+4.4.3  物理模型
+
+项目不包含MySQL、SQLite或关系型数据表，因此不存在传统数据库物理模型。客户端物理数据主要分为三类。
+
+第一类是Preferences键值数据，用于保存API地址、登录Cookie、用户资料和播放器恢复信息，特点是数据量小、读写频率低、适合应用配置。
+
+第二类是应用沙箱文件，用于保存下载歌曲、MV、封面和桌面卡片状态文件。文件路径基于context.cacheDir或filesDir生成，避免直接写入未授权的公共目录。
+
+第三类是内存响应式状态，主要由AuthStore、PlayerStore和页面State字段构成。列表数据、分页游标、加载状态、弹窗状态等在页面生命周期内保存，页面退出后可按需要重新拉取。
+
+4.5  详细设计
+
+4.5.1  程序系统结构
+
+系统结构可以概括为：HarmonyOS系统能力层→应用入口与导航层→页面和组件层→状态与服务层→网易云音乐NodeJS API数据源。
+
+入口与导航模块包括EntryAbility和Index。Index统一注册LoginPage、SearchPage、PlayPage、PlaylistDetailPage、AlbumDetailPage、ArtistPage、MvPlayerPage、UserProfilePage、MessageCenterPage、SettingsPage等页面，所有页面通过NavPathStack执行push、replace和pop操作。
+
+音乐发现模块包括Find、Recommend、Ranking、Style、StyleDetail、Radio、Sati、DigitalAlbum、DigitalAlbumDetail、DailyRecommend和NewSongList。
+
+播放与内容模块包括Play、PlaylistDetail、PlaylistEditor、PlaylistSongManager、PlaylistCoverPreview、AlbumDetail、Artist、MvPlayer、SongWiki和AiSongStudio。
+
+用户与社交模块包括Login、Mine、UserProfile、ProfileEditor、UserLevel、ListeningStats、RelationshipList、Moment、EventDetail、PublishEvent、MessageCenter和PrivateChat。
+
+公共与系统模块包括ApiClient、AppSettings、PlayerController、PlayerStore、AuthStore、LiveViewController、PlaybackControlBridge、MusicCardAbility、Sidebar、ShareSheet和FloatingMusicCard。
+
+4.5.2  程序功能说明
+
+（1）应用入口与导航功能
+
+EntryAbility在onCreate中处理由桌面卡片或系统控制产生的播放Want，初始化AppSettings并连接PlaybackControlBridge。在窗口阶段创建后加载Index页面，同时根据系统颜色模式设置沉浸式系统栏。应用进入后台时通知PlayerController，使后台播放和系统状态能够继续工作；销毁时释放相关资源。
+
+Index页面创建全局NavPathStack和PlayerStore，将播放控制器与状态绑定，构建主要页签、侧边栏和悬浮播放器。页面映射集中在PageMap中，降低跨页面跳转的耦合。
+
+（2）网络请求功能
+
+ApiClient默认维护baseUrl和Cookie。buildUrl负责拼接路径与查询参数；GET请求会将Cookie同时放入请求头和必要的查询参数；postJson用于JSON请求；postForm用于表单请求；upload用于歌单封面和头像等文件上传。每次请求结束后销毁HttpRequest，避免资源泄漏。页面通过ArkTS泛型指定响应模型，减少字段误用。
+
+（3）登录与认证功能
+
+Login页面包含手机号校验、密码登录、验证码发送和验证、未注册账号补全、二维码Key申请与轮询。二维码地址使用网易云登录链接生成。AuthStore的applyLogin负责保存Cookie、账号和资料，refreshAccount通过login/status刷新当前身份，logout调用接口后清理状态。AppSettings将Cookie和必要用户数据持久化，使下次启动能够恢复。
+
+（4）发现与推荐功能
+
+Find页面调用homepage/block/page和banner，将服务端区块转换为统一HomeBlockView和HomeCreativeView，用Swiper、横向列表和资源卡片呈现。Recommend页面整合recommend/resource、recommend/songs、personalized、personalized/newsong、personal_fm、program/recommend、personalized/djprogram、personalized/privatecontent、toplist和toplist/artist等接口，展示每日推荐、私人FM、新歌、节目、特色榜单和歌手榜。
+
+Ranking页面分别展示官方榜、精选榜和歌手榜，可进入歌单或歌手页。Style与StyleDetail通过style/preference、style/list、style/detail、style/song、style/album、style/playlist和style/artist构建曲风偏好、曲风详情及分类资源。Radio页面通过dj/banner、dj/program/toplist、program/recommend等接口展示播客节目。Sati页面通过场景、标签、资源列表、订阅接口提供沉浸式场景音乐。DigitalAlbum页面展示新碟、销量和风格，DigitalAlbumDetail展示数字专辑产品详情。
+
+（5）搜索功能
+
+Search页面获取search/default、search/hot/detail和search/suggest数据，并对输入变化进行延迟处理，减少频繁请求。search接口通过type参数区分不同资源类型。页面将不同接口字段映射为SearchDisplayItem和SearchSection，再用统一列表组件展示。歌曲结果加入播放队列；专辑、歌手、歌单、MV和用户结果跳转到对应页面；视频和播客结果按现有页面能力处理。
+
+（6）播放器核心功能
+
+PlayerStore是可观察状态对象，提供setQueue、selectAt、removeAt、clearQueue、modeTitle和qualityTitle等方法。PlayMode包含顺序播放、列表循环、单曲循环和随机播放。
+
+PlayerController采用单例，保证全应用共享一个AVPlayer。播放时先核对歌曲编号和当前请求令牌，避免快速切歌导致旧请求覆盖新歌曲。播放器优先请求song/url/v1，并根据设置映射音质与码率；失败时尝试song/url，再尝试song/download/url/v1等备用策略。解析返回地址时校验响应歌曲编号，降低串歌风险。
+
+PlayerController监听AVPlayer状态变化，在prepared后设置音量和跳转恢复进度，在playing、paused、completed和error等状态更新PlayerStore。previous、next和handleCompleted依据播放模式计算下一索引；randomIndex避免在队列允许时重复当前项。seek负责进度跳转，changeQuality会保留当前位置并重新加载音源。队列和进度通过AppSettings延迟持久化。
+
+播放器还创建AVSession，把歌曲标题、歌手、专辑、封面、播放状态、位置和循环模式同步给系统媒体中心，并响应系统播放、暂停、上一首、下一首和进度控制。LiveViewController向系统实况窗同步当前歌曲；PlaybackControlBridge把桌面卡片或外部Want转换为播放动作。
+
+（7）播放详情功能
+
+Play页面是项目代码量最大的核心页面之一。页面根据PlayerStore显示封面唱片、歌词、歌曲信息、进度和控制按钮。lyric/new接口提供原歌词、翻译歌词和逐字歌词，页面完成时间解析、当前歌词定位和滚动同步。song/detail、song/red/count和song/music/detail补充歌曲、热度和音质信息。
+
+用户可以在播放页执行喜欢或取消喜欢、查看评论、点赞评论、发布或回复评论、收藏歌曲到指定歌单、下载音频、保存封面、系统分享、打开专辑、歌手和SongWiki。需要登录的操作统一先检查AuthStore。
+
+（8）歌单功能
+
+PlaylistDetail通过playlist/detail获取详情和歌曲，通过playlist/detail/dynamic获取收藏、评论与分享统计，并加载comment/playlist。页面支持播放全部、点击单曲播放、歌单内搜索、收藏或取消收藏、评论、分享和所有者管理入口。
+
+PlaylistEditor区分创建和编辑模式。创建时调用playlist/create，编辑时调用playlist/update，封面通过playlist/cover/update上传。PlaylistSongManager通过search寻找歌曲，使用playlist/tracks添加或删除歌曲，并用song/order/update调整顺序。PlaylistCoverPreview负责缓存和预览歌单封面。Mine页面还支持playlist/delete及歌单导入任务创建和状态轮询。
+
+（9）专辑、歌手和MV功能
+
+AlbumDetail调用album、album/detail/dynamic、album/sub和comment/album，显示专辑资料、歌曲、收藏状态和评论。评论可点赞和发布，歌曲列表可建立播放队列。
+
+Artist调用artist/top/song、artist/album、artist/mv、artist/detail和simi/artist，提供热门歌曲、专辑、MV、详情和相似歌手页签。点击歌曲播放，点击专辑或MV进入对应页面。
+
+MvPlayer调用mv/url获取视频地址，调用mv/detail和mv/detail/info获取信息与统计，调用comment/mv管理评论，调用resource/like和comment/like处理点赞。下载功能将MV写入应用缓存目录，分享功能通过系统ShareKit输出文本和链接。
+
+（10）我的音乐与用户资料功能
+
+Mine页面集中展示当前用户信息和个人音乐资产。页面调用login/status、user/detail、user/playlist、user/playlist/collect、user/level、vip/info、album/sublist、listen/data/total、likelist、song/detail、listen/data/today/song、dj/sublist和user/event等接口。页面区分创建歌单、收藏歌单和收藏专辑，并展示喜欢歌曲、今日听歌排行、订阅电台和动态。
+
+ProfileEditor调用user/update修改文本资料，通过avatar/upload上传头像，并通过lbs/city/code辅助地区选择。UserLevel显示等级、听歌量和登录天数进度。ListeningStats分别获取总听歌数据、周报告和月报告，展示时长、时间分布、常听歌曲、歌手、曲风、年代和语言等统计。
+
+UserProfile展示指定用户资料、歌单和动态。页面根据目标用户与当前用户关系显示关注、互相关注或已关注状态，支持关注、取消关注、私信、分享主页和歌手身份跳转。RelationshipList分别调用user/follows和user/followeds分页获取关注与粉丝，通过follow接口改变关系。
+
+（11）动态、消息与私聊功能
+
+Moment调用event获取动态流，调用hot/topic和topic/detail/event/hot获取热门话题内容。动态JSON字段可能包含歌曲、专辑、MV、视频或转发数据，页面解析后构建不同资源卡片。resource/like处理动态点赞，comment/event和comment/like处理动态评论。
+
+EventDetail展示单条动态及转发链，支持打开发布者、播放关联歌曲、打开MV、点赞、评论、转发和删除本人动态。PublishEvent提供文本发布和资源分享界面，其最终成功范围由第三方send或share相关接口支持决定。
+
+MessageCenter分别调用msg/private、msg/comments和msg/notices展示私信、评论与通知。PrivateChat调用msg/private/history获取会话历史，通过send/text、send/song、send/album和send/playlist发送文字或音乐资源。ShareSheet可以调用系统分享，也可以获取msg/recentcontact并选择联系人进入私聊。
+
+（12）歌曲百科和AI歌词功能
+
+SongWiki调用song/wiki/summary解析复杂的百科区块，显示歌曲基本资料、幕后信息、记忆坐标、相关歌曲、相关歌单和其他资源。页面还调用sheet/list和sheet/preview展示乐谱并支持预览、保存和分享。由于百科响应采用多层creative、resource和uiElement结构，页面实现了专门的字段提取、类型识别和通用展示模型。
+
+AiSongStudio并非完整的服务端AI作曲系统。现有页面可以读取用户喜欢歌曲、搜索歌曲和歌词，将选择的歌曲或歌词作为润色、续写等提示上下文，并通过用户配置的兼容AI接口发送对话请求。项目没有实现训练模型、音乐生成、演唱合成或任务调度后端，因此该功能应描述为客户端AI歌词辅助界面和外部模型调用能力。
+
+（13）设置、卡片和系统集成功能
+
+Settings和SettingsV2提供API地址、播放模式和音质设置。API地址经规范化后写入Preferences并立即更新ApiClient。ImageUrl为网易云图片地址追加尺寸参数，减少无必要的大图传输。VipService将多种会员包字段整理为统一显示信息。
+
+MusicCardAbility保存卡片实例编号，读取当前音乐状态并通过formProvider更新卡片。MusicCard界面展示音乐信息。用户点击卡片控制按钮后，卡片事件被转换为Want，EntryAbility交给PlaybackControlBridge和PlayerController执行，实现桌面入口与应用内播放器共享状态。
+
+（14）明确未自建或受限功能
+
+项目没有自行实现网易云音乐服务端、数据库、管理员后台、支付系统、版权系统和会员购买系统。会员购买、云贝商城、票务等入口只能打开官方链接或作为界面入口。部分发布动态、私信、内容上传、付费音乐和高音质播放受账号、Cookie、接口版本、版权及会员权限限制。下载默认位于应用沙箱或缓存，未经过FilePicker授权时不能表述为已写入公共音乐目录。
+
+4.6  系统测试
+
+4.6.1  测试环境与方法
+
+项目配置HarmonyOS SDK 26.0.0，支持phone和tablet，构建模式包含debug和release。测试可在DevEco Studio预览器、模拟器或真机中进行。网络测试需要先启动网易云音乐NodeJS API服务，并在设置页填写终端可访问的服务地址。
+
+项目包含LocalUnit.test.ets、List.test.ets、Ability.test.ets等Hypium测试样例，但这些文件主要是工程模板级测试，不能覆盖音乐应用全部业务。因此本项目应以编译检查、接口联调和人工功能测试为主。测试时需要分别记录接口正常、未登录、无版权、网络失败、空数据和快速连续操作等情况。
+
+4.6.2  应用启动与导航测试
+
+测试步骤：启动应用，依次切换主要页签，打开侧边栏，从不同页面进入搜索、登录、播放、歌单、专辑、歌手和设置，再逐级返回。
+
+预期结果：Index正常加载；页签状态正确；所有页面均由NavPathStack管理；返回后上级页面状态合理保留；悬浮播放器不会因页面跳转重复创建；系统栏颜色与主题协调。
+
+4.6.3  登录模块测试
+
+测试内容包括手机号格式错误、密码登录成功与失败、验证码发送、未注册号码补全、二维码未扫码、已扫码待确认、登录成功、二维码过期和退出登录。
+
+预期结果：非法输入不会发起无效请求；接口错误有提示；成功后头像昵称刷新；需要登录的页面不再拦截；退出后Cookie和用户状态清除；重新启动可按持久化信息恢复或刷新账号。
+
+4.6.4  首页、推荐与搜索测试
+
+测试发现页Banner和区块，推荐歌单、每日歌曲、私人FM、新歌、排行榜、歌手榜、播客和独家放送。搜索分别使用歌曲、歌手、专辑、歌单、用户、MV和歌词关键词，测试建议、热搜、空结果和连续快速输入。
+
+预期结果：页面显示加载状态；成功后列表和图片正常；空数据不崩溃；错误可重试；搜索类型切换后结果与类型一致；快速输入不会让较早请求错误覆盖最终关键词结果。
+
+4.6.5  播放器功能测试
+
+测试步骤：从不同入口播放歌曲，执行播放、暂停、拖动、上一首、下一首；分别测试顺序、列表循环、单曲循环和随机模式；切换音质；快速连续切歌；删除当前项和清空队列；让歌曲自然播放结束。
+
+预期结果：当前歌曲、队列索引、封面和歌词一致；快速切歌不会串歌；进度在合法范围内；模式切换生效；音质切换后保留相近进度；播放完成后按模式选择歌曲；版权或地址失败时显示错误并保持应用可操作。
+
+4.6.6  后台播放与系统控制测试
+
+测试步骤：播放歌曲后将应用切入后台，使用系统媒体中心、桌面音乐卡片或实况窗执行播放暂停和切歌，再回到应用。
+
+预期结果：允许后台时音频持续；系统标题、歌手、封面和进度与应用一致；外部控制能够改变PlayerStore；返回应用后播放页与迷你播放器状态同步。若设备系统版本或权限不支持某项系统能力，应记录为平台限制，而不是业务接口错误。
+
+4.6.7  歌单、专辑、歌手和MV测试
+
+测试歌单详情、收藏、评论、创建、编辑、封面上传、歌曲增删和顺序调整；测试专辑收藏与评论；测试歌手热门歌曲、专辑、MV和相似歌手；测试MV播放、进度、评论、点赞、分享和缓存下载。
+
+预期结果：操作成功后统计或列表刷新；非歌单所有者不出现危险管理操作；未登录操作跳转登录；上传失败不覆盖原封面；MV资源不可用时给出提示；缓存文件名和路径合法。
+
+4.6.8  用户、动态和消息测试
+
+测试个人资料展示与修改、头像上传、等级和听歌报告、关注和取消关注、粉丝分页、用户动态、动态点赞评论、消息分类、私聊历史以及文字、歌曲、专辑和歌单消息发送。
+
+预期结果：当前用户和他人主页操作区分正确；取消关注需要确认；分页不重复数据；本人动态可显示删除入口；消息发送成功后会话刷新；第三方接口不支持或账号权限不足时有明确失败反馈。
+
+4.6.9  设置、持久化与异常测试
+
+测试修改API地址、播放模式和音质后重启应用；测试断网、服务地址错误、HTTP非成功状态、JSON业务码失败、Cookie过期、接口返回空字段和图片地址为空。
+
+预期结果：设置正确保存；重启后恢复；网络请求在finally阶段释放资源；空字段使用默认值或空列表；登录过期后需要重新登录；页面不因单个接口失败整体崩溃；旧数据不会被明显错误的新数据覆盖。
+
+4.6.10  测试结论
+
+从代码实现范围看，项目已形成可运行的HarmonyOS音乐客户端主体，主要页面、网络层、播放层、状态层和系统集成逻辑均已实现。正式验收时仍应在真实API服务和有效网易云账号环境中完成回归测试，特别关注版权歌曲、会员音质、Cookie有效期、不同设备后台策略、第三方接口变更和真机文件权限。模板单元测试数量不足是当前测试体系的主要缺口，后续应为ApiClient参数拼接、歌词解析、播放模式索引计算、数据模型转换和页面关键流程补充自动化测试。
+
+4.7  结论
+
+本项目完成了一款基于HarmonyOS的在线音乐播放器前端。项目使用ArkTS与ArkUI构建界面，以Stage模型管理应用生命周期，以Navigation和NavPathStack管理多页面导航，以NetworkKit对接网易云音乐NodeJS API，以AuthStore和PlayerStore共享登录及播放状态，以Preferences保存配置和恢复信息，并以AVPlayer和AVSession实现真实音频播放及系统级媒体控制。
+
+在功能方面，项目覆盖发现推荐、每日歌曲、歌单、专辑、歌手、排行榜、曲风、数字专辑、播客、搜索、私人FM、歌曲播放、歌词、评论、收藏、下载、分享、音乐百科、用户资料、等级、听歌统计、动态、关注粉丝、消息私聊、设置和桌面卡片等内容。项目代码不是单纯的静态页面集合，而是具有较完整的数据请求、状态变化和终端媒体能力。
+
+本项目的实际定位是“客户端前端加第三方网易云音乐API”，不能描述为自行完成了网易云音乐后端、数据库或管理后台。登录数据、音乐内容和社交数据由第三方接口提供，客户端主要负责调用、建模、展示和交互。AI写歌、会员购买、商城票务、公共目录下载以及部分发布和消息能力也受到外部服务、账号权限和系统授权限制。
+
+通过本项目的开发，能够掌握HarmonyOS应用目录与配置、ArkUI声明式组件、响应式状态、页面导航、HTTP接口联调、Cookie认证、媒体播放器生命周期、播放队列算法、系统媒体会话、文件缓存、系统分享、桌面卡片和异常处理等关键知识。后续可继续加强自动化测试、接口缓存、离线数据、本地媒体扫描、敏感信息加密、无障碍适配、平板响应式布局、公共目录导出、错误监控和正式版权合规，从而提升项目的稳定性、安全性和产品化程度。
