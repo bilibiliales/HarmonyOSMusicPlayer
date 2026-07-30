@@ -181,7 +181,7 @@ export struct AiSongStudioPage {
       { role: 'user', content: userPrompt }
     ]
     const body: AiRequestBody = {
-      model: this.model.trim() || 'gpt-3.5-turbo',
+      model: this.model.trim() || 'gpt-5.6-sol',
       messages: messages,
       temperature: temperature
     }
@@ -189,7 +189,7 @@ export struct AiSongStudioPage {
       'Authorization': `Bearer ${this.apiKey.trim()}`,
       'Content-Type': 'application/json'
     }
-    const response = await ApiClient.callOpenAIApi<AiResponse>(this.endpoint(), body, headers)
+    const response = await ApiClient.callOpenAIApi<AiResponse, AiRequestBody>(this.endpoint(), body, headers)
     const content = response.choices && response.choices.length > 0 ? response.choices[0].message.content : ''
     if (!content) {
       throw new Error('AI 没有返回文本内容')

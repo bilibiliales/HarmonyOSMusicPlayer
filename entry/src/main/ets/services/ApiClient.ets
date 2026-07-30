@@ -145,7 +145,7 @@ export class ApiClient {
     }
   }
 
-  static async callOpenAIApi<T>(endpoint: string, body: Record<string, any>, headers: Record<string, string>): Promise<T> {
+  static async callOpenAIApi<T, B>(endpoint: string, body: B, headers: Record<string, string>): Promise<T> {
     const request = http.createHttp()
     try {
       const response = await request.request(endpoint, {

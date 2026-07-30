@@ -47,6 +47,7 @@ export class AppSettings {
   static defaultPlayMode: PlayMode = PlayMode.LOOP
   static defaultOnlineQuality: string = 'exhigh'
   static defaultDownloadQuality: string = 'exhigh'
+  static aiWorkspaceId: string
 
   static async load(context: common.Context): Promise<void> {
     const store = await preferences.getPreferences(context, AppSettings.STORE_NAME)
