@@ -2,7 +2,7 @@ import { http } from '@kit.NetworkKit'
 import { ApiParam } from '../models/api'
 
 export class ApiClient {
-  static baseUrl: string = 'https://music.zdjlales.icu'
+  static baseUrl: string = 'https://apis.netstart.cn/music'
   static cookie: string = ''
 
   static setBaseUrl(value: string): void {

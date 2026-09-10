@@ -6,9 +6,9 @@
 
 | 项目      | 值 |
 |---------|-----|
-| 包名      | com.harmonyos.cloudmusic |
+| 包名      | com.hmos.cloudmusic |
 | 版本      | 1.0.0 |
-| 目标 SDK  | 26.0.0 (HarmonyOS) |
+| 目标 SDK  | 6.1.1(24) (HarmonyOS) |
 | 支持设备    | phone, tablet |
 | 主模块     | entry |
 | 主 Ability | EntryAbility |
@@ -169,7 +169,7 @@ HarmonyOS 系统能力层 (AVPlayer / AVSession / NetworkKit / FormKit / ShareKi
 ## 环境准备
 
 ### 开发工具
-- DevEco Studio (HarmonyOS SDK 26.0.0)
+- DevEco Studio (HarmonyOS SDK 6.1.1(24))
 - ArkTS + ArkUI
 
 ### 后端 API

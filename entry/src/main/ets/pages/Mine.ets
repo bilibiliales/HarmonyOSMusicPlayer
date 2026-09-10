@@ -73,7 +73,7 @@ export interface UserProfile {
 @Component
 export struct Mine {
   @Consume('pageStack') pageStack: NavPathStack
-  @Consume('authStore') authStore: AuthStore
+  @Consume('authStore') @Watch('onAuthStoreChanged') authStore: AuthStore
   @Consume('playerStore') playerStore: PlayerStore
 
   @State userProfile: UserProfile = {
@@ -142,6 +142,36 @@ export struct Mine {
   @State vipSvip: boolean = false
   @State vipLevel: number = 0
   @State totalListenTime: number = 0
+
+  // `Mine` is kept alive by `Tabs`, so its appear callback is not guaranteed
+  // to run when the login destination is popped or the sidebar logs out.
+  // Keep the last identity separately and synchronize as soon as the observed
+  // AuthStore changes.
+  private authStateKey: string = ''
+
+  private onAuthStoreChanged(): void {
+    const nextKey = `${this.authStore.loggedIn ? '1' : '0'}:${this.authStore.userId}`
+    if (nextKey === this.authStateKey) {
+      return
+    }
+    this.authStateKey = nextKey
+    this.lastLoggedInState = this.authStore.loggedIn
+    this.loadedUserId = ''
+
+    if (!this.authStore.loggedIn) {
+      this.resetUserData()
+      return
+    }
+
+    // A login response can publish the cookie/login flag before the user id.
+    // Wait for the id update; the watcher will run again and start the load.
+    if (!this.authStore.userId) {
+      this.resetUserData()
+      return
+    }
+    this.loadUserData()
+    this.loadVipInfo()
+  }
 
   private getVipText(vipLevel: number): string {
     return vipLevel == 1 ? '壹'
@@ -232,6 +262,15 @@ export struct Mine {
     this.likedSongs = []
     this.likedSongIds = []
     this.listenRankItems = []
+    this.djOffset = 0
+    this.djHasMore = true
+    this.eventsLasttime = -1
+    this.eventsHasMore = true
+    this.eventMessage = ''
+    this.vipActive = false
+    this.vipSvip = false
+    this.vipLevel = 0
+    this.totalListenTime = 0
     this.loadedUserId = ''
   }
 
@@ -1056,12 +1095,10 @@ export struct Mine {
     .height('100%')
     .backgroundColor('#121215')
     .onAppear(() => {
-      if (this.lastLoggedInState !== this.authStore.loggedIn) {
-        this.loadedUserId = ''
-        this.lastLoggedInState = this.authStore.loggedIn
-      }
-      this.loadUserData()
-      this.loadVipInfo()
+      // TabContent can stay mounted while another page is on top of it.  Run
+      // the same synchronization on appear for the initial state, while the
+      // AuthStore watcher handles login/logout changes made in the meantime.
+      this.onAuthStoreChanged()
       if (this.musicCategory === 'recent') {
         this.loadRecentData()
       }

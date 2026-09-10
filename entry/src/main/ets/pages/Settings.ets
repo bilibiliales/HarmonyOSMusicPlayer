@@ -107,7 +107,7 @@ export struct SettingsPage {
 
             Column({ space: 10 }) {
               Text('后端服务').width('100%').fontSize(16).fontWeight(FontWeight.Bold).fontColor('#ffffff')
-              TextInput({ text: this.serverUrl, placeholder: 'https://music.zdjlales.icu' })
+              TextInput({ text: this.serverUrl, placeholder: 'https://apis.netstart.cn/music' })
                 .height(50).fontColor('#ffffff').placeholderColor('#66666e').backgroundColor('#24242a')
                 .borderRadius(14).onChange((value: string) => this.serverUrl = value)
               Button('保存服务地址').width('100%').height(46).borderRadius(23)

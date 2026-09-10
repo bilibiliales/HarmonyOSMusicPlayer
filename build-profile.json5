@@ -1,12 +1,11 @@
 {
   "app": {
-    "signingConfigs": [],
     "products": [
       {
         "name": "default",
         "signingConfig": "default",
-        "targetSdkVersion": "26.0.0",
-        "compatibleSdkVersion": "26.0.0",
+        "targetSdkVersion": "6.1.1(24)",
+        "compatibleSdkVersion": "6.1.1(24)",
         "runtimeOS": "HarmonyOS",
         "buildOption": {
           "strictMode": {
@@ -18,12 +17,9 @@
     ],
     "buildModeSet": [
       {
-        "name": "debug",
-      },
-      {
-        "name": "release"
+        "name": "debug"
       }
-    ]
+    ],
   },
   "modules": [
     {
