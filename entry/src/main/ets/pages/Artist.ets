@@ -29,6 +29,7 @@ export struct ArtistPage {
   @State artistDetail: ArtistDetailArtist = { name: '' }
   @State expertIdentities: ArtistExpertIdentity[] = []
   @State topSongs: songItemType[] = []
+  @State topSongsExpanded: boolean = false
   @State albums: ApiAlbum[] = []
   @State allAlbums: ApiAlbum[] = []
   @State mvs: ArtistMvItem[] = []
@@ -323,7 +324,7 @@ export struct ArtistPage {
       }
       .width('100%').height(50).padding({ left: 18 })
       .onClick(() => this.playSong(0))
-      ForEach(this.topSongs, (song: songItemType, index: number) => {
+      ForEach(this.topSongsExpanded ? this.topSongs : this.topSongs.slice(0, 10), (song: songItemType, index: number) => {
         Row({ space: 12 }) {
           Text((index + 1).toString()).width(28).fontSize(12)
             .fontColor(index < 3 ? '#ff6577' : '#66666e').textAlign(TextAlign.Center)
@@ -343,7 +344,13 @@ export struct ArtistPage {
           SymbolGlyph($r('sys.symbol.play_circle')).fontSize(21).fontColor(['#77777f'])
         }
         .height(62).padding({ left: 12, right: 16 }).onClick(() => this.playSong(index))
-      })
+      }, (song: songItemType) => song.id)
+      if (this.topSongs.length > 10) {
+        Text(this.topSongsExpanded ? '收起' : '查看更多')
+          .width('100%').constraintSize({ minHeight: 44 })
+          .fontSize(13).fontColor('#9999a1').textAlign(TextAlign.Center)
+          .onClick(() => this.topSongsExpanded = !this.topSongsExpanded)
+      }
     }
     .width('100%')
   }

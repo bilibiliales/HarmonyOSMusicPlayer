@@ -231,11 +231,11 @@ struct HomeIndex {
               }
             }
             .tabBar(this.getTabBar(item))
+            .padding({ top: item.name === 'mine' ? 0 : this.topAvoidHeight })
             .backgroundColor('#121215')
           })
         }
         .barHeight(60)
-        .padding({ top: this.topAvoidHeight })
         .barMode(BarMode.Fixed)
         .barBackgroundColor('#17171c')
         .onChange((index: number) => {

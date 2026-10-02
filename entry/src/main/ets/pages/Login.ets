@@ -273,6 +273,7 @@ export struct Login {
         await this.finishLogin(response, true)
       }
     } catch (_error) {
+      console.error(_error)
       this.qrStatus = '连接中断，正在重试…'
     }
   }

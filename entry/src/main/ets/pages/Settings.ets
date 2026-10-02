@@ -6,6 +6,24 @@ import { BubbleTip } from '../services/BubbleTip'
 import { PlayerStore } from '../stores/PlayerStore'
 
 @Component
+struct QualitySelector {
+  @Link selected: string
+
+  build() {
+    Flex({ wrap: FlexWrap.Wrap }) {
+      ForEach(QUALITY_OPTIONS, (item: QualityOption) => {
+        Button(item.title)
+          .fontSize(12).fontColor(this.selected === item.level ? '#ffffff' : '#9a9aa2')
+          .constraintSize({ minHeight: 44 }).padding({ left: 14, right: 14 })
+          .backgroundColor(this.selected === item.level ? '#ef233c' : '#29292f')
+          .borderRadius(22).margin({ right: 8, bottom: 8 })
+          .onClick(() => this.selected = item.level)
+      }, (item: QualityOption) => item.level)
+    }.width('100%').constraintSize({ minHeight: 52 })
+  }
+}
+
+@Component
 export struct SettingsPage {
   @Consume('pageStack') pageStack: NavPathStack
   @Consume('topAvoidHeight') topAvoidHeight: number
@@ -56,20 +74,6 @@ export struct SettingsPage {
     }
   }
 
-  @Builder
-  private QualitySelector(selected: string, onSelect: (level: string) => void) {
-    Scroll() {
-      Row({ space: 8 }) {
-        ForEach(QUALITY_OPTIONS, (item: QualityOption) => {
-          Text(item.title).fontSize(12).fontColor(selected === item.level ? '#ffffff' : '#9a9aa2')
-            .padding({ left: 14, right: 14, top: 9, bottom: 9 })
-            .backgroundColor(selected === item.level ? '#ef233c' : '#29292f').borderRadius(18)
-            .onClick(() => onSelect(item.level))
-        }, (item: QualityOption) => item.level)
-      }
-    }.width('100%').scrollable(ScrollDirection.Horizontal).scrollBar(BarState.Off)
-  }
-
   build() {
     NavDestination() {
       Column() {
@@ -80,7 +84,7 @@ export struct SettingsPage {
           Text('设置').layoutWeight(1).fontSize(18).fontWeight(FontWeight.Bold)
             .fontColor('#ffffff').textAlign(TextAlign.Center)
           Column().width(24)
-        }.height(56).width('100%').padding({ left: 16, right: 16 })
+        }.height(56).constraintSize({ minHeight: 56 }).width('100%').padding({ left: 16, right: 16 })
         Scroll() {
           Column({ space: 16 }) {
             Column({ space: 12 }) {
@@ -96,11 +100,9 @@ export struct SettingsPage {
                 })
               }.width('100%')
               Text('在线播放音质').width('100%').fontSize(12).fontColor('#b9b9c0')
-              this.QualitySelector(this.defaultOnlineQuality,
-                (level: string) => this.defaultOnlineQuality = level)
+              QualitySelector({ selected: $defaultOnlineQuality })
               Text('下载音质').width('100%').fontSize(12).fontColor('#b9b9c0')
-              this.QualitySelector(this.defaultDownloadQuality,
-                (level: string) => this.defaultDownloadQuality = level)
+              QualitySelector({ selected: $defaultDownloadQuality })
               Button('保存默认播放设置').width('100%').height(46).borderRadius(23)
                 .backgroundColor('#ef233c').onClick(() => this.savePlaybackDefaults())
             }.width('100%').padding(18).backgroundColor('#1b1b20').borderRadius(20)
@@ -128,8 +130,8 @@ export struct SettingsPage {
               Button('保存 AI 模型连接').width('100%').height(46).borderRadius(23)
                 .backgroundColor('#ef233c').onClick(() => this.saveAiConnection())
             }.width('100%').padding(18).backgroundColor('#1b1b20').borderRadius(20)
-          }.padding({ left: 16, right: 16, top: 12, bottom: 32 })
-        }.layoutWeight(1)
+          }.width('100%').padding({ left: 16, right: 16, top: 12, bottom: 32 })
+        }.width('100%').layoutWeight(1)
       }.width('100%').height('100%').backgroundColor('#121215')
     }.hideTitleBar(true)
   }

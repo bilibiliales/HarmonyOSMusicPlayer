@@ -41,7 +41,7 @@ export class AppSettings {
   private static readonly DEFAULT_ONLINE_QUALITY_KEY: string = 'default_online_quality'
   private static readonly DEFAULT_DOWNLOAD_QUALITY_KEY: string = 'default_download_quality'
 
-  static aiBaseUrl: string = 'https://api.openai.com/v1'
+  static aiBaseUrl: string = 'https://zm.wwoyun.cn'
   static aiApiKey: string = ''
   static aiModel: string = 'gpt-3.5-turbo'
   static defaultPlayMode: PlayMode = PlayMode.LOOP

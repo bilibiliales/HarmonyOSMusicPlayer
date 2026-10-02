@@ -2,35 +2,12 @@ import { uiMaterial } from '@kit.ArkUI'
 import { deviceInfo } from '@kit.BasicServicesKit'
 import { PlayerStore } from '../stores/PlayerStore'
 import { playerController } from '../services/PlayerController'
+import { VinylRecord } from './VinylRecord'
 
 @Component
 export struct FloatingMusicCard {
-  @Consume('playerStore') @Watch('onPlayingChanged') playerStore: PlayerStore
+  @Consume('playerStore') playerStore: PlayerStore
   onOpen: () => void = () => {}
-  @State vinylAngle: number = 0
-  private rotationTimer: number = -1
-
-  aboutToDisappear(): void {
-    if (this.rotationTimer !== -1) {
-      clearInterval(this.rotationTimer)
-      this.rotationTimer = -1
-    }
-  }
-
-  private onPlayingChanged(): void {
-    this.syncRotation()
-  }
-
-  private syncRotation(): void {
-    if (this.playerStore.isPlaying && this.rotationTimer === -1) {
-      this.rotationTimer = setInterval(() => {
-        this.vinylAngle = (this.vinylAngle + 0.8) % 360
-      }, 16)
-    } else if (!this.playerStore.isPlaying && this.rotationTimer !== -1) {
-      clearInterval(this.rotationTimer)
-      this.rotationTimer = -1
-    }
-  }
 
   build() {
     if (this.playerStore.queue.length === 0) {
@@ -54,13 +31,11 @@ export struct FloatingMusicCard {
     } else {
       Row({ space: 10 }) {
         Stack() {
-          Image($r('app.media.ic_cd')).width(44).height(44)
-          if (this.playerStore.currentSong.img) {
-            Image(this.playerStore.currentSong.img).width(28).height(28).borderRadius(14)
-              .objectFit(ImageFit.Cover).rotate({ angle: this.vinylAngle })
-          } else {
-            SymbolGlyph($r('sys.symbol.music')).fontSize(16).fontColor(['#ffffff'])
-          }
+          VinylRecord({
+            coverUrl: this.playerStore.currentSong.img,
+            isPlaying: this.playerStore.isPlaying && !this.playerStore.isLoading,
+            diameter: 44
+          })
         }
         .width(48).height(48).onClick(() => this.onOpen())
 
@@ -90,7 +65,6 @@ export struct FloatingMusicCard {
         interactive: true
       }) : uiMaterial.Material.empty)
       .shadow({ radius: 40, color: 'rgba(0,0,0,0.32)', offsetY: 8 })
-      .onAppear(() => this.syncRotation())
     }
   }
 }

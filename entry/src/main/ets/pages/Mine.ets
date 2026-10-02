@@ -73,6 +73,7 @@ export interface UserProfile {
 @Component
 export struct Mine {
   @Consume('pageStack') pageStack: NavPathStack
+  @Consume('topAvoidHeight') topAvoidHeight: number
   @Consume('authStore') @Watch('onAuthStoreChanged') authStore: AuthStore
   @Consume('playerStore') playerStore: PlayerStore
 
@@ -1216,18 +1217,20 @@ export struct Mine {
       }
       .width('100%')
       .alignItems(HorizontalAlign.Center)
-      .padding({ top: 32, bottom: 16 })
+      .padding({ top: this.topAvoidHeight + 32, bottom: 16 })
 
       if (this.authStore.loggedIn) {
         Stack() {
           SymbolGlyph($r('sys.symbol.square_and_pencil')).fontSize(19).fontColor(['#ffffff'])
         }
         .width(40).height(40).borderRadius(14).backgroundColor('rgba(20,20,25,0.55)')
-        .position({ right: 18, top: 28 }).onClick(() => this.openProfileEditor())
+        .position({ right: 18, top: this.topAvoidHeight + 28 }).onClick(() => this.openProfileEditor())
       }
     }
     .width('100%')
-    .height(220)
+    .height(this.topAvoidHeight + 220)
+    .constraintSize({ minHeight: this.topAvoidHeight + 220 })
+    .flexShrink(0)
     .onClick(() => {
       if (!this.authStore.loggedIn) {
         this.pageStack.pushPathByName('LoginPage', null)

@@ -27,6 +27,7 @@ import { playerController } from '../services/PlayerController'
 import { AuthStore } from '../stores/AuthStore'
 import { PlayerStore } from '../stores/PlayerStore'
 import { ShareSheet } from '../components/ShareSheet'
+import { VinylRecord } from '../components/VinylRecord'
 import { AppSettings } from '../services/AppSettings'
 import { BubbleTip } from '../services/BubbleTip'
 import { RectShape } from '@kit.ArkUI'
@@ -45,7 +46,7 @@ export struct Play {
   @State commentInput: string = ''
   @State commentSubmitting: boolean = false
   @State liked: boolean = false
-  @State vinylAngle: number = 0
+  @State vinylDiameter: number = 280
   @State downloadProgress: number = 0
   @State shareSheetVisible: boolean = false
   @State showLyrics: boolean = false
@@ -74,7 +75,6 @@ export struct Play {
   @State progressSeeking: boolean = false
   @State seekPreviewPosition: number = 0
   private shareParam: SharePageParam = { type: 'song', id: '', name: '', img: '' }
-  private rotationTimer: number = -1
   private lyricTimer: number = -1
   private lyricResumeTimer: number = -1
   private lyricAutoScrollTimer: number = -1
@@ -102,14 +102,9 @@ export struct Play {
     this.loadLikedState()
     this.loadLyrics()
     this.startLyricTracking()
-    this.syncRotation()
   }
 
   aboutToDisappear(): void {
-    if (this.rotationTimer !== -1) {
-      clearInterval(this.rotationTimer)
-      this.rotationTimer = -1
-    }
     if (this.lyricTimer !== -1) {
       clearInterval(this.lyricTimer)
       this.lyricTimer = -1
@@ -121,17 +116,6 @@ export struct Play {
     if (this.lyricAutoScrollTimer !== -1) {
       clearTimeout(this.lyricAutoScrollTimer)
       this.lyricAutoScrollTimer = -1
-    }
-  }
-
-  private syncRotation(): void {
-    if (this.playerStore.isPlaying && this.rotationTimer === -1) {
-      this.rotationTimer = setInterval(() => {
-        this.vinylAngle = (this.vinylAngle + 0.55) % 360
-      }, 16)
-    } else if (!this.playerStore.isPlaying && this.rotationTimer !== -1) {
-      clearInterval(this.rotationTimer)
-      this.rotationTimer = -1
     }
   }
 
@@ -1204,14 +1188,12 @@ export struct Play {
       this.switchingSong = false
       return
     }
-    this.vinylAngle = 0
     this.liked = this.playerStore.currentSong.liked || false
     this.loadComments()
     this.loadLyrics()
     this.loadRedCount()
     this.loadMusicQualities()
     this.loadLikedState()
-    this.syncRotation()
     if (!animateVinyl) {
       this.switchingSong = false
       return
@@ -1239,7 +1221,6 @@ export struct Play {
     this.loadRedCount()
     this.loadMusicQualities()
     this.loadLikedState()
-    this.syncRotation()
   }
 
   @Builder
@@ -1856,6 +1837,7 @@ export struct Play {
             colors: [['rgba(12,12,16,0.42)', 0], ['rgba(15,15,20,0.82)', 0.58], ['#121215', 1]]
           })
 
+        Scroll() {
         Column() {
           if (!this.lyricsImmersive) {
             Column().width('100%').height(this.topAvoidHeight)
@@ -1880,6 +1862,7 @@ export struct Play {
             }
             .width('100%')
             .height(58)
+            .constraintSize({ minHeight: 58 })
             .padding({ left: 18, right: 18 })
           }
 
@@ -1888,19 +1871,14 @@ export struct Play {
           } else {
             Column({ space: 14 }) {
               Stack() {
-                Image($r('app.media.ic_cd'))
-                  .width('100%')
-                  .height('100%')
-                Image(this.playerStore.currentSong.img)
-                  .width('63%')
-                  .height('63%')
-                  .borderRadius(160)
-                  .objectFit(ImageFit.Cover)
+                VinylRecord({
+                  coverUrl: this.playerStore.currentSong.img,
+                  isPlaying: this.playerStore.isPlaying && !this.playerStore.isLoading,
+                  diameter: this.vinylDiameter
+                })
               }
-              .width('78%')
-              .borderRadius(180)
-              .aspectRatio(1)
-              .rotate({ angle: this.vinylAngle })
+              .width(this.vinylDiameter).height(this.vinylDiameter)
+              .borderRadius('50%')
               .translate({ x: this.vinylOffsetX })
               .opacity(this.vinylOpacity)
               .shadow({
@@ -1925,8 +1903,14 @@ export struct Play {
               .backgroundColor('rgba(255,255,255,0.07)')
               .borderRadius(15)
             }
+            .width('100%')
             .layoutWeight(1)
+            .constraintSize({ minHeight: 220 })
             .justifyContent(FlexAlign.Center)
+            .onAreaChange((_oldArea: Area, newArea: Area) => {
+              this.vinylDiameter = Math.max(1,
+                Math.min(360, Number(newArea.width) * 0.78, Number(newArea.height) - 64))
+            })
             .onClick(() => this.openLyrics())
           }
 
@@ -1980,6 +1964,7 @@ export struct Play {
             })
             }
             .width('100%')
+            .constraintSize({ minHeight: 70 })
             .padding({ left: 24, right: 24, bottom: 12 })
 
             Column({ space: 2 }) {
@@ -2010,6 +1995,7 @@ export struct Play {
             .width('100%')
             .justifyContent(FlexAlign.SpaceBetween)
             }
+            .constraintSize({ minHeight: 60 })
             .padding({ left: 20, right: 20 })
 
             Row() {
@@ -2040,10 +2026,7 @@ export struct Play {
             }
             .width(72)
             .height(72)
-            .onClick(() => {
-              playerController.toggle()
-              setTimeout(() => this.syncRotation(), 120)
-            })
+            .onClick(() => playerController.toggle())
 
             SymbolGlyph($r('sys.symbol.forward_end_fill'))
               .fontSize(31)
@@ -2062,6 +2045,7 @@ export struct Play {
             }
             .width('100%')
             .height(94)
+            .constraintSize({ minHeight: 94 })
             .justifyContent(FlexAlign.SpaceAround)
             .alignItems(VerticalAlign.Center)
 
@@ -2074,6 +2058,7 @@ export struct Play {
             })
             }
             .width('100%')
+            .constraintSize({ minHeight: 60 })
             .padding({ left: 16, right: 16, bottom: 18 })
 
             if (this.playerStore.errorMessage) {
@@ -2088,6 +2073,10 @@ export struct Play {
         }
         .width('100%')
         .height('100%')
+        .constraintSize({ minHeight: this.lyricsImmersive ? 0 : this.topAvoidHeight + 660 })
+        }
+        .width('100%').height('100%').scrollBar(BarState.Off)
+        .scrollable(this.lyricsImmersive ? ScrollDirection.None : ScrollDirection.Vertical)
 
         if (this.activeSheet) {
           this.BottomSheet()

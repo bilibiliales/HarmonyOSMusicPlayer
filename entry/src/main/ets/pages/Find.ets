@@ -50,6 +50,13 @@ struct Find {
     })
   }
 
+  private sectionTransition(): TransitionEffect {
+    return TransitionEffect.asymmetric(
+      TransitionEffect.translate({ x: this.transitionDirection < 0 ? '100%' : '-100%' }),
+      TransitionEffect.translate({ x: this.transitionDirection < 0 ? '-100%' : '100%' })
+    ).animation({ duration: 280, curve: Curve.EaseOut })
+  }
+
   private sectionSubtitle(): string {
     if (this.currentSection === 1) {
       return '官方榜单、歌手榜与热门排行'
@@ -270,6 +277,7 @@ struct Find {
       .onClick(() => this.pageStack.pushPathByName('SearchPage', null))
     }
     .width('100%').padding({ left: 16, right: 16, top: 14, bottom: 5 })
+    .constraintSize({ minHeight: 72 }).flexShrink(0)
   }
 
   @Builder
@@ -287,7 +295,8 @@ struct Find {
             .onClick(() => this.switchSection(index))
         })
       }.padding({ left: 8, right: 8 })
-    }.width('100%').scrollable(ScrollDirection.Horizontal).scrollBar(BarState.Off)
+    }.width('100%').height(46).constraintSize({ minHeight: 46 })
+      .scrollable(ScrollDirection.Horizontal).scrollBar(BarState.Off)
       .backgroundColor('#17171c')
   }
 
@@ -461,36 +470,24 @@ struct Find {
         Column() {
           this.DiscoverContent()
         }.width('100%').height('100%')
-          .transition(TransitionEffect.OPACITY
-            .combine(TransitionEffect.translate({ x: this.transitionDirection * 52 }))
-            .animation({ duration: 280, curve: Curve.EaseOut }))
+          .transition(this.sectionTransition())
       } else if (this.currentSection === 1) {
         RankingPage({ embedded: true })
-          .transition(TransitionEffect.OPACITY
-            .combine(TransitionEffect.translate({ x: this.transitionDirection * 52 }))
-            .animation({ duration: 280, curve: Curve.EaseOut }))
+          .transition(this.sectionTransition())
       } else if (this.currentSection === 2) {
         StylePage({ embedded: true })
-          .transition(TransitionEffect.OPACITY
-            .combine(TransitionEffect.translate({ x: this.transitionDirection * 52 }))
-            .animation({ duration: 280, curve: Curve.EaseOut }))
+          .transition(this.sectionTransition())
       } else if (this.currentSection === 3) {
         RadioPage({ embedded: true })
-          .transition(TransitionEffect.OPACITY
-            .combine(TransitionEffect.translate({ x: this.transitionDirection * 52 }))
-            .animation({ duration: 280, curve: Curve.EaseOut }))
+          .transition(this.sectionTransition())
       } else if (this.currentSection === 4) {
         DigitalAlbumPage({ embedded: true })
-          .transition(TransitionEffect.OPACITY
-            .combine(TransitionEffect.translate({ x: this.transitionDirection * 52 }))
-            .animation({ duration: 280, curve: Curve.EaseOut }))
+          .transition(this.sectionTransition())
       } else {
         SatiPage({ embedded: true })
-          .transition(TransitionEffect.OPACITY
-            .combine(TransitionEffect.translate({ x: this.transitionDirection * 52 }))
-            .animation({ duration: 280, curve: Curve.EaseOut }))
+          .transition(this.sectionTransition())
       }
-    }.width('100%').height('100%')
+    }.width('100%').layoutWeight(1).constraintSize({ minHeight: 120 }).clip(true)
   }
 
   build() {

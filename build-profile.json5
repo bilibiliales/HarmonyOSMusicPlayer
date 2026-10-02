@@ -20,6 +20,34 @@
         "name": "debug"
       }
     ],
+    "signingConfigs": [
+      {
+        "name": "default",
+        "type": "HarmonyOS",
+        "material": {
+          "certpath": "C:\\Users\\User\\.ohos\\config\\default_HarmonyOSMusicPlayer_ro2HojgEsmrnd4HHLa4eTyLqRffLdCce4yuTacdcoFw=.cer",
+          "keyAlias": "debugKey",
+          "keyPassword": "0000001A9F9F2242BB1D00F5D21355D4E5728124AEB9D3884929FB235D457BB312B473B3D2B5AE716F38",
+          "profile": "C:\\Users\\User\\.ohos\\config\\default_HarmonyOSMusicPlayer_ro2HojgEsmrnd4HHLa4eTyLqRffLdCce4yuTacdcoFw=.p7b",
+          "signAlg": "SHA256withECDSA",
+          "storeFile": "C:\\Users\\User\\.ohos\\config\\default_HarmonyOSMusicPlayer_ro2HojgEsmrnd4HHLa4eTyLqRffLdCce4yuTacdcoFw=.p12",
+          "storePassword": "0000001A46994E731CF2CE6FEE467E547C522121EBB1FE519A4ACBECE2B686EAC3F1D5E592881F4EE5B9"
+        }
+      },
+      {
+        "name": "music",
+        "type": "HarmonyOS",
+        "material": {
+          "certpath": "C:\\Users\\User\\.ohos\\config\\music_HarmonyOSMusicPlayer_ro2HojgEsmrnd4HHLa4eTyLqRffLdCce4yuTacdcoFw=.cer",
+          "keyAlias": "debugKey",
+          "keyPassword": "0000001A2375433A8A0495F9FAF068FC3B99E4C378C4D015EE99E23A270BFF8BE7902C3AFA159B22FBBB",
+          "profile": "C:\\Users\\User\\.ohos\\config\\music_HarmonyOSMusicPlayer_ro2HojgEsmrnd4HHLa4eTyLqRffLdCce4yuTacdcoFw=.p7b",
+          "signAlg": "SHA256withECDSA",
+          "storeFile": "C:\\Users\\User\\.ohos\\config\\music_HarmonyOSMusicPlayer_ro2HojgEsmrnd4HHLa4eTyLqRffLdCce4yuTacdcoFw=.p12",
+          "storePassword": "0000001A56749BC9C7DC4B25FB051BD2721791310A87FAD218E907C1CAB5D48AB7AC1A224E5C5C33F9E8"
+        }
+      }
+    ]
   },
   "modules": [
     {
