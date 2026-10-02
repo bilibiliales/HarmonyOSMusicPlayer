@@ -4,6 +4,7 @@ import { ApiClient } from '../services/ApiClient'
 import { AppSettings } from '../services/AppSettings'
 import { BubbleTip } from '../services/BubbleTip'
 import { PlayerStore } from '../stores/PlayerStore'
+import { playerController } from '../services/PlayerController'
 
 @Component
 struct QualitySelector {
@@ -35,6 +36,23 @@ export struct SettingsPage {
   @State defaultPlayMode: PlayMode = AppSettings.defaultPlayMode
   @State defaultOnlineQuality: string = AppSettings.defaultOnlineQuality
   @State defaultDownloadQuality: string = AppSettings.defaultDownloadQuality
+  @State backgroundPlaybackEnabled: boolean = AppSettings.backgroundPlaybackEnabled
+  @State changingPlayback: boolean = false
+
+  private async changeBackgroundPlayback(enabled: boolean): Promise<void> {
+    if (this.changingPlayback || enabled === AppSettings.backgroundPlaybackEnabled) { return }
+    this.changingPlayback = true
+    try {
+      const context = this.getUIContext().getHostContext() as common.UIAbilityContext
+      await playerController.setBackgroundPlayback(context, enabled)
+      BubbleTip.show(this.getUIContext(), enabled ? '已开启后台播放，请重新点击播放' : '已切换为前台 MP3 播放，请重新点击播放')
+    } catch (error) {
+      BubbleTip.show(this.getUIContext(), error instanceof Error ? error.message : '切换播放方式失败')
+    } finally {
+      this.backgroundPlaybackEnabled = AppSettings.backgroundPlaybackEnabled
+      this.changingPlayback = false
+    }
+  }
 
   private async savePlaybackDefaults(): Promise<void> {
     try {
@@ -43,6 +61,10 @@ export struct SettingsPage {
         this.defaultDownloadQuality)
       this.playerStore.playMode = this.defaultPlayMode
       this.playerStore.quality = this.defaultOnlineQuality
+      if (!AppSettings.backgroundPlaybackEnabled &&
+        (this.defaultOnlineQuality === 'lossless' || this.defaultOnlineQuality === 'hires')) {
+        this.playerStore.quality = 'exhigh'
+      }
       BubbleTip.show(this.getUIContext(), '默认播放设置已保存并应用')
     } catch (error) {
       BubbleTip.show(this.getUIContext(), error instanceof Error ? error.message : '默认播放设置保存失败')
@@ -89,6 +111,14 @@ export struct SettingsPage {
           Column({ space: 16 }) {
             Column({ space: 12 }) {
               Text('默认播放设置').width('100%').fontSize(16).fontWeight(FontWeight.Bold).fontColor('#ffffff')
+              Row({ space: 12 }) {
+                Text('开启后台播放').layoutWeight(1).fontSize(14).fontColor('#ffffff')
+                Toggle({ type: ToggleType.Switch, isOn: this.backgroundPlaybackEnabled })
+                  .selectedColor('#ef233c').enabled(!this.changingPlayback)
+                  .onChange((enabled: boolean) => this.changeBackgroundPlayback(enabled))
+              }.width('100%')
+              Text('关闭后使用实验性前台 MP3 播放，切到后台即停止；切换方式会中断当前播放。')
+                .width('100%').fontSize(12).fontColor('#b9b9c0')
               Text('播放顺序').width('100%').fontSize(12).fontColor('#b9b9c0')
               Row({ space: 8 }) {
                 ForEach([PlayMode.LOOP, PlayMode.SINGLE, PlayMode.SHUFFLE], (mode: PlayMode) => {
@@ -109,7 +139,7 @@ export struct SettingsPage {
 
             Column({ space: 10 }) {
               Text('后端服务').width('100%').fontSize(16).fontWeight(FontWeight.Bold).fontColor('#ffffff')
-              TextInput({ text: this.serverUrl, placeholder: 'https://apis.netstart.cn/music' })
+              TextInput({ text: this.serverUrl, placeholder: 'https://zm.wwoyun.cn' })
                 .height(50).fontColor('#ffffff').placeholderColor('#66666e').backgroundColor('#24242a')
                 .borderRadius(14).onChange((value: string) => this.serverUrl = value)
               Button('保存服务地址').width('100%').height(46).borderRadius(23)

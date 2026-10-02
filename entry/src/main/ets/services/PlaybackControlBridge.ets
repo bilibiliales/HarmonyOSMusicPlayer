@@ -28,6 +28,11 @@ export class PlaybackControlBridge {
     }
   }
 
+  static unsubscribe(): void {
+    PlaybackControlBridge.handler = undefined
+    PlaybackControlBridge.pendingAction = undefined
+  }
+
   static async getPlaybackWantAgent(action: PlaybackAction): Promise<WantAgent> {
     if (action === 'play' && PlaybackControlBridge.playAgent) {
       return PlaybackControlBridge.playAgent

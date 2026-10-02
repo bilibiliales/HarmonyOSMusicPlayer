@@ -3,7 +3,7 @@ import { PiPWindow } from '@kit.ArkUI'
 import { request } from '@kit.BasicServicesKit'
 import { fileIo, picker } from '@kit.CoreFileKit'
 import { media } from '@kit.MediaKit'
-import { systemShare } from '@kit.ShareKit'
+import { SystemShareService, NearbyShareSession, ShareLink } from '../services/SystemShareService'
 import {
   CommentApiItem,
   CommentResponse,
@@ -431,22 +431,18 @@ export struct MvPlayerPage {
 
   private async shareMv(): Promise<void> {
     try {
-      const record: systemShare.SharedRecord = {
-        utd: 'general.plain-text',
-        title: this.mvName || 'MV',
-        content: `分享 MV「${this.mvName || 'MV'}」\nhttps://music.163.com/#/mv?id=${this.mvId}`
-      }
-      const data = new systemShare.SharedData(record)
-      const controller = new systemShare.ShareController(data)
-      const options: systemShare.ShareControllerOptions = {
-        selectionMode: systemShare.SelectionMode.SINGLE,
-        previewMode: systemShare.SharePreviewMode.DEFAULT
-      }
       const context = this.getUIContext().getHostContext() as common.UIAbilityContext
-      await controller.show(context, options)
+      await SystemShareService.showLink(context, this.mvShareLink())
     } catch (error) {
       this.actionMessage = error instanceof Error ? error.message : '无法打开系统分享面板'
     }
+  }
+
+  private nearbyShare: NearbyShareSession = new NearbyShareSession()
+
+  private mvShareLink(): ShareLink {
+    return { url: `https://music.163.com/mv?id=${encodeURIComponent(this.mvId)}`,
+      title: this.mvName || 'MV', description: this.mvArtistName || '分享 MV', label: 'MV', image: this.mvCover }
   }
 
   private async openComments(): Promise<void> {
@@ -854,5 +850,7 @@ export struct MvPlayerPage {
         onDisappear: () => this.commentSheetVisible = false
       })
     }.hideTitleBar(true)
+    .onShown(() => this.nearbyShare.activate(() => SystemShareService.linkRecords(this.mvShareLink())))
+    .onHidden(() => this.nearbyShare.deactivate())
   }
 }

@@ -1,5 +1,5 @@
 import { common } from '@kit.AbilityKit'
-import { systemShare } from '@kit.ShareKit'
+import { SystemShareService, NearbyShareSession } from '../services/SystemShareService'
 import {
   MsgRecentContactResponse,
   MsgRecentContactUser,
@@ -21,27 +21,26 @@ export struct ShareSheet {
   @State contactsVisible: boolean = false
   @State contacts: MsgRecentContactUser[] = []
   @State contactsLoading: boolean = false
+  @State preparingSystemShare: boolean = false
+  private nearbyShare: NearbyShareSession = new NearbyShareSession()
   onClose: () => void = () => {}
 
+  aboutToAppear(): void {
+    this.nearbyShare.activate(() => SystemShareService.linkRecords(SystemShareService.musicLink(this.shareParam)))
+  }
+
+  aboutToDisappear(): void { this.nearbyShare.deactivate() }
+
   private async shareSystem(): Promise<void> {
+    if (this.preparingSystemShare) { return }
+    this.preparingSystemShare = true
+    this.shareMessage = ''
     try {
-      const typeLabel = this.shareParam.type === 'song' ? '歌曲' : this.shareParam.type === 'playlist' ? '歌单' : '专辑'
-      const typePath = this.shareParam.type === 'playlist' ? 'playlist' : this.shareParam.type === 'album' ? 'album' : 'song'
-      const record: systemShare.SharedRecord = {
-        utd: 'general.plain-text',
-        title: this.shareParam.name,
-        content: `分享${typeLabel}「${this.shareParam.name}」\nhttps://music.163.com/${typePath}?id=${this.shareParam.id}`
-      }
-      const data = new systemShare.SharedData(record)
-      const controller = new systemShare.ShareController(data)
-      const options: systemShare.ShareControllerOptions = {
-        selectionMode: systemShare.SelectionMode.SINGLE,
-        previewMode: systemShare.SharePreviewMode.DEFAULT
-      }
-      await controller.show(this.getUIContext().getHostContext() as common.UIAbilityContext, options)
+      await SystemShareService.showLink(this.getUIContext().getHostContext() as common.UIAbilityContext,
+        SystemShareService.musicLink(this.shareParam))
     } catch (error) {
       this.shareMessage = error instanceof Error ? error.message : '无法打开系统分享面板'
-    }
+    } finally { this.preparingSystemShare = false }
   }
 
   private async shareToDynamic(): Promise<void> {
@@ -192,11 +191,13 @@ export struct ShareSheet {
           .width('100%').padding({ left: 20, right: 20 })
         } else {
           Row({ space: 16 }) {
-            this.ShareOption($r('sys.symbol.share'), '系统分享', () => this.shareSystem())
+            this.ShareOption($r('sys.symbol.share'), this.preparingSystemShare ? '准备分享…' : '系统分享', () => this.shareSystem())
             this.ShareOption($r('sys.symbol.ellipsis_bubble'), '私信分享', () => this.openContacts())
             this.ShareOption($r('sys.symbol.textformat'), '动态分享', () => this.shareToDynamic())
           }
           .width('100%').justifyContent(FlexAlign.Center).padding({ left: 20, right: 20 })
+          Text('支持的设备可在此碰一碰分享或隔空传送')
+            .fontSize(11).fontColor('#9999a0').margin({ top: 12 })
         }
 
         if (this.shareMessage) {

@@ -4,6 +4,7 @@ import { window } from '@kit.ArkUI';
 import { AppSettings } from '../services/AppSettings';
 import { playerController } from '../services/PlayerController';
 import { PlaybackControlBridge } from '../services/PlaybackControlBridge';
+import { NearbyShareSession } from '../services/SystemShareService';
 
 const DOMAIN = 0x0000;
 
@@ -29,6 +30,7 @@ export default class EntryAbility extends UIAbility {
   }
 
   onDestroy(): void {
+    playerController.release().catch((error: Error) => console.error(error.message));
     hilog.info(DOMAIN, 'testTag', '%{public}s', 'Ability onDestroy');
   }
 
@@ -68,11 +70,14 @@ export default class EntryAbility extends UIAbility {
   }
 
   onForeground(): void {
+    NearbyShareSession.setForeground(true);
+    playerController.onAppForeground();
     // Ability has brought to foreground
     hilog.info(DOMAIN, 'testTag', '%{public}s', 'Ability onForeground');
   }
 
   onBackground(): void {
+    NearbyShareSession.setForeground(false);
     playerController.onAppBackground();
     hilog.info(DOMAIN, 'testTag', '%{public}s', 'Ability onBackground');
   }

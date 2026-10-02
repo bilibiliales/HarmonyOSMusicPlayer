@@ -3,6 +3,8 @@ import { fileIo, fileUri } from '@kit.CoreFileKit'
 import { photoAccessHelper } from '@kit.MediaLibraryKit'
 import { http } from '@kit.NetworkKit'
 import { systemShare } from '@kit.ShareKit'
+import { uniformTypeDescriptor } from '@kit.ArkData'
+import { SystemShareService, NearbyShareSession } from '../services/SystemShareService'
 import {
   AlbumPageParam,
   ArtistPageParam,
@@ -525,30 +527,35 @@ export struct SongWiki {
     this.previewActionRunning = true
     this.previewMessage = '正在准备全部乐谱页…'
     try {
-      const records: systemShare.SharedRecord[] = []
-      for (let index = 0; index < this.previewPages.length; index++) {
-        this.previewMessage = `正在准备分享第 ${index + 1}/${this.previewPages.length} 页…`
-        const uri = await this.cachePreviewPage(this.previewPages[index])
-        records.push({
-          utd: 'general.jpeg',
-          uri: uri,
-          title: `${this.song.name} - ${this.selectedSheet.name} - 第 ${index + 1} 页`,
-          description: `${this.sheetMeta(this.selectedSheet)}，共 ${this.previewPages.length} 页`
-        })
-      }
-      const data = new systemShare.SharedData(records[0])
-      for (let index = 1; index < records.length; index++) {
-        data.addRecord(records[index])
-      }
-      const controller = new systemShare.ShareController(data)
       const context = this.getUIContext().getHostContext() as common.UIAbilityContext
-      await controller.show(context, {})
+      await SystemShareService.show(context, await this.scoreShareRecords())
       this.previewMessage = ''
     } catch (error) {
       this.previewMessage = error instanceof Error ? error.message : '分享乐谱失败'
     } finally {
       this.previewActionRunning = false
     }
+  }
+
+  private nearbyShare: NearbyShareSession = new NearbyShareSession()
+
+  private async scoreShareRecords(): Promise<systemShare.SharedRecord[]> {
+    const sheet = this.selectedSheet
+    const pages = this.previewPages.slice()
+    if (!sheet || !pages.length || pages.length > SystemShareService.MAX_RECORDS) {
+      throw new Error('请选择 1 至 500 页乐谱进行分享')
+    }
+    const records: systemShare.SharedRecord[] = []
+    for (let index = 0; index < pages.length; index++) {
+      const uri = await this.cachePreviewPage(pages[index])
+      records.push({
+        utd: uniformTypeDescriptor.UniformDataType.JPEG, uri: uri, thumbnailUri: uri,
+        title: `${this.song.name} - ${sheet.name} - 第 ${index + 1} 页`,
+        description: `${this.sheetMeta(sheet)}，共 ${pages.length} 页`
+      })
+      SystemShareService.validate(records)
+    }
+    return records
   }
 
   private async saveScoreToGallery(): Promise<void> {
@@ -1247,6 +1254,11 @@ export struct SongWiki {
       })
     }
     .hideTitleBar(true)
+    .onShown(() => this.nearbyShare.activate(async () => {
+      if (!this.scoreSheetVisible || this.previewLoading) { throw new Error('请先打开乐谱预览') }
+      return await this.scoreShareRecords()
+    }))
+    .onHidden(() => this.nearbyShare.deactivate())
   }
 }
 

@@ -40,6 +40,9 @@ export class AppSettings {
   private static readonly DEFAULT_PLAY_MODE_KEY: string = 'default_play_mode'
   private static readonly DEFAULT_ONLINE_QUALITY_KEY: string = 'default_online_quality'
   private static readonly DEFAULT_DOWNLOAD_QUALITY_KEY: string = 'default_download_quality'
+  private static readonly BACKGROUND_PLAYBACK_KEY: string = 'background_playback_enabled'
+
+  static backgroundPlaybackEnabled: boolean = true
 
   static aiBaseUrl: string = 'https://zm.wwoyun.cn'
   static aiApiKey: string = ''
@@ -51,6 +54,8 @@ export class AppSettings {
 
   static async load(context: common.Context): Promise<void> {
     const store = await preferences.getPreferences(context, AppSettings.STORE_NAME)
+    const backgroundValue = await store.get(AppSettings.BACKGROUND_PLAYBACK_KEY, true)
+    AppSettings.backgroundPlaybackEnabled = typeof backgroundValue === 'boolean' ? backgroundValue : true
     const urlValue = await store.get(AppSettings.API_BASE_URL_KEY, ApiClient.baseUrl)
     if (typeof urlValue === 'string') {
       ApiClient.setBaseUrl(urlValue)
@@ -124,6 +129,13 @@ export class AppSettings {
     const store = await preferences.getPreferences(context, AppSettings.STORE_NAME)
     await store.put(AppSettings.API_BASE_URL_KEY, ApiClient.baseUrl)
     await store.flush()
+  }
+
+  static async saveBackgroundPlayback(context: common.Context, enabled: boolean): Promise<void> {
+    const store = await preferences.getPreferences(context, AppSettings.STORE_NAME)
+    await store.put(AppSettings.BACKGROUND_PLAYBACK_KEY, enabled)
+    await store.flush()
+    AppSettings.backgroundPlaybackEnabled = enabled
   }
 
   static async saveAiSettings(context: common.Context, baseUrl: string, apiKey: string,

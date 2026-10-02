@@ -1,5 +1,5 @@
 import { common } from '@kit.AbilityKit'
-import { systemShare } from '@kit.ShareKit'
+import { SystemShareService, NearbyShareSession, ShareLink } from '../services/SystemShareService'
 import {
   ArtistPageParam,
   EventDetailPageParam,
@@ -507,22 +507,19 @@ export struct UserProfilePage {
       return
     }
     try {
-      const nickname = this.detail?.profile.nickname || '用户'
-      const record: systemShare.SharedRecord = {
-        utd: 'general.plain-text',
-        title: nickname,
-        content: `分享用户「${nickname}」\nhttps://music.163.com/user/home?id=${this.pageParam.uid}`
-      }
-      const data = new systemShare.SharedData(record)
-      const controller = new systemShare.ShareController(data)
-      const options: systemShare.ShareControllerOptions = {
-        selectionMode: systemShare.SelectionMode.SINGLE,
-        previewMode: systemShare.SharePreviewMode.DEFAULT
-      }
-      await controller.show(this.getUIContext().getHostContext() as common.UIAbilityContext, options)
+      await SystemShareService.showLink(this.getUIContext().getHostContext() as common.UIAbilityContext,
+        this.profileShareLink())
     } catch (error) {
       BubbleTip.show(this.getUIContext(), error instanceof Error ? error.message : '无法打开系统分享面板')
     }
+  }
+
+  private nearbyShare: NearbyShareSession = new NearbyShareSession()
+
+  private profileShareLink(): ShareLink {
+    return { url: `https://music.163.com/user/home?id=${encodeURIComponent(this.pageParam.uid)}`,
+      title: this.detail?.profile.nickname || '用户', description: this.detail?.profile.signature || '分享用户主页',
+      label: '用户', image: this.detail?.profile.avatarUrl }
   }
 
   @Builder
@@ -873,5 +870,7 @@ export struct UserProfilePage {
       .width('100%').height('100%')
     }
     .hideTitleBar(true)
+    .onShown(() => this.nearbyShare.activate(() => SystemShareService.linkRecords(this.profileShareLink())))
+    .onHidden(() => this.nearbyShare.deactivate())
   }
 }

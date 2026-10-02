@@ -1,5 +1,4 @@
 import { common } from '@kit.AbilityKit'
-import { systemShare } from '@kit.ShareKit'
 import {
   CommentResponse,
   mapApiSong,
