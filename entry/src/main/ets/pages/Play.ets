@@ -1397,7 +1397,7 @@ export struct Play {
   @Builder
   private QualitySheet() {
     Column() {
-      this.SheetHeader('选择播放音质', '实际音质受歌曲资源与账号权益影响')
+      this.SheetHeader('选择播放音质', `当前：${this.playerStore.qualityTitle()} · 目标：${this.playerStore.requestedQualityTitle()}`)
       if (this.qualityLoading) {
         LoadingProgress().width(36).height(36).color('#ef233c').margin({ top: 28 })
       } else if (this.availableQualities.length === 0) {

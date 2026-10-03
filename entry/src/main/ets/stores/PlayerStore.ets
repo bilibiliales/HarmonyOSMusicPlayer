@@ -115,18 +115,6 @@ export class PlayerStore {
   }
 
   requestedQualityTitle(): string {
-    if (this.quality === 'hires') {
-      return 'Hi-Res'
-    }
-    if (this.quality === 'lossless') {
-      return '无损'
-    }
-    if (this.quality === 'exhigh') {
-      return '极高'
-    }
-    if (this.quality === 'higher') {
-      return '较高'
-    }
-    return '标准'
+    return QUALITY_OPTIONS.find((item) => item.level === this.quality)?.title || '极高'
   }
 }
