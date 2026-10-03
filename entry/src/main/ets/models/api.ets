@@ -74,6 +74,7 @@ export interface ArtistMvResponse {
 }
 
 export interface MvPlayerPageParam {
+  isVideo?: boolean
   id: string
   name: string
   cover?: string
@@ -942,6 +943,7 @@ export interface SongUrlData {
   level: string
   type: string
   size?: number
+  freeTrialInfo?: Object | null
 }
 
 export interface SongUrlResponse {
@@ -1015,6 +1017,10 @@ export interface SongMusicDetailData {
   h?: SongMusicQualityInfo
   sq?: SongMusicQualityInfo
   hr?: SongMusicQualityInfo
+  je?: SongMusicQualityInfo
+  sk?: SongMusicQualityInfo
+  db?: SongMusicQualityInfo
+  jm?: SongMusicQualityInfo
 }
 
 export interface SongMusicDetailResponse {
@@ -1241,6 +1247,7 @@ export function mapPlaylist(item: ApiPlaylist): playlistType {
     count: item.trackCount || 0,
     creator: item.creator?.nickname || '网易云音乐',
     creatorId: item.creator?.userId?.toString() || '',
+    isLiked: item.specialType === 5,
     description: item.description || '',
     tags: item.tags || [],
     privacy: item.privacy || 0

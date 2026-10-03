@@ -2,6 +2,7 @@ import { liveViewManager } from '@kit.LiveViewKit'
 import { WantAgent } from '@kit.AbilityKit'
 import { songItemType } from '../models/music'
 import { PlaybackControlBridge } from './PlaybackControlBridge'
+import { AppSettings } from './AppSettings'
 
 export class LiveViewController {
   private static readonly LIVE_VIEW_ID: number = 10001
@@ -105,13 +106,13 @@ export class LiveViewController {
 
   private static async applySync(revision: number, song: songItemType, isPlaying: boolean,
     position: number, duration: number, verifyActive: boolean = false): Promise<void> {
-    if (revision !== LiveViewController.revision || !await LiveViewController.isLiveViewEnabled()) {
+    if (!AppSettings.backgroundPlaybackEnabled || revision !== LiveViewController.revision || !await LiveViewController.isLiveViewEnabled()) {
       return
     }
     if (verifyActive) {
       await LiveViewController.verifyActiveState()
     }
-    if (revision !== LiveViewController.revision) {
+    if (!AppSettings.backgroundPlaybackEnabled || revision !== LiveViewController.revision) {
       return
     }
     if (!LiveViewController.active) {
@@ -163,6 +164,7 @@ export class LiveViewController {
 
   public static sync(song: songItemType, isPlaying: boolean, position: number = 0,
     duration: number = 0): Promise<void> {
+    if (!AppSettings.backgroundPlaybackEnabled) { return Promise.resolve() }
     LiveViewController.lastSong = song
     LiveViewController.lastPlaying = isPlaying
     LiveViewController.lastPosition = Math.max(0, position)
@@ -178,6 +180,7 @@ export class LiveViewController {
 
   public static refresh(song: songItemType, isPlaying: boolean, position: number = 0,
     duration: number = 0): Promise<void> {
+    if (!AppSettings.backgroundPlaybackEnabled) { return Promise.resolve() }
     LiveViewController.lastSong = song
     LiveViewController.lastPlaying = isPlaying
     LiveViewController.lastPosition = Math.max(0, position)

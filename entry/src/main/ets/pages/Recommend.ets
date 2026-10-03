@@ -31,6 +31,7 @@ import {
 } from '../models'
 import { recommendList, songs } from '../constants'
 import { ApiClient } from '../services/ApiClient'
+import { DiscoveryPlaylistsService } from '../services/DiscoveryPlaylistsService'
 import { playerController } from '../services/PlayerController'
 import { AuthStore } from '../stores/AuthStore'
 import { resizeImageUrl } from '../services/ImageUrl'
@@ -52,7 +53,7 @@ struct Recommend {
   @State dailyPlaylists: playlistType[] = []
   @State dailyRecommendSongs: songItemType[] = []
   @State personalizedNewSongColumns: SongColumn[] = []
-  @State fmColumns: SongColumn[] = []
+  @State radarPlaylists: playlistType[] = []
   @State radioCards: ProgramCard[] = []
   @State programCards: ProgramCard[] = []
   @State privateContents: PrivateContentItem[] = []
@@ -98,7 +99,7 @@ struct Recommend {
       this.loadDailyPlaylists(),
       this.loadDailySongs(),
       this.loadPersonalizedNewSongs(),
-      this.loadPersonalFm(),
+      this.loadRadar(),
       this.loadNewSongCovers(),
       this.loadRadioCards(),
       this.loadProgramCards(),
@@ -316,18 +317,10 @@ struct Recommend {
     }
   }
 
-  private async loadPersonalFm(): Promise<boolean> {
+  private async loadRadar(): Promise<boolean> {
     try {
-      const response = await ApiClient.get<PersonalFmResponse>('/personal_fm')
-      if (response.code === 200 && response.data?.length) {
-        const list = response.data.map((item) => {
-          const song = mapApiSong(item)
-          song.recommendTag = item.recommendReason || item.reason || ''
-          return song
-        })
-        this.fmColumns = this.toColumns(list)
-        return true
-      }
+      this.radarPlaylists = await DiscoveryPlaylistsService.radar()
+      return this.radarPlaylists.length > 0
     } catch (_error) {
     }
     return false
@@ -806,9 +799,18 @@ struct Recommend {
               .padding({ top: 18, bottom: 18 })
           }
 
-          if (this.fmColumns.length > 0) {
-            this.SectionTitle('私人 FM', '为你持续发现下一首好歌')
-            this.ThreeRowSongs(this.fmColumns)
+          if (this.radarPlaylists.length > 0) {
+            this.SectionTitle('雷达歌单', '发现与你合拍的音乐')
+            Scroll() {
+              Row({ space: 12 }) {
+                ForEach(this.radarPlaylists, (item: playlistType) => {
+                  Column({ space: 8 }) {
+                    Image(item.cover).width(120).height(120).borderRadius(12)
+                    Text(item.name).fontSize(12).fontColor('#eeeeee').maxLines(2)
+                  }.width(120).onClick(() => this.pageStack.pushPathByName('PlaylistDetailPage', item))
+                })
+              }.padding({ left: 16, right: 16 })
+            }.width('100%').scrollable(ScrollDirection.Horizontal).scrollBar(BarState.Off)
           }
 
           this.SectionTitle('新歌速递', '全部、华语、欧美、日本、韩国')

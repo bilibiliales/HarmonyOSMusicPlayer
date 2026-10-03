@@ -18,6 +18,9 @@ import { ApiClient } from '../services/ApiClient'
 import { playerController } from '../services/PlayerController'
 import { AuthStore } from '../stores/AuthStore'
 
+interface RecentVideoUrl { url: string; r?: number }
+interface RecentVideoUrlResponse { code: number; urls?: RecentVideoUrl[] }
+
 @Component
 export struct MvPlayerPage {
   @Consume('pageStack') pageStack: NavPathStack
@@ -75,9 +78,11 @@ export struct MvPlayerPage {
     } catch (_error) {
       this.pipSupported = false
     }
-    await this.loadMvDetail()
-    await this.loadDetailInfo()
-    this.loadCommentSummary()
+    if (!this.pageParam.isVideo) {
+      await this.loadMvDetail()
+      await this.loadDetailInfo()
+      this.loadCommentSummary()
+    }
     await this.loadVideoUrl(this.selectedResolution)
   }
 
@@ -294,6 +299,16 @@ export struct MvPlayerPage {
     }
     this.videoUrl = ''
     try {
+      if (this.pageParam.isVideo) {
+        const video = await ApiClient.get<RecentVideoUrlResponse>('/video/url', [
+          { key: 'id', value: this.mvId }, { key: 'resolution', value: resolution.toString() }
+        ])
+        if (requestToken !== this.requestToken) { return }
+        if (video.code !== 200 || !video.urls?.[0]?.url) { throw new Error('视频播放地址暂不可用') }
+        this.videoUrl = video.urls[0].url
+        this.actualResolution = video.urls[0].r || resolution
+        return
+      }
       const response = await ApiClient.get<MvUrlResponse>('/mv/url', [
         { key: 'id', value: this.mvId },
         { key: 'r', value: resolution.toString() },
@@ -790,6 +805,7 @@ export struct MvPlayerPage {
               }
             }.width('100%').alignItems(HorizontalAlign.Start)
 
+            if (!this.pageParam.isVideo) {
             Row() {
               this.ActionButton(() => $r('sys.symbol.share'), () => '分享',
                 () => this.compactCount(this.shareCount), () => false,
@@ -804,6 +820,7 @@ export struct MvPlayerPage {
                 () => this.downloading ? `${this.downloadProgress}%` : '', () => this.downloading,
                 () => this.downloadVideo())
             }.width('100%').padding({ top: 4, bottom: 4 })
+            }
 
             Column({ space: 11 }) {
               Row() {

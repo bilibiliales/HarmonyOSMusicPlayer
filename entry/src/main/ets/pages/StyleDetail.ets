@@ -285,7 +285,7 @@ export struct StyleDetailPage {
           Column().width(this.currentTab === tab ? 24 : 0).height(3).borderRadius(2).backgroundColor('#ef233c')
         }.layoutWeight(1).height(48).justifyContent(FlexAlign.Center).onClick(() => this.switchTab(tab))
       })
-    }.width('100%').backgroundColor('#17171c')
+    }.width('100%')
   }
 
   @Builder

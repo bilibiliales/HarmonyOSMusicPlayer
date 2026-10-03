@@ -6,6 +6,7 @@ import Moment from './Moment'
 import Recommend from './Recommend'
 import { Play } from './Play'
 import { PlaylistDetail } from './PlaylistDetail'
+import { RecentPlaybackPage, RecentPlaybackParam } from './RecentPlayback'
 import { Login } from './Login'
 import { SongWiki } from './SongWiki'
 import { SearchPage } from './Search'
@@ -118,6 +119,8 @@ struct HomeIndex {
   PageMap(name: string, param: object) {
     if (name === 'PlayPage') {
       Play()
+    } else if (name === 'RecentPlaybackPage') {
+      RecentPlaybackPage({ pageParam: (param || {}) as RecentPlaybackParam })
     } else if (name === 'PlaylistDetailPage') {
       PlaylistDetail({ initialPlaylist: param as playlistType })
     } else if (name === 'LoginPage') {
@@ -237,7 +240,6 @@ struct HomeIndex {
         }
         .barHeight(60)
         .barMode(BarMode.Fixed)
-        .barBackgroundColor('#17171c')
         .onChange((index: number) => {
           this.currentIndex = index
           this.currentName = tabsData[index].name

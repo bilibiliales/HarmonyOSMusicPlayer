@@ -1,7 +1,7 @@
 import { common } from '@kit.AbilityKit'
+import { BusinessError } from '@kit.BasicServicesKit'
 import { systemShare, harmonyShare } from '@kit.ShareKit'
 import { uniformTypeDescriptor } from '@kit.ArkData'
-import { util } from '@kit.ArkTS'
 import { http } from '@kit.NetworkKit'
 import { image } from '@kit.ImageKit'
 import { SharePageParam } from '../models/api'
@@ -18,13 +18,38 @@ export interface ShareLink {
 export class SystemShareService {
   static readonly MAX_RECORDS: number = 500
   static readonly MAX_BYTES: number = 200 * 1024
-  private static controller?: systemShare.ShareController
+  private static abilityContext?: common.UIAbilityContext
+  private static launching: boolean = false
+
+  static bindAbility(context: common.UIAbilityContext): void {
+    SystemShareService.abilityContext = context
+  }
+
+  static unbindAbility(): void {
+    SystemShareService.abilityContext = undefined
+  }
+
+  // Count UTF-8 directly: platform TextEncoder implementations may return undefined
+  // for an empty string. Optional share descriptions are commonly empty.
+  static utf8ByteLength(value: string): number {
+    let bytes = 0
+    for (let index = 0; index < value.length; index++) {
+      const code = value.charCodeAt(index)
+      if (code <= 0x7f) { bytes += 1 }
+      else if (code <= 0x7ff) { bytes += 2 }
+      else if (code >= 0xd800 && code <= 0xdbff && index + 1 < value.length &&
+        value.charCodeAt(index + 1) >= 0xdc00 && value.charCodeAt(index + 1) <= 0xdfff) {
+        bytes += 4
+        index++
+      } else { bytes += 3 }
+    }
+    return bytes
+  }
 
   static validate(records: systemShare.SharedRecord[]): void {
     if (!records.length || records.length > SystemShareService.MAX_RECORDS) {
       throw new Error('单次分享需要 1 至 500 个条目')
     }
-    const encoder = new util.TextEncoder()
     let bytes = 0
     for (const record of records) {
       if (!record.utd || (!record.uri && !record.content)) { throw new Error('分享内容或 UTD 类型为空') }
@@ -33,7 +58,7 @@ export class SystemShareService {
         JSON.stringify(record.extraData || {}), JSON.stringify(record.revisitShareRecordData || {})]
       // Include a small serialization allowance as well as all UTF-8 text and binary thumbnails.
       bytes += 64 + (record.thumbnail?.byteLength || 0)
-      for (const field of fields) { bytes += encoder.encodeInto(field).byteLength }
+      for (const field of fields) { bytes += SystemShareService.utf8ByteLength(field) }
       if (bytes > SystemShareService.MAX_BYTES) { throw new Error('分享数据描述总量不能超过 200KB，请减少分享条目') }
     }
   }
@@ -72,7 +97,7 @@ export class SystemShareService {
       pixel = await source.createPixelMap({ desiredSize: { width: 256, height: 256 } })
       packer = image.createImagePacker()
       const buffer = await packer.packing(pixel, { format: 'image/jpeg', quality: 75 })
-      return buffer.byteLength <= 48 * 1024 ? new Uint8Array(buffer) : undefined
+      return buffer && buffer.byteLength > 0 && buffer.byteLength < 32 * 1024 ? new Uint8Array(buffer) : undefined
     } catch (_error) {
       // A missing cover must not prevent sharing the link.
       return undefined
@@ -91,33 +116,51 @@ export class SystemShareService {
       content: link.url, title: link.title, description: link.description, label: link.label
     }
     SystemShareService.validate([record])
-    if (link.image) { record.thumbnail = await SystemShareService.thumbnail(link.image) }
+    if (link.image) {
+      const thumbnail = await SystemShareService.thumbnail(link.image)
+      if (thumbnail) { record.thumbnail = thumbnail }
+    }
     SystemShareService.validate([record])
     return [record]
   }
 
   static async show(context: common.UIAbilityContext, records: systemShare.SharedRecord[]): Promise<void> {
-    if (SystemShareService.controller) { return }
-    const controller = new systemShare.ShareController(SystemShareService.data(records))
-    SystemShareService.controller = controller
-    const dismiss = (): void => {
-      controller.off('dismiss', dismiss)
-      if (SystemShareService.controller === controller) { SystemShareService.controller = undefined }
-    }
-    controller.on('dismiss', dismiss)
+    if (SystemShareService.launching) { return }
+    SystemShareService.launching = true
     try {
-      await controller.show(context, {
+      await SystemShareService.present(context, records)
+    } finally {
+      SystemShareService.launching = false
+    }
+  }
+
+  private static async present(context: common.UIAbilityContext, records: systemShare.SharedRecord[]): Promise<void> {
+    try {
+      const host = SystemShareService.abilityContext || context
+      const controller = new systemShare.ShareController(SystemShareService.data(records))
+      const isLink = records.every((record: systemShare.SharedRecord) =>
+        record.utd === uniformTypeDescriptor.UniformDataType.HYPERLINK)
+      await controller.show(host, {
         selectionMode: records.length > 1 ? systemShare.SelectionMode.BATCH : systemShare.SelectionMode.SINGLE,
-        previewMode: systemShare.SharePreviewMode.DETAIL
+        previewMode: isLink ? systemShare.SharePreviewMode.DEFAULT : systemShare.SharePreviewMode.DETAIL
       })
     } catch (error) {
-      dismiss()
-      throw new Error(error instanceof Error ? error.message : '无法打开系统分享面板')
+      const err = error as BusinessError
+      const code = err.code !== undefined ? err.code.toString() : 'unknown'
+      const message = err.message || '系统未返回错误描述'
+      console.error(`[SystemShare] launch failed: code=${code}, message=${message}`)
+      throw new Error(`无法打开系统分享面板（${code}）：${message}`)
     }
   }
 
   static async showLink(context: common.UIAbilityContext, link: ShareLink): Promise<void> {
-    await SystemShareService.show(context, await SystemShareService.linkRecords(link))
+    if (SystemShareService.launching) { return }
+    SystemShareService.launching = true
+    try {
+      await SystemShareService.present(context, await SystemShareService.linkRecords(link))
+    } finally {
+      SystemShareService.launching = false
+    }
   }
 }
 

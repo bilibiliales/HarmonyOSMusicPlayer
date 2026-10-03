@@ -289,7 +289,7 @@ export struct MessageCenterPage {
         .layoutWeight(1).height(46).justifyContent(FlexAlign.Center).onClick(() => this.switchTab(tab))
       })
     }
-    .width('100%').backgroundColor('#17171c')
+    .width('100%')
   }
 
   @Builder

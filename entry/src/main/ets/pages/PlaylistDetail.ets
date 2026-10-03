@@ -1,4 +1,6 @@
 import { common } from '@kit.AbilityKit'
+import { ListeningPlaylistService } from '../services/ListeningPlaylistService'
+import { DiscoveryPlaylistsService, FM_ICON } from '../services/DiscoveryPlaylistsService'
 import {
   CommentResponse,
   mapApiSong,
@@ -48,15 +50,76 @@ export struct PlaylistDetail {
   @State selectedSongId: string = ''
   @State selectedSongName: string = ''
   @State deleting: boolean = false
+  @State recordType: 0 | 1 = 1
+  private recordRequest: number = 0
   private shareParam: SharePageParam = { type: 'playlist', id: '', name: '', img: '' }
 
   aboutToAppear(): void {
     this.playlist = this.initialPlaylist
     this.creatorId = this.initialPlaylist.creatorId || ''
+    this.recordType = this.initialPlaylist.recordType === 0 ? 0 : 1
     this.loadDetail()
   }
 
+  aboutToDisappear(): void {
+    this.recordRequest++
+  }
+
+  private async loadListeningPlaylist(): Promise<void> {
+    const kind = this.playlist.specialType
+    if (!kind) { return }
+    if (kind === 'fm') {
+      this.loading = true
+      this.message = ''
+      try {
+        this.songList = await DiscoveryPlaylistsService.fm()
+        this.playlist = DiscoveryPlaylistsService.playlist()
+        this.playlist.count = this.songList.length
+        this.playlist.cover = this.songList[0]?.img || FM_ICON
+      } catch (error) {
+        this.message = error instanceof Error ? error.message : '私人FM加载失败'
+      } finally { this.loading = false }
+      return
+    }
+    if (kind === 'recent' && (!this.authStore.loggedIn || this.creatorId !== this.authStore.userId)) {
+      this.loading = false
+      this.songList = []
+      this.message = '只能查看自己的最近播放'
+      return
+    }
+    const request = ++this.recordRequest
+    const type = this.recordType
+    const uid = this.creatorId
+    this.loading = true
+    this.message = ''
+    this.songList = []
+    this.playlist = ListeningPlaylistService.playlist(kind, uid, this.playlist.creator, [], type)
+    try {
+      const songs = kind === 'recent' ? await ListeningPlaylistService.recent() :
+        await ListeningPlaylistService.record(uid, type)
+      if (request !== this.recordRequest) { return }
+      this.songList = songs
+      this.playlist = ListeningPlaylistService.playlist(kind, uid, this.playlist.creator, songs, type)
+    } catch (error) {
+      if (request === this.recordRequest) {
+        this.message = error instanceof Error ? error.message : '播放记录加载失败'
+      }
+    } finally {
+      if (request === this.recordRequest) { this.loading = false }
+    }
+  }
+
+  private switchRecordType(type: 0 | 1): void {
+    if (this.recordType === type) { return }
+    this.recordType = type
+    this.loadListeningPlaylist()
+  }
+
   private async loadDetail(): Promise<void> {
+    if (this.playlist.specialType) {
+      await this.loadListeningPlaylist()
+      return
+    }
     if (!this.playlist.id) {
       this.loading = false
       this.message = '歌单参数无效'
@@ -137,7 +200,7 @@ export struct PlaylistDetail {
   }
 
   private isOwner(): boolean {
-    return this.authStore.loggedIn && this.creatorId.length > 0 && this.creatorId === this.authStore.userId
+    return !this.playlist.specialType && this.authStore.loggedIn && this.creatorId.length > 0 && this.creatorId === this.authStore.userId
   }
 
   private openCreatorProfile(): void {
@@ -282,15 +345,20 @@ export struct PlaylistDetail {
   }
 
   private async playAt(index: number): Promise<void> {
+    if (this.loading) { return }
     const list = this.filteredSongs()
     if (list.length === 0) {
       return
+    }
+    if (!this.playlist.specialType) {
+      list.forEach((song: songItemType) => song.sourceId = this.playlist.id)
     }
     await playerController.setQueue(list, index, true)
     this.pageStack.pushPathByName('PlayPage', null)
   }
 
   private sharePlaylist(): void {
+    if (this.playlist.specialType) { return }
     this.shareParam = {
       type: 'playlist',
       id: this.playlist.id,
@@ -301,6 +369,7 @@ export struct PlaylistDetail {
   }
 
   private async toggleSubscribe(): Promise<void> {
+    if (this.playlist.specialType) { return }
     if (!this.authStore.loggedIn) {
       this.pageStack.pushPathByName('LoginPage', null)
       return
@@ -328,6 +397,7 @@ export struct PlaylistDetail {
   }
 
   private async openComments(): Promise<void> {
+    if (this.playlist.specialType) { return }
     this.commentSheetVisible = true
     this.commentsLoading = true
     try {
@@ -535,7 +605,8 @@ export struct PlaylistDetail {
                     this.searchVisible = !this.searchVisible
                     if (!this.searchVisible) this.keyword = ''
                   })
-                SymbolGlyph($r('sys.symbol.ellipsis_circle')).fontSize(22).fontColor(['#ffffff'])
+                if (!this.playlist.specialType) {
+                  SymbolGlyph($r('sys.symbol.ellipsis_circle')).fontSize(22).fontColor(['#ffffff'])
                   .onClick(() => {
                     if (this.isOwner()) {
                       this.ownerMenuVisible = true
@@ -543,11 +614,26 @@ export struct PlaylistDetail {
                       this.sharePlaylist()
                     }
                   })
+                }
               }
               .width('100%').height(56 + this.topAvoidHeight)
               .padding({ top: this.topAvoidHeight })
 
               Row({ space: 16 }) {
+                if (this.playlist.specialType) {
+                  Stack() {
+                    if (this.playlist.cover) {
+                      Image(this.playlist.cover).width('100%').height('100%').objectFit(ImageFit.Cover)
+                    }
+                    Column().width('100%').height('100%').backgroundColor('rgba(0,0,0,0.28)')
+                    if (this.playlist.specialType === 'fm') {
+                      Image(FM_ICON).width(48).height(48).borderRadius(24)
+                    } else {
+                    SymbolGlyph(this.playlist.specialType === 'recent' ? $r('sys.symbol.clock') : $r('sys.symbol.sort'))
+                      .fontSize(48).fontColor(['#ffffff'])
+                    }
+                  }.width(120).height(120).borderRadius(14).clip(true).backgroundColor('#25252c')
+                } else {
                 Image(this.playlist.cover).width(120).height(120).borderRadius(14).objectFit(ImageFit.Cover)
                   .shadow({ radius: 18, color: 'rgba(0,0,0,0.32)', offsetY: 8 })
                   .onClick(() => {
@@ -561,6 +647,7 @@ export struct PlaylistDetail {
                     };
                     this.pageStack.pushPathByName('PlaylistCoverPreviewPage', param);
                   })
+                }
                 Column({ space: 8 }) {
                   Text(this.playlist.name).fontSize(20).fontWeight(FontWeight.Bold).fontColor('#ffffff').maxLines(3)
                   Row({ space: 5 }) {
@@ -568,7 +655,8 @@ export struct PlaylistDetail {
                     Text(this.playlist.creator).fontSize(12).fontColor('#d0d0d6').maxLines(1)
                   }
                   .onClick(() => this.openCreatorProfile())
-                  Text(`${this.playlist.count} 首歌曲 · ${this.formatCount(this.playCount)} 次播放`)
+                  Text(this.playlist.specialType ? `${this.playlist.count} 首歌曲` :
+                    `${this.playlist.count} 首歌曲 · ${this.formatCount(this.playCount)} 次播放`)
                     .fontSize(11).fontColor('#77777f')
                   if (this.playlistTags.length > 0) {
                     Text(this.playlistTags.join(' · ')).fontSize(10).fontColor('#ef6577').maxLines(1)
@@ -582,6 +670,23 @@ export struct PlaylistDetail {
           }
           .width('100%').height(280 + this.topAvoidHeight)
 
+          if (this.playlist.specialType === 'record') {
+            Row({ space: 28 }) {
+              Column({ space: 7 }) {
+                Text('最近一周').fontSize(14).fontColor(this.recordType === 1 ? '#ffffff' : '#77777f')
+                  .fontWeight(this.recordType === 1 ? FontWeight.Bold : FontWeight.Regular)
+                Column().width(24).height(3).borderRadius(2)
+                  .backgroundColor(this.recordType === 1 ? '#ef233c' : 'transparent')
+              }.height(46).justifyContent(FlexAlign.Center).onClick(() => this.switchRecordType(1))
+              Column({ space: 7 }) {
+                Text('全部时间').fontSize(14).fontColor(this.recordType === 0 ? '#ffffff' : '#77777f')
+                  .fontWeight(this.recordType === 0 ? FontWeight.Bold : FontWeight.Regular)
+                Column().width(24).height(3).borderRadius(2)
+                  .backgroundColor(this.recordType === 0 ? '#ef233c' : 'transparent')
+              }.height(46).justifyContent(FlexAlign.Center).onClick(() => this.switchRecordType(0))
+            }.width('100%').height(46).padding({ left: 20, right: 20 })
+          }
+
           Row({ space: 10 }) {
             Button() {
               Row({ space: 6 }) {
@@ -591,8 +696,10 @@ export struct PlaylistDetail {
               }
             }
             .layoutWeight(1).height(40).backgroundColor('#ef233c').borderRadius(20)
-            .type(ButtonType.Normal).onClick(() => this.playAt(0))
+            .type(ButtonType.Normal).enabled(!this.loading && this.filteredSongs().length > 0)
+            .onClick(() => this.playAt(0))
 
+            if (!this.playlist.specialType) {
             Button() {
               Row({ space: 4 }) {
                 SymbolGlyph(this.subscribed ? $r('sys.symbol.heart_fill') : $r('sys.symbol.heart'))
@@ -622,6 +729,7 @@ export struct PlaylistDetail {
             }
             .height(40).backgroundColor('#27272d').borderRadius(20).type(ButtonType.Normal)
             .padding({ left: 12, right: 12 }).onClick(() => this.sharePlaylist())
+            }
           }
           .width('100%').height(62).padding({ left: 16, right: 16, top: 10, bottom: 10 })
 
@@ -654,15 +762,23 @@ export struct PlaylistDetail {
                         .textOverflow({ overflow: TextOverflow.Ellipsis })
                     }
                     .layoutWeight(1).alignItems(HorizontalAlign.Start).onClick(() => this.playAt(index))
-                    SymbolGlyph($r('sys.symbol.ellipsis_circle')).fontSize(19).fontColor(['#66666e'])
+                    if (this.playlist.specialType === 'record') {
+                      Row({ space: 4 }) {
+                        SymbolGlyph($r('sys.symbol.play_fill')).fontSize(12).fontColor(['#888890'])
+                        Text(`${item.playCount || 0}`).fontSize(12).fontColor('#888890')
+                      }
+                    }
+                    if (this.isOwner()) {
+                      SymbolGlyph($r('sys.symbol.ellipsis_circle')).fontSize(19).fontColor(['#66666e'])
                       .onClick(() => this.openSongMenu(item))
+                    }
                   }
                   .height(62).padding({ left: 14, right: 16 })
                 }
               })
               if (this.filteredSongs().length === 0) {
                 ListItem() {
-                  Text('没有找到匹配歌曲').width('100%').height(120).fontSize(12)
+                  Text(this.keyword ? '没有找到匹配歌曲' : '暂无歌曲').width('100%').height(120).fontSize(12)
                     .fontColor('#77777f').textAlign(TextAlign.Center)
                 }
               }

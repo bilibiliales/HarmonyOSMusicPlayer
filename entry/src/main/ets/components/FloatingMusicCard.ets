@@ -23,6 +23,7 @@ export struct FloatingMusicCard {
           Text('播放列表为空').fontSize(11).fontColor('#62626a')
         }
         .layoutWeight(1).alignItems(HorizontalAlign.Start)
+        SymbolGlyph($r('sys.symbol.backward_end_fill')).fontSize(21).fontColor(['#4d4d55'])
         SymbolGlyph($r('sys.symbol.play_circle_fill')).fontSize(30).fontColor(['#55555d'])
         SymbolGlyph($r('sys.symbol.forward_end_fill')).fontSize(21).fontColor(['#4d4d55']).margin({ right: 4 })
       }
@@ -47,6 +48,8 @@ export struct FloatingMusicCard {
         }
         .layoutWeight(1).alignItems(HorizontalAlign.Start).onClick(() => this.onOpen())
 
+        SymbolGlyph($r('sys.symbol.backward_end_fill')).fontSize(21).fontColor(['#d3d3d8'])
+          .onClick(() => playerController.previous())
         if (this.playerStore.isLoading) {
           LoadingProgress().width(26).height(26).color('#ffffff')
         } else {

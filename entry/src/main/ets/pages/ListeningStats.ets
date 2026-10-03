@@ -1,19 +1,17 @@
 import {
-  ApiArtist,
   ListenDataResponse,
   ListenDataValue,
-  ListenDurationDetail,
   ListenReportData,
   ListenReportLanguageSection,
   ListenReportResponse,
   ListenReportStyleSection,
   ListenReportTopArtistSection,
   ListenReportTopSongSection,
-  ListenTimeBlock,
   ListenTimePeriodDuration
 } from '../models/api'
 import { ApiClient } from '../services/ApiClient'
 import { AuthStore } from '../stores/AuthStore'
+import { buildListeningPeriod, ListeningDay, ListeningPeriod, listeningDayBackground, listeningDayColor } from '../services/ListeningFootprint'
 
 @Component
 export struct ListeningStatsPage {
@@ -25,6 +23,45 @@ export struct ListeningStatsPage {
   @State monthReport: ListenReportData | null = null
   @State loading: boolean = true
   @State message: string = ''
+  @State currentPeriod: string = 'week'
+  @State weekChart: ListeningPeriod | null = null
+  @State monthChart: ListeningPeriod | null = null
+  @State selectedDay: string = ''
+  @State weekMessage: string = ''
+  @State monthMessage: string = ''
+
+  private activeReport(): ListenReportData | null { return this.currentPeriod === 'week' ? this.weekReport : this.monthReport }
+  private activeChart(): ListeningPeriod | null { return this.currentPeriod === 'week' ? this.weekChart : this.monthChart }
+  private activeMessage(): string { return this.currentPeriod === 'week' ? this.weekMessage : this.monthMessage }
+
+  private switchPeriod(period: string): void {
+    this.currentPeriod = period
+    this.selectedDay = ''
+  }
+
+  private async loadReport(period: string): Promise<void> {
+    try {
+      const response = await ApiClient.get<ListenReportResponse>('/listen/data/report', [{ key: 'type', value: period }])
+      if (response.code !== 200 || !response.data) { throw new Error(response.message || '暂无该周期的听歌报告') }
+      if (period === 'week') {
+        this.weekReport = response.data
+        this.weekChart = buildListeningPeriod(response.data, false)
+      } else {
+        this.monthReport = response.data
+        this.monthChart = buildListeningPeriod(response.data, true)
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '听歌报告加载失败'
+      if (period === 'week') { this.weekMessage = message } else { this.monthMessage = message }
+    }
+  }
+
+  private async loadTotal(): Promise<void> {
+    try {
+      const response = await ApiClient.get<ListenDataResponse>('/listen/data/total')
+      if (response.code === 200) { this.total = response.data || null }
+    } catch (_error) {}
+  }
 
   aboutToAppear(): void {
     this.loadData()
@@ -36,29 +73,15 @@ export struct ListeningStatsPage {
       this.message = '登录后才能获取听歌足迹'
       return
     }
-    try {
-      const totalResponse = await ApiClient.get<ListenDataResponse>('/listen/data/total')
-      const weekResponse = await ApiClient.get<ListenReportResponse>('/listen/data/report', [
-        { key: 'type', value: 'week' }
-      ])
-      const monthResponse = await ApiClient.get<ListenReportResponse>('/listen/data/report', [
-        { key: 'type', value: 'month' }
-      ])
-      this.total = totalResponse.data || null
-      if (weekResponse.code === 200 && weekResponse.data) {
-        this.weekReport = weekResponse.data
-      }
-      if (monthResponse.code === 200 && monthResponse.data) {
-        this.monthReport = monthResponse.data
-      }
-      if (!this.total && !this.weekReport && !this.monthReport) {
-        this.message = totalResponse.message || '接口暂未返回听歌足迹，部分账号需要会员权限'
-      }
-    } catch (error) {
-      this.message = error instanceof Error ? error.message : '听歌足迹加载失败'
-    } finally {
-      this.loading = false
+    this.loading = true
+    this.message = ''
+    this.weekMessage = ''
+    this.monthMessage = ''
+    await Promise.all([this.loadTotal(), this.loadReport('week'), this.loadReport('month')])
+    if (!this.total && !this.weekReport && !this.monthReport) {
+      this.message = this.activeMessage() || '暂无听歌足迹'
     }
+    this.loading = false
   }
 
   private totalDuration(): number {
@@ -90,7 +113,8 @@ export struct ListeningStatsPage {
     if (!value || value <= 0) {
       return '0 分钟'
     }
-    const minutes = value
+    const minutes = Math.floor(value)
+    if (minutes === 0) { return '不足 1 分钟' }
     if (minutes >= 60) {
       const h = Math.floor(minutes / 60)
       const m = minutes % 60
@@ -113,19 +137,6 @@ export struct ListeningStatsPage {
       'deep_night': '深夜'
     }
     return map[period] || period
-  }
-
-  @Builder
-  private StatCard(title: string, report: ListenReportData | null, color: string = '#ef233c') {
-    Row() {
-      Column().width(10).height(10).borderRadius(5).backgroundColor(color)
-      Text(`${title}听歌报告`).fontSize(15).fontWeight(FontWeight.Bold).fontColor('#ffffff').margin({ left: 8 })
-      if (report?.listenTimeBlock?.playDurationText) {
-        Text(report.listenTimeBlock.playDurationText).fontSize(12).fontColor('#77777f').margin({ left: 10 })
-      }
-    }
-    .width('100%').padding({ left: 16, right: 16, top: 12, bottom: 12 })
-    .backgroundColor('#1b1b20').borderRadius(16)
   }
 
   @Builder
@@ -252,27 +263,6 @@ export struct ListeningStatsPage {
     return maxVal
   }
 
-  private maxDailyDuration(details: ListenDurationDetail[]): number {
-    let maxVal: number = 1
-    for (let i = 0; i < details.length; i++) {
-      if (details[i].duration > maxVal) {
-        maxVal = details[i].duration
-      }
-    }
-    return maxVal
-  }
-
-  private formatDayLabel(period: string): string {
-    const parts = period.split('-')
-    if (parts.length >= 3) {
-      const weekDays: string[] = ['日', '一', '二', '三', '四', '五', '六']
-      const date = new Date(period)
-      const day = date.getDay()
-      return `周${weekDays[day]}`
-    }
-    return period
-  }
-
   @Builder
   private TimeDistributionSection(report: ListenReportData | null) {
     if (report?.listenTimeBlock?.circleTimePeriodDurations &&
@@ -303,52 +293,123 @@ export struct ListeningStatsPage {
     }
   }
 
-  @Builder
-  private DailyDistributionSection(report: ListenReportData | null) {
-    if (report?.listenTimeDistributionBlock?.durationDetails &&
-      report.listenTimeDistributionBlock.durationDetails.length > 0) {
-      Column({ space: 10 }) {
-        Row() {
-          Text('每日听歌时长').fontSize(14).fontColor('#ffffff').fontWeight(FontWeight.Medium)
-          if (report.listenTimeDistributionBlock.listenDays) {
-            Text(`共 ${report.listenTimeDistributionBlock.listenDays} 天`)
-              .fontSize(11).fontColor('#77777f').margin({ left: 8 })
-          }
-        }.width('100%')
-        Column({ space: 6 }) {
-          ForEach(report.listenTimeDistributionBlock.durationDetails,
-            (item: ListenDurationDetail) => {
-              Row({ space: 8 }) {
-                Text(this.formatDayLabel(item.period)).fontSize(11).fontColor('#92929a').width(36)
-                Row() {
-                  Row()
-                    .width(`${Math.max(2, (item.duration / this.maxDailyDuration(report.listenTimeDistributionBlock!.durationDetails!)) * 100)}%`)
-                    .height('100%')
-                    .borderRadius(4)
-                    .linearGradient({ angle: 90, colors: [['#7f76ff', 0], ['#a59bff', 1]] })
-                }
-                .layoutWeight(1).height(14).backgroundColor('#25252c').borderRadius(4)
-                Text(this.formatPlayDuration(item.duration)).fontSize(10).fontColor('#77777f').width(60).textAlign(TextAlign.End)
-              }
-              .width('100%')
-            })
-        }
-        .width('100%')
-      }
-      .width('100%').padding(16).backgroundColor('#1b1b20').borderRadius(16)
-    }
+  private dayValue(day: ListeningDay): string {
+    if (day.future) { return '—' }
+    if (!day.reported) { return '—' }
+    if (day.minutes <= 0) { return '0分' }
+    if (day.minutes < 1) { return '<1分' }
+    return day.minutes >= 60 ? `${Number((day.minutes / 60).toFixed(1))}时` : `${Math.floor(day.minutes)}分`
+  }
+
+  private dayDescription(chart: ListeningPeriod): string {
+    const day = chart.days.find((item: ListeningDay) => item.key === this.selectedDay)
+    if (!day) { return this.currentPeriod === 'week' ? '点击柱形查看当天时长' : '点击日期查看当天时长' }
+    return `${day.key} · ${day.future ? '尚未到来' : !day.reported ? '暂无数据' : this.formatPlayDuration(day.minutes)}`
   }
 
   @Builder
-  private ReportDetail(title: string, report: ListenReportData | null, color: string = '#ef233c') {
+  private PeriodTabs() {
+    Row() {
+      ForEach(['week', 'month'], (period: string) => {
+        Column({ space: 7 }) {
+          Text(period === 'week' ? '本周' : '本月').fontSize(15)
+            .fontWeight(this.currentPeriod === period ? FontWeight.Bold : FontWeight.Regular)
+            .fontColor(this.currentPeriod === period ? '#ffffff' : '#77777f')
+          Column().width(24).height(3).borderRadius(2)
+            .backgroundColor(this.currentPeriod === period ? '#ef233c' : 'transparent')
+        }.layoutWeight(1).height(48).justifyContent(FlexAlign.Center)
+          .onClick(() => this.switchPeriod(period))
+      })
+    }.width('100%')
+  }
+
+  @Builder
+  private WeekBars(chart: ListeningPeriod) {
+    Row({ space: 6 }) {
+      Column() {
+        Text(this.formatPlayDuration(chart.axisMinutes)).fontSize(9).fontColor('#77777f')
+        Blank()
+        Text(this.formatPlayDuration(chart.axisMinutes / 2)).fontSize(9).fontColor('#77777f')
+        Blank()
+        Text('0分').fontSize(9).fontColor('#77777f')
+      }.width(36).height(184).margin({ bottom: 38 })
+      Row({ space: 5 }) {
+        ForEach(chart.days, (day: ListeningDay) => {
+          Column({ space: 6 }) {
+            Column() {
+              Blank()
+              Text(this.dayValue(day)).fontSize(9).fontWeight(FontWeight.Medium)
+                .fontColor(listeningDayColor(day)).textAlign(TextAlign.Center)
+                .width('100%')
+                .height(day.minutes > 0 ? Math.max(28, day.minutes / chart.axisMinutes * 184) : 22)
+                .backgroundColor(listeningDayBackground(day)).borderRadius(22)
+                .border({ width: this.selectedDay === day.key ? 1 : 0, color: '#ff8190' })
+            }.width('100%').height(184)
+            Text(day.weekday).fontSize(11).fontColor('#9999a1')
+            Text(day.key.substring(5).replace('-', '/')).fontSize(9).fontColor('#66666e')
+          }.layoutWeight(1).onClick(() => this.selectedDay = day.key)
+        }, (day: ListeningDay) => day.key)
+      }.layoutWeight(1).alignItems(VerticalAlign.Bottom)
+    }.width('100%').alignItems(VerticalAlign.Bottom).margin({ top: 12 })
+  }
+
+  @Builder
+  private MonthCalendar(chart: ListeningPeriod) {
+    Column({ space: 10 }) {
+      Row() {
+        ForEach(['日', '一', '二', '三', '四', '五', '六'], (label: string) => {
+          Text(label).layoutWeight(1).fontSize(11).fontColor('#85858e').textAlign(TextAlign.Center)
+        })
+      }.width('100%')
+      ForEach(chart.rows, (week: ListeningDay[]) => {
+        Row() {
+          ForEach(week, (day: ListeningDay) => {
+            Column({ space: 4 }) {
+              if (day.day > 0) {
+                Text(day.day.toString()).width(32).height(32).borderRadius(16)
+                  .fontSize(12).fontWeight(FontWeight.Medium).textAlign(TextAlign.Center)
+                  .backgroundColor(listeningDayBackground(day)).fontColor(listeningDayColor(day))
+                  .border({ width: this.selectedDay === day.key ? 1 : 0, color: '#ff8190' })
+                Text(this.dayValue(day)).fontSize(9).fontColor(day.minutes > 0 ? '#ff6577' : '#66666e')
+              }
+            }.layoutWeight(1).height(52).justifyContent(FlexAlign.Center)
+              .onClick(() => { if (day.day > 0) { this.selectedDay = day.key } })
+          }, (day: ListeningDay) => day.key)
+        }.width('100%')
+      })
+    }.width('100%').margin({ top: 12 })
+  }
+
+  @Builder
+  private DurationCard(chart: ListeningPeriod) {
+    Column({ space: 14 }) {
+      Text(this.currentPeriod === 'week' ? '本周听歌时长' : '本月听歌时长')
+        .width('100%').fontSize(22).fontWeight(FontWeight.Bold).fontColor('#a3a3ad')
+      Text(this.formatPlayDuration(chart.totalMinutes)).width('100%')
+        .fontSize(30).fontWeight(FontWeight.Bold).fontColor('#ffffff').textAlign(TextAlign.End)
+      Text(`已听 ${chart.listenedDays}/${chart.days.length} 天`).width('100%')
+        .fontSize(12).fontColor('#9999a1').textAlign(TextAlign.End)
+      if (this.currentPeriod === 'week') { this.WeekBars(chart) } else { this.MonthCalendar(chart) }
+      Text(this.dayDescription(chart)).width('100%').fontSize(12).fontColor('#b5b5bd')
+        .textAlign(TextAlign.Center).constraintSize({ minHeight: 30 })
+      Row({ space: 6 }) {
+        Column().width(8).height(8).borderRadius(4).backgroundColor('rgba(239,35,60,0.22)')
+        Text('不足1小时').fontSize(10).fontColor('#ff6577')
+        Blank().width(12)
+        Column().width(8).height(8).borderRadius(4).backgroundColor('#ef233c')
+        Text('1小时及以上').fontSize(10).fontColor('#9999a1')
+      }.width('100%').justifyContent(FlexAlign.Center)
+    }.width('100%').padding(16).backgroundColor('#1b1b20').borderRadius(22)
+  }
+
+  @Builder
+  private ReportDetail(report: ListenReportData | null) {
     Column({ space: 12 }) {
-      this.StatCard(title, report, color)
       this.TopSongSection(report)
       this.TopArtistSection(report)
       this.StyleSection(report)
       this.LanguageSection(report)
       this.TimeDistributionSection(report)
-      this.DailyDistributionSection(report)
     }
   }
 
@@ -365,6 +426,8 @@ export struct ListeningStatsPage {
           Column().width(24)
         }
         .height(56).width('100%').padding({ left: 16, right: 16 })
+
+        this.PeriodTabs()
 
         if (this.loading) {
           LoadingProgress().layoutWeight(1).width(46).color('#ef233c')
@@ -391,12 +454,15 @@ export struct ListeningStatsPage {
               .width('100%').padding(24).borderRadius(24)
               .linearGradient({ angle: 135, colors: [['#7d2735', 0], ['#28253d', 1]] })
 
-              if (this.weekReport) {
-                this.ReportDetail('本周', this.weekReport, '#ef233c')
-              }
-
-              if (this.monthReport) {
-                this.ReportDetail('本月', this.monthReport, '#7f76ff')
+              if (this.activeChart()) {
+                Text(this.activeChart()!.title).width('100%').fontSize(16).fontWeight(FontWeight.Medium)
+                  .fontColor('#ededf0').textAlign(TextAlign.Center).margin({ top: 4, bottom: 4 })
+                this.DurationCard(this.activeChart()!)
+                this.ReportDetail(this.activeReport())
+              } else {
+                Text(this.activeMessage() || '暂无该周期的听歌数据').width('100%').fontSize(13)
+                  .fontColor('#9999a1').textAlign(TextAlign.Center).padding(24)
+                Button('重新加载').backgroundColor('#ef233c').onClick(() => this.loadData())
               }
 
               Text('听歌足迹数据由网易云接口提供，部分账号或数据维度可能需要会员权益。')

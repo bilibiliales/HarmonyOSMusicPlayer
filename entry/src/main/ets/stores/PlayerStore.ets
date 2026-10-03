@@ -1,4 +1,4 @@
-import { PlayMode, songItemType } from '../models/music'
+import { PlayMode, songItemType, QUALITY_OPTIONS } from '../models/music'
 
 function emptySong(): songItemType {
   return {
@@ -23,6 +23,7 @@ export class PlayerStore {
   duration: number = 0
   playMode: PlayMode = PlayMode.LOOP
   quality: string = 'exhigh'
+  actualQuality: string = ''
   errorMessage: string = ''
 
   hasQueue(): boolean {
@@ -110,6 +111,10 @@ export class PlayerStore {
   }
 
   qualityTitle(): string {
+    return QUALITY_OPTIONS.find((item) => item.level === this.actualQuality)?.title || '音质待确认'
+  }
+
+  requestedQualityTitle(): string {
     if (this.quality === 'hires') {
       return 'Hi-Res'
     }

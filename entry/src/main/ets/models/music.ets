@@ -12,6 +12,9 @@ export interface songItemType {
   commentCount?: number
   recommendTag?: string
   artists?: SongArtist[]
+  playCount?: number
+  sourceId?: string
+  isVoice?: boolean
 }
 
 export interface SongArtist {
@@ -37,7 +40,11 @@ export const QUALITY_OPTIONS: QualityOption[] = [
   { level: 'higher', title: '较高', description: '192 kbps' },
   { level: 'exhigh', title: '极高', description: '320 kbps' },
   { level: 'lossless', title: '无损', description: 'FLAC' },
-  { level: 'hires', title: 'Hi-Res', description: '高解析度无损' }
+  { level: 'hires', title: 'Hi-Res', description: '高解析度无损' },
+  { level: 'jyeffect', title: '高清环绕声', description: '高清音效' },
+  { level: 'sky', title: '沉浸环绕声', description: '沉浸式空间音频' },
+  { level: 'dolby', title: '杜比全景声', description: '需要设备支持' },
+  { level: 'jymaster', title: '超清母带', description: '母带级音质' }
 ]
 
 export interface recommendListType {
@@ -173,6 +180,8 @@ export interface playlistType {
   count: number      // 歌曲数量
   creator: string    // 创建者
   isLiked?: boolean  // 是否为我喜欢的音乐
+  specialType?: 'recent' | 'record' | 'fm'
+  recordType?: 0 | 1
   creatorId?: string
   description?: string
   tags?: string[]

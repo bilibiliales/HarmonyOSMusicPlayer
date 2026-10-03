@@ -18,6 +18,9 @@ import { songItemType } from '../models/music'
 import { ApiClient } from '../services/ApiClient'
 import { playerController } from '../services/PlayerController'
 import { resizeImageUrl } from '../services/ImageUrl'
+import { common } from '@kit.AbilityKit'
+import { SystemShareService, ShareLink, NearbyShareSession } from '../services/SystemShareService'
+import { BubbleTip } from '../services/BubbleTip'
 
 @Component
 export struct ArtistPage {
@@ -41,6 +44,29 @@ export struct ArtistPage {
   @State allAlbumsLoading: boolean = false
   @State allAlbumsMore: boolean = true
   private allAlbumsOffset: number = 0
+  @State preparingShare: boolean = false
+  private nearbyShare: NearbyShareSession = new NearbyShareSession()
+
+  private artistShareLink(): ShareLink {
+    return {
+      url: `https://music.163.com/artist?id=${encodeURIComponent(this.pageParam.id)}`,
+      title: this.displayName(),
+      description: this.artistDetail.briefDesc || `分享歌手「${this.displayName()}」`,
+      label: '歌手',
+      image: this.headerImage()
+    }
+  }
+
+  private async shareArtist(): Promise<void> {
+    if (this.preparingShare || !this.pageParam.id) { return }
+    this.preparingShare = true
+    try {
+      await SystemShareService.showLink(this.getUIContext().getHostContext() as common.UIAbilityContext,
+        this.artistShareLink())
+    } catch (error) {
+      BubbleTip.show(this.getUIContext(), error instanceof Error ? error.message : '分享歌手失败')
+    } finally { this.preparingShare = false }
+  }
 
   aboutToAppear(): void {
     this.artist = {
@@ -312,7 +338,7 @@ export struct ArtistPage {
       }
       .width('100%').padding({ bottom: 18 })
     }
-    .width('100%').height(280)
+    .width('100%').height(280 + this.topAvoidHeight + 54)
   }
 
   @Builder
@@ -420,7 +446,7 @@ export struct ArtistPage {
         .onClick(() => this.switchTab(tab))
       })
     }
-    .width('100%').backgroundColor('#17171c')
+    .width('100%')
   }
 
   @Builder
@@ -545,25 +571,12 @@ export struct ArtistPage {
   build() {
     NavDestination() {
       Stack({ alignContent: Alignment.TopStart }) {
-        Image(resizeImageUrl(this.headerImage(), 720, 240))
-          .width('100%').height(this.topAvoidHeight + 54).objectFit(ImageFit.Cover).blur(24).opacity(0.58)
-        Column() {
-        Column().width('100%').height(this.topAvoidHeight)
-        Row() {
-          SymbolGlyph($r('sys.symbol.chevron_left')).fontSize(24).fontColor(['#ffffff'])
-            .onClick(() => this.pageStack.pop())
-          Text('歌手主页').layoutWeight(1).fontSize(17).fontWeight(FontWeight.Bold)
-            .fontColor('#ffffff').textAlign(TextAlign.Center)
-          SymbolGlyph($r('sys.symbol.ellipsis_circle')).fontSize(22).fontColor(['#ffffff'])
-        }
-        .height(54).width('100%').padding({ left: 16, right: 16 })
-
-        if (this.loading) {
-          LoadingProgress().layoutWeight(1).width(46).color('#ef233c')
-        } else {
           Scroll() {
             Column() {
               this.ArtistHeader()
+              if (this.loading) {
+                LoadingProgress().width(46).height(46).color('#ef233c').margin({ top: 36 })
+              } else {
               this.ArtistNavigation()
               if (this.currentTab === 'music') {
                 if (this.topSongs.length > 0) {
@@ -589,20 +602,39 @@ export struct ArtistPage {
               } else {
                 this.AlbumsTab()
               }
+              }
             }
+            .width('100%')
           }
-          .layoutWeight(1).scrollBar(BarState.Off)
+          .width('100%').height('100%').scrollBar(BarState.Off)
           .onReachEnd(() => {
             if (this.currentTab === 'albums') {
               this.loadAllAlbums()
             }
           })
+        Column() {
+          Column().width('100%').height(this.topAvoidHeight)
+          Row() {
+            SymbolGlyph($r('sys.symbol.chevron_left')).fontSize(24).fontColor(['#ffffff'])
+              .width(44).height(44).onClick(() => this.pageStack.pop())
+            Text('歌手主页').layoutWeight(1).fontSize(17).fontWeight(FontWeight.Bold)
+              .fontColor('#ffffff').textAlign(TextAlign.Center)
+            SymbolGlyph($r('sys.symbol.ellipsis_circle')).fontSize(22).fontColor(['#ffffff'])
+              .width(44).height(44)
+              .bindMenu([{
+                value: this.preparingShare ? '准备分享…' : '分享歌手',
+                action: () => { this.shareArtist() }
+              }])
+          }.height(54).width('100%').padding({ left: 6, right: 6 })
         }
+        .width('100%')
+        .linearGradient({ angle: 180, colors: [['rgba(0,0,0,0.5)', 0], ['rgba(0,0,0,0)', 1]] })
       }
       .width('100%').height('100%').backgroundColor('#121215')
-      }
-      .width('100%').height('100%')
+      .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP])
     }
     .hideTitleBar(true)
+    .onShown(() => this.nearbyShare.activate(() => SystemShareService.linkRecords(this.artistShareLink())))
+    .onHidden(() => this.nearbyShare.deactivate())
   }
 }

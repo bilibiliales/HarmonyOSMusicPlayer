@@ -2,6 +2,7 @@ import { common } from '@kit.AbilityKit'
 import { fileIo, fileUri, picker } from '@kit.CoreFileKit'
 import { photoAccessHelper } from '@kit.MediaLibraryKit'
 import { http } from '@kit.NetworkKit'
+import { request } from '@kit.BasicServicesKit'
 import curves from '@ohos.curves'
 import {
   ApiParam,
@@ -705,13 +706,11 @@ export struct Play {
       if (response.data?.hr) {
         this.appendQuality(qualities, 'hires')
       }
+      if (response.data?.je) { this.appendQuality(qualities, 'jyeffect') }
+      if (response.data?.sk) { this.appendQuality(qualities, 'sky') }
+      if (response.data?.db) { this.appendQuality(qualities, 'dolby') }
+      if (response.data?.jm) { this.appendQuality(qualities, 'jymaster') }
       this.availableQualities = qualities
-      if (qualities.length > 0) {
-        const currentAvailable = qualities.find((item: QualityOption) => item.level === this.playerStore.quality)
-        if (!currentAvailable) {
-          this.playerStore.quality = qualities[qualities.length - 1].level
-        }
-      }
     } catch (_error) {
       if (songId === this.playerStore.currentSong.id) {
         this.availableQualities = QUALITY_OPTIONS.slice(0, 3)
@@ -920,6 +919,7 @@ export struct Play {
   }
 
   private async downloadSong(): Promise<void> {
+    const downloadSong = this.playerStore.currentSong
     BubbleTip.show(this.getUIContext(), '正在获取下载地址…')
     this.downloadProgress = 0
     try {
@@ -927,12 +927,13 @@ export struct Play {
       let fileType: string = 'mp3'
 
       const params: ApiParam[] = [
-        { key: 'id', value: this.playerStore.currentSong.id },
+        { key: 'id', value: downloadSong.id },
         { key: 'level', value: AppSettings.defaultDownloadQuality }
       ]
       try {
         const response = await ApiClient.get<SongDownloadUrlResponse>('/song/download/url/v1', params)
-        if (response.code === 200 && response.data && response.data.url && response.data.url.length > 0) {
+        if (response.code === 200 && response.data && response.data.url && response.data.url.length > 0 &&
+          String(response.data.id) === downloadSong.id && !response.data.freeTrialInfo) {
           downloadUrl = response.data.url
           fileType = response.data.type || 'mp3'
         }
@@ -940,28 +941,11 @@ export struct Play {
       }
 
       if (downloadUrl.length === 0) {
-        const cookie = ApiClient.cookie.length > 0
-          ? (ApiClient.cookie.indexOf('os=') >= 0 ? ApiClient.cookie : `${ApiClient.cookie}; os=pc;`)
-          : ''
-        const body: Record<string, string> = {}
-        body['id'] = this.playerStore.currentSong.id
-        body['level'] = AppSettings.defaultDownloadQuality
-        if (cookie.length > 0) {
-          body['cookie'] = cookie
-        }
-        const fallback = await ApiClient.postJson<SongUrlResponse>('/song/url/v1', body)
-        if (fallback.data && fallback.data.length > 0 && fallback.data[0].url) {
-          downloadUrl = fallback.data[0].url
-          fileType = fallback.data[0].type || 'mp3'
-        }
-      }
-
-      if (downloadUrl.length === 0) {
         BubbleTip.show(this.getUIContext(), '当前歌曲或账号没有可下载资源')
         return
       }
       const extension = fileType
-      const safeName = `${this.playerStore.currentSong.name}-${this.playerStore.currentSong.author}`
+      const safeName = `${downloadSong.name}-${downloadSong.author}`
         .replace(/[\\/:*?"<>|]/g, '_')
       const context = this.getUIContext().getHostContext() as common.UIAbilityContext
       const audioPicker = new picker.AudioViewPicker(context)
@@ -974,33 +958,38 @@ export struct Play {
       }
       this.downloadProgress = 10
       BubbleTip.show(this.getUIContext(), '正在下载音频…')
-      const client = http.createHttp()
+      const tempPath = `${context.cacheDir}/song_${downloadSong.id}_${Date.now()}.${extension}`
       try {
-        const audioResponse = await client.request(downloadUrl, {
-          method: http.RequestMethod.GET,
+        const task = await request.downloadFile(context, {
+          url: downloadUrl,
+          filePath: tempPath,
           header: {
             'Cookie': ApiClient.cookie,
             'Referer': 'https://music.163.com/'
           },
-          expectDataType: http.HttpDataType.ARRAY_BUFFER,
-          connectTimeout: 15000,
-          readTimeout: 120000,
-          usingCache: false
+          enableMetered: true,
+          background: false
         })
-        if (audioResponse.responseCode < 200 || audioResponse.responseCode >= 300) {
-          throw new Error(`下载请求失败 (${audioResponse.responseCode})`)
-        }
+        task.on('progress', (received: number, total: number) => {
+          if (total > 0) { this.downloadProgress = Math.floor(received * 100 / total) }
+        })
+        await new Promise<void>((resolve, reject) => {
+          task.on('complete', () => resolve())
+          task.on('fail', (code: number) => reject(new Error(`下载失败 (${code})`)))
+        })
+        const source = fileIo.openSync(tempPath, fileIo.OpenMode.READ_ONLY)
         const target = fileIo.openSync(uris[0],
           fileIo.OpenMode.CREATE | fileIo.OpenMode.READ_WRITE | fileIo.OpenMode.TRUNC)
         try {
-          fileIo.writeSync(target.fd, audioResponse.result as ArrayBuffer)
+          fileIo.copyFileSync(source.fd, target.fd)
         } finally {
+          fileIo.closeSync(source)
           fileIo.closeSync(target)
         }
         this.downloadProgress = 100
         BubbleTip.show(this.getUIContext(), `下载完成：${safeName}.${extension}`)
       } finally {
-        client.destroy()
+        if (fileIo.accessSync(tempPath)) { fileIo.unlinkSync(tempPath) }
       }
     } catch (error) {
       BubbleTip.show(this.getUIContext(), error instanceof Error ? error.message : '下载失败')

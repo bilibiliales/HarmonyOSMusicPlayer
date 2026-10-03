@@ -4,7 +4,7 @@ import { window } from '@kit.ArkUI';
 import { AppSettings } from '../services/AppSettings';
 import { playerController } from '../services/PlayerController';
 import { PlaybackControlBridge } from '../services/PlaybackControlBridge';
-import { NearbyShareSession } from '../services/SystemShareService';
+import { NearbyShareSession, SystemShareService } from '../services/SystemShareService';
 
 const DOMAIN = 0x0000;
 
@@ -25,11 +25,13 @@ export default class EntryAbility extends UIAbility {
       hilog.error(DOMAIN, 'testTag', 'Failed to set colorMode. Cause: %{public}s', JSON.stringify(err));
     }
     AppSettings.context = this.context;
+    SystemShareService.bindAbility(this.context);
     this.handlePlaybackWant(want);
     hilog.info(DOMAIN, 'testTag', '%{public}s', 'Ability onCreate');
   }
 
   onDestroy(): void {
+    SystemShareService.unbindAbility();
     playerController.release().catch((error: Error) => console.error(error.message));
     hilog.info(DOMAIN, 'testTag', '%{public}s', 'Ability onDestroy');
   }

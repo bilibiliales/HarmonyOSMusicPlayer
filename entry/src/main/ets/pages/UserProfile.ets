@@ -1,4 +1,6 @@
 import { common } from '@kit.AbilityKit'
+import { ListeningPlaylistService } from '../services/ListeningPlaylistService'
+import { ListeningPlaylistCard } from '../components/ListeningPlaylistCard'
 import { SystemShareService, NearbyShareSession, ShareLink } from '../services/SystemShareService'
 import {
   ArtistPageParam,
@@ -41,6 +43,10 @@ export struct UserProfilePage {
 
   @State detail?: UserDetailResponse = undefined
   @State playlists: playlistType[] = []
+  @State recordSongs: songItemType[] = []
+  @State recordLoading: boolean = true
+  @State recordPreviewType: 0 | 1 = 1
+  @State recordError: string = ''
   @State events: UserEventItem[] = []
   @State currentTab: string = 'home'
   @State loading: boolean = true
@@ -67,6 +73,30 @@ export struct UserProfilePage {
   aboutToAppear(): void {
     this.applyRelationHint()
     this.loadProfile()
+    this.loadRecord()
+  }
+
+  private rankingPlaylist(): playlistType {
+    return ListeningPlaylistService.playlist('record', this.pageParam.uid,
+      this.detail?.profile.nickname || '', this.recordSongs, this.recordPreviewType)
+  }
+
+  private async loadRecord(): Promise<void> {
+    const uid = this.pageParam.uid
+    this.recordSongs = []
+    this.recordError = ''
+    this.recordLoading = true
+    try {
+      let songs = await ListeningPlaylistService.record(uid, 1)
+      const type: 0 | 1 = songs.length === 0 ? 0 : 1
+      if (type === 0) { songs = await ListeningPlaylistService.record(uid, 0) }
+      if (uid === this.pageParam.uid) { this.recordSongs = songs; this.recordPreviewType = type }
+    } catch (error) {
+      if (uid === this.pageParam.uid) {
+        this.recordSongs = []
+        this.recordError = error instanceof Error ? error.message : '听歌排行暂不可用'
+      }
+    } finally { this.recordLoading = false }
   }
 
   private hasRelationHint(): boolean {
@@ -659,6 +689,12 @@ export struct UserProfilePage {
   @Builder
   private HomeTab() {
     Column({ space: 14 }) {
+      if (this.recordSongs.length > 0 && !this.recordError) {
+      ListeningPlaylistCard({
+        playlist: this.rankingPlaylist(), loading: this.recordLoading, message: this.recordError,
+        onOpen: () => this.pageStack.pushPathByName('PlaylistDetailPage', this.rankingPlaylist())
+      })
+      }
       Text(`共公开 ${this.playlists.length} 个歌单`)
         .width('100%').fontSize(13).fontColor('#92929a')
       ForEach(this.playlists.slice(0, 3), (item: playlistType) => {

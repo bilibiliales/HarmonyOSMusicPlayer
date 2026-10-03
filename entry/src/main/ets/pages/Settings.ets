@@ -45,7 +45,7 @@ export struct SettingsPage {
     try {
       const context = this.getUIContext().getHostContext() as common.UIAbilityContext
       await playerController.setBackgroundPlayback(context, enabled)
-      BubbleTip.show(this.getUIContext(), enabled ? '已开启后台播放，请重新点击播放' : '已切换为前台 MP3 播放，请重新点击播放')
+      BubbleTip.show(this.getUIContext(), enabled ? '已开启后台播放' : '已关闭后台播放')
     } catch (error) {
       BubbleTip.show(this.getUIContext(), error instanceof Error ? error.message : '切换播放方式失败')
     } finally {
@@ -60,11 +60,7 @@ export struct SettingsPage {
       await AppSettings.savePlaybackDefaults(context, this.defaultPlayMode, this.defaultOnlineQuality,
         this.defaultDownloadQuality)
       this.playerStore.playMode = this.defaultPlayMode
-      this.playerStore.quality = this.defaultOnlineQuality
-      if (!AppSettings.backgroundPlaybackEnabled &&
-        (this.defaultOnlineQuality === 'lossless' || this.defaultOnlineQuality === 'hires')) {
-        this.playerStore.quality = 'exhigh'
-      }
+      await playerController.changeQuality(this.defaultOnlineQuality)
       BubbleTip.show(this.getUIContext(), '默认播放设置已保存并应用')
     } catch (error) {
       BubbleTip.show(this.getUIContext(), error instanceof Error ? error.message : '默认播放设置保存失败')
@@ -117,7 +113,7 @@ export struct SettingsPage {
                   .selectedColor('#ef233c').enabled(!this.changingPlayback)
                   .onChange((enabled: boolean) => this.changeBackgroundPlayback(enabled))
               }.width('100%')
-              Text('关闭后使用实验性前台 MP3 播放，切到后台即停止；切换方式会中断当前播放。')
+              Text('关闭后仅在前台播放，切到后台自动暂停；开启后支持后台播放和系统媒体控制。')
                 .width('100%').fontSize(12).fontColor('#b9b9c0')
               Text('播放顺序').width('100%').fontSize(12).fontColor('#b9b9c0')
               Row({ space: 8 }) {

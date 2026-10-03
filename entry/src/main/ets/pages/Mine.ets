@@ -1,9 +1,9 @@
+import { ListeningPlaylistService } from '../services/ListeningPlaylistService'
 import { userPlaylists } from '../constants'
 import { playlistType, songItemType } from '../models'
 import {
   AlbumPageParam,
   AlbumSublistResponse,
-  ApiArtist,
   ApiParam,
   ApiSong,
   CommentApiItem,
@@ -18,8 +18,6 @@ import {
   EventPicture,
   LikeListResponse,
   ListenDataResponse,
-  ListenRankItem,
-  ListenRankResponse,
   LoginStatusResponse,
   mapApiSong,
   mapPlaylist,
@@ -125,7 +123,9 @@ export struct Mine {
   @State commentInput: string = ''
   @State commentSubmitting: boolean = false
   @State eventMessage: string = ''
-  @State listenRankItems: ListenRankItem[] = []
+  @State listenRankItems: songItemType[] = []
+  @State listenRankError: string = ''
+  @State recentSongsError: string = ''
   @State listenRankLoading: boolean = false
   @State recentSongs: songItemType[] = []
   @State recentSongsLoading: boolean = false
@@ -263,6 +263,8 @@ export struct Mine {
     this.likedSongs = []
     this.likedSongIds = []
     this.listenRankItems = []
+    this.listenRankError = ''
+    this.recentSongsError = ''
     this.djOffset = 0
     this.djHasMore = true
     this.eventsLasttime = -1
@@ -357,6 +359,8 @@ export struct Mine {
         }
       }
       this.loadedUserId = this.authStore.userId
+      this.loadRecentSongs(timestamp)
+      this.loadListenRank(timestamp)
       if (this.currentTab === 'music' && this.musicCategory === 'recent') {
         await this.loadRecentData(timestamp, refreshRecent)
       }
@@ -401,7 +405,16 @@ export struct Mine {
   }
 
   private currentPlaylists(): playlistType[] {
-    return this.musicCategory === 'created' ? this.createdPlaylists : this.subscribedPlaylists
+    if (this.musicCategory !== 'created') { return this.subscribedPlaylists }
+    return this.createdWithListening()
+  }
+
+  private createdWithListening(): playlistType[] {
+    const result = this.createdPlaylists.slice()
+    const likedIndex = result.findIndex((item: playlistType) => item.isLiked === true)
+    result.splice(likedIndex >= 0 ? likedIndex + 1 : Math.min(1, result.length), 0,
+      this.listeningPlaylist('recent'), this.listeningPlaylist('record'))
+    return result
   }
 
   private async loadRecentData(timestamp: string = '', forceRefresh: boolean = false): Promise<void> {
@@ -556,52 +569,35 @@ export struct Mine {
   }
 
   private async loadListenRank(timestamp: string = ''): Promise<void> {
-    if (!this.authStore.loggedIn || this.listenRankLoading) {
-      return
-    }
+    if (!this.authStore.loggedIn || this.listenRankLoading) { return }
+    const uid = this.authStore.userId
     this.listenRankLoading = true
+    this.listenRankError = ''
     try {
-      const response = await ApiClient.get<ListenRankResponse>('/listen/data/today/song',
-        this.withTimestamp([], timestamp))
-      if (response.code === 200 && response.data) {
-        const rankItems: ListenRankItem[] = response.data.songDTOs || response.data.songPlayRank || []
-        this.listenRankItems = rankItems
+      const songs = await ListeningPlaylistService.record(uid, 1, timestamp)
+      if (this.authStore.userId === uid) { this.listenRankItems = songs }
+    } catch (error) {
+      if (this.authStore.userId === uid) {
+        this.listenRankItems = []
+        this.listenRankError = error instanceof Error ? error.message : '听歌排行加载失败'
       }
-    } catch (_error) {
-    } finally {
-      this.listenRankLoading = false
-    }
+    } finally { this.listenRankLoading = false }
   }
 
   private async loadRecentSongs(timestamp: string = ''): Promise<void> {
-    if (!this.authStore.loggedIn || this.recentSongsLoading) {
-      return
-    }
+    if (!this.authStore.loggedIn || this.recentSongsLoading) { return }
+    const uid = this.authStore.userId
     this.recentSongsLoading = true
+    this.recentSongsError = ''
     try {
-      const response = await ApiClient.get<ListenRankResponse>('/listen/data/today/song',
-        this.withTimestamp([], timestamp))
-      if (response.code === 200 && response.data) {
-        const songDTOs = response.data.songDTOs || []
-        this.recentSongs = songDTOs.map((item: ListenRankItem): songItemType => {
-          const artists = item.artists || []
-          const mapped: songItemType = {
-            id: (item.songId || 0).toString(),
-            name: item.songName || '',
-            author: artists.map((ar: ApiArtist) => ar.name).join(' / '),
-            img: item.picUrl || '',
-            url: '',
-            duration: 0,
-            album: '',
-            fee: 0
-          }
-          return mapped
-        })
+      const songs = await ListeningPlaylistService.recent(timestamp)
+      if (this.authStore.userId === uid) { this.recentSongs = songs }
+    } catch (error) {
+      if (this.authStore.userId === uid) {
+        this.recentSongs = []
+        this.recentSongsError = error instanceof Error ? error.message : '最近播放加载失败'
       }
-    } catch (_error) {
-    } finally {
-      this.recentSongsLoading = false
-    }
+    } finally { this.recentSongsLoading = false }
   }
 
   private async loadDjRadios(timestamp: string = ''): Promise<void> {
@@ -1345,7 +1341,6 @@ export struct Mine {
     }
     .width('100%')
     .height(44)
-    .backgroundColor('#121215')
   }
 
   @Builder
@@ -1380,8 +1375,6 @@ export struct Mine {
         .backgroundColor('#1d1d23')
         .borderRadius(16)
       } else {
-        this.RecentPlaySection()
-        this.ListenRankSection()
         this.RecentPlaylistsSection()
         this.RecentAlbumsSection()
         Text('已通过分页参数查询全部可见收藏内容，该列表仅自己可见')
@@ -1449,155 +1442,9 @@ export struct Mine {
     .margin({ top: 10 })
   }
 
-  @Builder
-  RecentPlaySection() {
-    Column() {
-      Row() {
-        Text('最近播放')
-          .fontSize(14)
-          .fontColor('#ffffff')
-          .fontWeight(FontWeight.Medium)
-        Text('今天')
-          .fontSize(11)
-          .fontColor('#77777f')
-          .margin({ left: 6 })
-      }
-      .width('100%')
-      .padding({ left: 16, right: 16, top: 12, bottom: 6 })
-
-      if (this.recentSongsLoading) {
-        LoadingProgress().width(42).color('#ef233c').margin({ top: 20, bottom: 20 })
-      } else if (this.recentSongs.length === 0) {
-        Text('暂无最近播放')
-          .fontSize(12)
-          .fontColor('#77777f')
-          .width('100%')
-          .textAlign(TextAlign.Center)
-          .margin({ top: 16, bottom: 16 })
-      } else {
-        Column() {
-          ForEach(this.recentSongs.slice(0, 10), (item: songItemType, index: number) => {
-            Row({ space: 12 }) {
-              Text(`${(index as number) + 1}`)
-                .fontSize(14)
-                .fontColor((index as number) < 3 ? '#c0392b' : '#66666e')
-                .fontWeight((index as number) < 3 ? FontWeight.Bold : FontWeight.Regular)
-                .width(24)
-                .textAlign(TextAlign.Center)
-
-              if (item.img) {
-                Image(item.img).width(42).height(42).borderRadius(8).objectFit(ImageFit.Cover)
-                  .onClick(() => {
-                    const queue = this.playerStore.queue.map((s: songItemType) => s)
-                    let pos = queue.findIndex((s: songItemType) => s.id === item.id)
-                    if (pos < 0) {
-                      queue.push(item)
-                      pos = queue.length - 1
-                    }
-                    playerController.setQueue(queue, pos, true)
-                    this.pageStack.pushPathByName('PlayPage', null)
-                  })
-              } else {
-                Stack() {
-                  SymbolGlyph($r('sys.symbol.music')).fontSize(20).fontColor(['#55555d'])
-                }
-                .width(42).height(42).borderRadius(8).backgroundColor('#25252c')
-              }
-
-              Column({ space: 3 }) {
-                Text(item.name)
-                  .fontSize(13)
-                  .fontColor('#ededf0')
-                  .maxLines(1)
-                  .textOverflow({ overflow: TextOverflow.Ellipsis })
-                Text(item.author)
-                  .fontSize(11)
-                  .fontColor('#77777f')
-                  .maxLines(1)
-                  .textOverflow({ overflow: TextOverflow.Ellipsis })
-              }
-              .layoutWeight(1)
-              .alignItems(HorizontalAlign.Start)
-            }
-            .width('100%')
-            .height(56)
-            .padding({ left: 12, right: 16 })
-          })
-        }
-        .width('100%')
-      }
-    }
-    .width('100%')
-  }
-
-  @Builder
-  ListenRankSection() {
-    Column() {
-      Row() {
-        Text('听歌排行')
-          .fontSize(14)
-          .fontColor('#ffffff')
-          .fontWeight(FontWeight.Medium)
-        Text('近1个月')
-          .fontSize(11)
-          .fontColor('#77777f')
-          .margin({ left: 6 })
-      }
-      .width('100%')
-      .padding({ left: 16, right: 16, top: 12, bottom: 6 })
-
-      if (this.listenRankLoading) {
-        LoadingProgress().width(42).color('#ef233c').margin({ top: 20, bottom: 20 })
-      } else if (this.listenRankItems.length === 0) {
-        Text('暂无听歌排行数据')
-          .fontSize(12)
-          .fontColor('#77777f')
-          .width('100%')
-          .textAlign(TextAlign.Center)
-          .margin({ top: 16, bottom: 16 })
-      } else {
-        Column() {
-          ForEach(this.listenRankItems.slice(0, 10), (item: ListenRankItem, index: number) => {
-            Row({ space: 12 }) {
-              Text(`${(index as number) + 1}`)
-                .fontSize(14)
-                .fontColor((index as number) < 3 ? '#c0392b' : '#66666e')
-                .fontWeight((index as number) < 3 ? FontWeight.Bold : FontWeight.Regular)
-                .width(24)
-                .textAlign(TextAlign.Center)
-
-              Column({ space: 3 }) {
-                Text(item.songName || item.song?.songName || item.song?.name || '')
-                  .fontSize(13)
-                  .fontColor('#ededf0')
-                  .maxLines(1)
-                  .textOverflow({ overflow: TextOverflow.Ellipsis })
-                Text(item.artists?.map((ar: ApiArtist) => ar.name).join(' / ') ||
-                  item.song?.artists?.map((ar: ApiArtist) => ar.name).join(' / ') ||
-                  item.song?.ar?.map((ar: ApiArtist) => ar.name).join(' / ') || '')
-                  .fontSize(11)
-                  .fontColor('#77777f')
-                  .maxLines(1)
-                  .textOverflow({ overflow: TextOverflow.Ellipsis })
-              }
-              .layoutWeight(1)
-              .alignItems(HorizontalAlign.Start)
-
-              if (item.playCount) {
-                Text(`${item.playCount}次`)
-                  .fontSize(10)
-                  .fontColor('#55555d')
-              }
-            }
-            .width('100%')
-            .height(52)
-            .padding({ left: 12, right: 16 })
-          })
-        }
-        .width('100%')
-      }
-    }
-    .width('100%')
+  private listeningPlaylist(kind: 'recent' | 'record'): playlistType {
+    return ListeningPlaylistService.playlist(kind, this.authStore.userId, this.authStore.nickname,
+      kind === 'recent' ? this.recentSongs : this.listenRankItems)
   }
 
   @Builder
@@ -1616,13 +1463,19 @@ export struct Mine {
       .width('100%')
       .padding({ left: 16, right: 16, top: 12, bottom: 6 })
 
-      ForEach(this.createdPlaylists.slice(0, 4), (item: playlistType) => {
+      ForEach(this.createdWithListening().slice(0, 6), (item: playlistType) => {
         Row({ space: 12 }) {
+          Stack() {
           Image(item.cover)
             .width(48)
             .height(48)
             .borderRadius(8)
             .objectFit(ImageFit.Cover)
+            if (item.specialType) {
+              SymbolGlyph(item.specialType === 'recent' ? $r('sys.symbol.clock') : $r('sys.symbol.sort'))
+                .fontSize(26).fontColor(['#ffffff']).shadow({ radius: 4, color: '#333333' })
+            }
+          }.width(56).height(56)
           Column({ space: 4 }) {
             Text(item.name)
               .fontSize(13)
@@ -1859,11 +1712,17 @@ export struct Mine {
     Column() {
       ForEach(this.currentPlaylists(), (item: playlistType) => {
         Row({ space: 12 }) {
+          Stack() {
           Image(item.cover)
             .width(56)
             .height(56)
             .borderRadius(8)
             .objectFit(ImageFit.Cover)
+            if (item.specialType) {
+              SymbolGlyph(item.specialType === 'recent' ? $r('sys.symbol.clock') : $r('sys.symbol.sort'))
+                .fontSize(26).fontColor(['#ffffff'])
+            }
+          }.width(56).height(56)
 
           Column({ space: 4 }) {
             Row({ space: 6 }) {
@@ -1922,6 +1781,10 @@ export struct Mine {
                   .fontSize(14)
                   .fontColor(['#c0392b'])
                   .position({ right: 6, top: 6 })
+              }
+              if (item.specialType) {
+                SymbolGlyph(item.specialType === 'recent' ? $r('sys.symbol.clock') : $r('sys.symbol.sort'))
+                  .fontSize(30).fontColor(['#ffffff']).shadow({ radius: 4, color: '#333333' })
               }
             }
             .width('100%')
@@ -2405,6 +2268,10 @@ export struct Mine {
   }
 
   navigateToPlaylist(playlist: playlistType) {
+    if (playlist.specialType === 'recent') {
+      this.pageStack.pushPathByName('RecentPlaybackPage', null)
+      return
+    }
     playlist.onChanged = () => {
       this.loadedUserId = ''
       this.loadUserData()

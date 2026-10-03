@@ -157,7 +157,8 @@ export class AppSettings {
     if (typeof value !== 'string') {
       return 'exhigh'
     }
-    if (value === 'standard' || value === 'higher' || value === 'exhigh' || value === 'lossless' || value === 'hires') {
+    if (value === 'standard' || value === 'higher' || value === 'exhigh' || value === 'lossless' || value === 'hires' ||
+      value === 'jyeffect' || value === 'sky' || value === 'dolby' || value === 'jymaster') {
       return value
     }
     return 'exhigh'

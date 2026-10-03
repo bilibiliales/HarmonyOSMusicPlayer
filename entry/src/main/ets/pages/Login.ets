@@ -360,6 +360,7 @@ export struct Login {
         }
         .width('100%')
         .height(56)
+        .padding({ left: 16, right: 16 })
 
         Scroll() {
           Column({ space: 20 }) {
