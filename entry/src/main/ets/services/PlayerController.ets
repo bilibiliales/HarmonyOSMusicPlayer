@@ -3,13 +3,13 @@ import { common } from '@kit.AbilityKit'
 import { avSession } from '@kit.AVSessionKit'
 import { media } from '@kit.MediaKit'
 import { PlayMode, songItemType } from '../models/music'
-import { ApiParam, SongDownloadUrlResponse, SongUrlData, SongUrlResponse } from '../models/api'
 import { PlayerStore } from '../stores/PlayerStore'
-import { ApiClient } from './ApiClient'
 import { AppSettings } from './AppSettings'
 import { LiveViewController } from './LiveViewController'
 import { PlaybackAction, PlaybackControlBridge } from './PlaybackControlBridge'
 import { ListeningScrobble } from './ListeningScrobble'
+import { SongAudioResource, SongQualityService } from './SongQualityService'
+import { MemoryAudioLoad } from './MemoryAudioSource'
 
 export class PlayerController {
   private static instance: PlayerController = new PlayerController()
@@ -33,6 +33,13 @@ export class PlayerController {
   private externalControlInProgress: boolean = false
   private released: boolean = false
   private scrobble: ListeningScrobble = new ListeningScrobble()
+
+  private audioLoad?: MemoryAudioLoad
+
+  private cancelAudioLoad(): void {
+    this.audioLoad?.cancel()
+    this.audioLoad = undefined
+  }
 
   private foreground: boolean = true
   private switchingBackground: boolean = false
@@ -103,6 +110,7 @@ export class PlayerController {
     if (!AppSettings.backgroundPlaybackEnabled) {
       this.shouldAutoPlay = false
       ++this.playRequestToken
+      this.cancelAudioLoad()
       this.loadingSongId = ''
       if (this.store) { this.store.isLoading = false }
       this.pause().catch((error: Error) => this.log('FOREGROUND_PAUSE_FAILED', error.message))
@@ -341,14 +349,6 @@ export class PlayerController {
 
   private log(event: string, detail: string): void {
     console.info(`[PlayerController][${event}] ${detail}`)
-  }
-
-  private urlSummary(url: string): string {
-    const queryIndex = url.indexOf('?')
-    const cleanUrl = queryIndex >= 0 ? url.substring(0, queryIndex) : url
-    const parts = cleanUrl.split('/')
-    const tail = parts.length > 0 ? parts[parts.length - 1] : cleanUrl
-    return `${tail} urlLength=${url.length}`
   }
 
   private isCurrentPlayer(player: media.AVPlayer, generation: number): boolean {
@@ -594,125 +594,24 @@ export class PlayerController {
     return songId.length > 0 && (this.sourceSongId === songId || this.loadingSongId === songId)
   }
 
-  private playbackCookie(): string {
-    const cookie = ApiClient.cookie
-    if (cookie.length === 0) {
-      return ''
-    }
-    if (cookie.indexOf('os=') >= 0) {
-      return cookie
-    }
-    return `${cookie}; os=pc;`
-  }
-
-  private bitrateForLevel(level: string): number {
-    if (level === 'standard') {
-      return 128000
-    }
-    if (level === 'higher') {
-      return 192000
-    }
-    if (level === 'exhigh') {
-      return 320000
-    }
-    return 999000
-  }
-
-  private extractUrlItem(data: SongUrlResponse): SongUrlData | null {
-    if (data.data && data.data.length > 0) {
-      return data.data[0]
-    }
-    return null
-  }
-
-  private async attemptUrl(endpoint: string, body: Record<string, string>, songId: string,
-    requestToken: number): Promise<string> {
-    try {
-      const params: ApiParam[] = []
-      const keys = Object.keys(body)
-      for (let i = 0; i < keys.length; i++) {
-        params.push({ key: keys[i], value: body[keys[i]] })
+  private async resolveSongResource(song: songItemType, requestToken: number): Promise<SongAudioResource> {
+    let resource: SongAudioResource | undefined
+    if (song.isVoice) {
+      resource = await SongQualityService.playbackAtLevel(song.id, 'standard')
+      if (!resource && song.url) {
+        resource = { url: song.url, requestedLevel: '', selectedLevel: '', actualLevel: '',
+          size: 0, type: '', encodeType: '', trial: false }
       }
-      params.push({ key: 'timestamp', value: Date.now().toString() })
-      const response = await ApiClient.get<SongUrlResponse>(endpoint, params)
-      const item = this.extractUrlItem(response)
-      if (item && item.url && item.url.length > 0) {
-        if (item.id.toString() !== songId) {
-          this.log('URL_ID_MISMATCH', `requestToken=${requestToken} endpoint=${endpoint} requestedSongId=${songId} responseSongId=${item.id} rejected=true`)
-          return ''
-        }
-        this.log('URL_RESOLVED', `requestToken=${requestToken} endpoint=${endpoint} requestedSongId=${songId} responseSongId=${item.id} ${this.urlSummary(item.url)}`)
-        if (requestToken === this.playRequestToken && this.store) {
-          this.store.actualQuality = item.level || ''
-          this.scrobble.setTrial(!!item.freeTrialInfo)
-        }
-        return item.url
-      }
-      this.log('URL_EMPTY', `requestToken=${requestToken} endpoint=${endpoint} requestedSongId=${songId} code=${response.code}`)
-    } catch (error) {
-      this.log('URL_REQUEST_FAILED', `requestToken=${requestToken} endpoint=${endpoint} requestedSongId=${songId} message=${error instanceof Error ? error.message : 'unknown error'}`)
+    } else {
+      resource = await SongQualityService.playback(song.id, this.store?.quality || 'exhigh')
     }
-    return ''
-  }
-
-  private async resolveSongUrl(song: songItemType, requestToken: number): Promise<string> {
-    if (this.store && requestToken === this.playRequestToken) {
-      this.store.actualQuality = ''
+    if (!resource) { throw new Error('暂无可播放音源') }
+    if (requestToken === this.playRequestToken && this.store) {
+      this.store.actualQuality = resource.actualLevel
+      this.scrobble.setTrial(resource.trial)
+      this.log('QUALITY_RESOLVED', `songId=${song.id} requested=${resource.requestedLevel} selected=${resource.selectedLevel} actual=${resource.actualLevel}`)
     }
-    const cookie = this.playbackCookie()
-    const level = this.store?.quality || 'exhigh'
-    const id = song.id
-
-    const body1: Record<string, string> = {}
-    body1['id'] = id
-    body1['level'] = level
-    if (cookie.length > 0) {
-      body1['cookie'] = cookie
-    }
-    let url = await this.attemptUrl('/song/url/v1', body1, id, requestToken)
-    if (url.length > 0) {
-      return url
-    }
-
-    const body2: Record<string, string> = {}
-    body2['id'] = id
-    body2['br'] = this.bitrateForLevel(level).toString()
-    if (cookie.length > 0) {
-      body2['cookie'] = cookie
-    }
-    url = await this.attemptUrl('/song/url', body2, id, requestToken)
-    if (url.length > 0) {
-      return url
-    }
-
-    try {
-      const params: ApiParam[] = [
-        { key: 'id', value: id },
-        { key: 'level', value: level },
-        { key: 'timestamp', value: Date.now().toString() }
-      ]
-      const response = await ApiClient.get<SongDownloadUrlResponse>('/song/download/url/v1', params)
-      if (response.code === 200 && response.data && response.data.url && response.data.url.length > 0) {
-        if (response.data.id.toString() !== id) {
-          this.log('URL_ID_MISMATCH', `requestToken=${requestToken} endpoint=/song/download/url/v1 requestedSongId=${id} responseSongId=${response.data.id} rejected=true`)
-          throw new Error('audio source response song id mismatch')
-        }
-        this.log('URL_RESOLVED', `requestToken=${requestToken} endpoint=/song/download/url/v1 requestedSongId=${id} responseSongId=${response.data.id} ${this.urlSummary(response.data.url)}`)
-        if (requestToken === this.playRequestToken && this.store) {
-          this.store.actualQuality = response.data.level || ''
-          this.scrobble.setTrial(!!response.data.freeTrialInfo)
-        }
-        return response.data.url
-      }
-    } catch (error) {
-      console.error(`[PlayerController] /song/download/url/v1 failed: ${error instanceof Error ? error.message : 'unknown error'}`)
-    }
-
-    if (song.url && song.url.length > 0) {
-      this.log('URL_RESOLVED', `requestToken=${requestToken} endpoint=song.url requestedSongId=${id} ${this.urlSummary(song.url)}`)
-      return song.url
-    }
-    throw new Error('所有接口均未返回可播放地址，请检查登录状态或版权限制')
+    return resource
   }
 
   async playAt(index: number, autoPlay: boolean = true, forceReload: boolean = false): Promise<void> {
@@ -744,6 +643,7 @@ export class PlayerController {
     }
 
     const requestToken = ++this.playRequestToken
+    this.cancelAudioLoad()
     if (!forceReload) { this.scrobble.reset() }
     this.store.actualQuality = ''
     if (!forceReload) {
@@ -775,18 +675,22 @@ export class PlayerController {
     this.loadingSongId = song.id
     this.shouldAutoPlay = autoPlay
     try {
-      const url = await this.resolveSongUrl(song, requestToken)
+      const resource = await this.resolveSongResource(song, requestToken)
       if (requestToken !== this.playRequestToken || this.store.currentSong.id !== song.id ||
         !this.isCurrentPlayer(player, generation)) {
-        this.log('STALE_REQUEST', `stage=urlResolved requestToken=${requestToken} activeToken=${this.playRequestToken} targetSongId=${song.id} storeSongId=${this.store.currentSong.id} generation=${generation} activeGeneration=${this.playerGeneration}`)
+        this.log('STALE_REQUEST', `stage=urlResolved requestToken=${requestToken} activeToken=${this.playRequestToken} targetSongId=${song.id} storeSongId=${this.store?.currentSong.id} generation=${generation} activeGeneration=${this.playerGeneration}`)
         return
       }
-      if (!url) {
-        throw new Error('暂无可播放音源')
-      }
+      const load = new MemoryAudioLoad()
+      this.audioLoad = load
+      const source = await load.load(resource.url, resource.size)
+      if (this.audioLoad === load) { this.audioLoad = undefined }
+      if (requestToken !== this.playRequestToken || this.store.currentSong.id !== song.id ||
+        !this.isCurrentPlayer(player, generation)) { return }
       this.sourceSongId = song.id
-      this.log('SET_PLAYER_URL', `requestToken=${requestToken} generation=${generation} songId=${song.id} expectedDuration=${song.duration} ${this.urlSummary(url)}`)
-      player.url = url
+      this.log('SET_MEMORY_SOURCE', `requestToken=${requestToken} generation=${generation} songId=${song.id} bytes=${source.size}`)
+      // The descriptor callback retains the complete file until this AVPlayer is released.
+      player.dataSrc = source.descriptor()
     } catch (error) {
       if (requestToken !== this.playRequestToken) {
         return
@@ -797,7 +701,9 @@ export class PlayerController {
       this.loadingSongId = ''
       this.shouldAutoPlay = false
       this.resumePosition = 0
-      this.notifyPlaybackFailure(error instanceof Error ? error.message : 'unable to resolve song url')
+      this.cancelAudioLoad()
+      this.store.actualQuality = ''
+      this.notifyPlaybackFailure(error instanceof Error ? error.message : 'unable to load audio')
     }
   }
 
@@ -939,9 +845,9 @@ export class PlayerController {
   }
 
   async changeQuality(level: string): Promise<void> {
-    if (!this.store || this.store.quality === level) {
-      return
-    }
+    if (!this.store) { return }
+    if (this.store.quality === level && this.store.actualQuality === level &&
+      this.sourceSongId === this.store.currentSong.id) { return }
     const wasPlaying = this.store.isPlaying
     this.resumePosition = this.store.position
     this.store.quality = level
@@ -965,6 +871,7 @@ export class PlayerController {
 
   private async stopAndClearSource(): Promise<void> {
     const requestToken = ++this.playRequestToken
+    this.cancelAudioLoad()
     this.sourceSongId = ''
     this.loadingSongId = ''
     this.shouldAutoPlay = false

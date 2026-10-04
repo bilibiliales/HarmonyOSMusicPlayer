@@ -22,20 +22,36 @@ export function listeningDateKey(date: Date): string {
   return `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}-${date.getDate().toString().padStart(2, '0')}`
 }
 
-function parseDay(value: string): Date | undefined {
-  const match = /^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})(?:$|[ T])/.exec(value)
-  if (!match) { return undefined }
-  const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]))
-  return date.getFullYear() === Number(match[1]) && date.getMonth() === Number(match[2]) - 1 &&
-    date.getDate() === Number(match[3]) ? date : undefined
+function parseDay(value: string | number, anchor?: Date): Date | undefined {
+  const text = String(value).trim()
+  let match = /^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})(?:$|[ T])/.exec(text)
+  if (!match) { match = /^(\d{4})(\d{2})(\d{2})$/.exec(text) }
+  if (match) {
+    const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]))
+    return date.getFullYear() === Number(match[1]) && date.getMonth() === Number(match[2]) - 1 &&
+      date.getDate() === Number(match[3]) ? date : undefined
+  }
+  if (/^\d{10,13}$/.test(text)) {
+    const date = new Date(Number(text) < 100000000000 ? Number(text) * 1000 : Number(text))
+    return Number.isFinite(date.getTime()) ? date : undefined
+  }
+  if (anchor) {
+    const short = /^(?:(\d{1,2})[-/.])?(\d{1,2})$/.exec(text)
+    if (short) {
+      const month = short[1] ? Number(short[1]) - 1 : anchor.getMonth()
+      const date = new Date(anchor.getFullYear(), month, Number(short[2]))
+      if (date.getMonth() === month && date.getDate() === Number(short[2])) { return date }
+    }
+  }
+  return undefined
 }
 
 export function buildListeningPeriod(report: ListenReportData, monthly: boolean, now: Date = new Date()): ListeningPeriod {
   const details = report.listenTimeDistributionBlock?.durationDetails || []
   let anchor = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-  if (report.startTime && report.startTime > 0) {
-    const start = new Date(report.startTime < 100000000000 ? report.startTime * 1000 : report.startTime)
-    if (Number.isFinite(start.getTime())) { anchor = start }
+  const reportStart = report.startTime ? parseDay(report.startTime) : undefined
+  if (reportStart) {
+    anchor = reportStart
   } else {
     const dates: Date[] = []
     for (const detail of details) {
@@ -46,7 +62,7 @@ export function buildListeningPeriod(report: ListenReportData, monthly: boolean,
     if (dates.length) { anchor = dates[0] }
   }
   const start = monthly ? new Date(anchor.getFullYear(), anchor.getMonth(), 1) :
-    new Date(anchor.getFullYear(), anchor.getMonth(), anchor.getDate() - (report.startTime ? 0 : anchor.getDay()))
+    new Date(anchor.getFullYear(), anchor.getMonth(), anchor.getDate() - (reportStart ? 0 : anchor.getDay()))
   const count = monthly ? new Date(start.getFullYear(), start.getMonth() + 1, 0).getDate() : 7
   const weekdays: string[] = ['日', '一', '二', '三', '四', '五', '六']
   const days: ListeningDay[] = []
@@ -58,7 +74,7 @@ export function buildListeningPeriod(report: ListenReportData, monthly: boolean,
     const date = new Date(start.getFullYear(), start.getMonth(), start.getDate() + index)
     const key = listeningDateKey(date)
     const detail = details.find((item) => {
-      const parsed = parseDay(item.period)
+      const parsed = parseDay(item.period, start)
       return parsed !== undefined && listeningDateKey(parsed) === key
     })
     const future = date.getTime() > today

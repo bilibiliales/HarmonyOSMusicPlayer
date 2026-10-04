@@ -5,7 +5,6 @@ import { http } from '@kit.NetworkKit'
 import { request } from '@kit.BasicServicesKit'
 import curves from '@ohos.curves'
 import {
-  ApiParam,
   AlbumPageParam,
   ArtistPageParam,
   CommentResponse,
@@ -15,15 +14,14 @@ import {
   mapComment,
   mapPlaylist,
   SharePageParam,
-  SongDownloadUrlResponse,
   SongDetailResponse,
-  SongMusicDetailResponse,
   SongRedCountResponse,
-  SongUrlResponse,
   UserPlaylistResponse
 } from '../models/api'
-import { MusicComment, PlayMode, playlistType, QUALITY_OPTIONS, QualityOption, SongArtist, songItemType } from '../models/music'
+import { MusicComment, PlayMode, playlistType, QualityOption, SongArtist, songItemType } from '../models/music'
 import { ApiClient } from '../services/ApiClient'
+import { SongQualityService } from '../services/SongQualityService'
+import { AudioFileFormat } from '../services/AudioFileFormat'
 import { playerController } from '../services/PlayerController'
 import { AuthStore } from '../stores/AuthStore'
 import { PlayerStore } from '../stores/PlayerStore'
@@ -67,6 +65,16 @@ export struct Play {
   @State switchingSong: boolean = false
   @State availableQualities: QualityOption[] = []
   @State qualityLoading: boolean = false
+  @State qualityError: string = ''
+  @State downloadQualities: QualityOption[] = []
+  @State downloadQualityLoading: boolean = false
+  @State downloadQualityError: string = ''
+  @State downloadSongName: string = ''
+  @State preferredDownloadLevel: string = ''
+  @State downloading: boolean = false
+  private downloadTarget?: songItemType
+  private downloadQualityToken: number = 0
+  private qualityRequestToken: number = 0
   @State coverPreviewVisible: boolean = false
   @State coverSaving: boolean = false
   @State coverMessage: string = ''
@@ -664,68 +672,59 @@ export struct Play {
     return value.toString()
   }
 
-  private qualityOption(level: string): QualityOption | null {
-    const option = QUALITY_OPTIONS.find((item: QualityOption) => item.level === level)
-    return option || null
-  }
-
-  private appendQuality(target: QualityOption[], level: string): void {
-    const option = this.qualityOption(level)
-    if (option) {
-      target.push(option)
-    }
-  }
-
   private async loadMusicQualities(): Promise<void> {
     const songId = this.playerStore.currentSong.id
-    if (this.qualityLoading && this.loadedQualitySongId === songId) {
-      return
-    }
+    if (!songId || (this.qualityLoading && this.loadedQualitySongId === songId)) { return }
+    const token = ++this.qualityRequestToken
     this.loadedQualitySongId = songId
     this.qualityLoading = true
+    this.qualityError = ''
+    this.availableQualities = []
     try {
-      const response = await ApiClient.get<SongMusicDetailResponse>('/song/music/detail', [
-        { key: 'id', value: songId }
-      ])
-      if (songId !== this.playerStore.currentSong.id) {
-        return
+      const qualities = await SongQualityService.available(songId)
+      if (token === this.qualityRequestToken && songId === this.playerStore.currentSong.id) {
+        this.availableQualities = qualities
       }
-      const qualities: QualityOption[] = []
-      if (response.data?.l) {
-        this.appendQuality(qualities, 'standard')
-      }
-      if (response.data?.m) {
-        this.appendQuality(qualities, 'higher')
-      }
-      if (response.data?.h) {
-        this.appendQuality(qualities, 'exhigh')
-      }
-      if (response.data?.sq) {
-        this.appendQuality(qualities, 'lossless')
-      }
-      if (response.data?.hr) {
-        this.appendQuality(qualities, 'hires')
-      }
-      if (response.data?.je) { this.appendQuality(qualities, 'jyeffect') }
-      if (response.data?.sk) { this.appendQuality(qualities, 'sky') }
-      if (response.data?.db) { this.appendQuality(qualities, 'dolby') }
-      if (response.data?.jm) { this.appendQuality(qualities, 'jymaster') }
-      this.availableQualities = qualities
-    } catch (_error) {
-      if (songId === this.playerStore.currentSong.id) {
-        this.availableQualities = QUALITY_OPTIONS.slice(0, 3)
+    } catch (error) {
+      if (token === this.qualityRequestToken && songId === this.playerStore.currentSong.id) {
+        this.qualityError = error instanceof Error ? error.message : '音质查询失败，点击重试'
       }
     } finally {
-      if (songId === this.playerStore.currentSong.id) {
-        this.qualityLoading = false
-      }
+      if (token === this.qualityRequestToken) { this.qualityLoading = false }
     }
   }
 
   private openQualitySheet(): void {
     this.activeSheet = 'quality'
-    if (this.loadedQualitySongId !== this.playerStore.currentSong.id || this.availableQualities.length === 0) {
-      this.loadMusicQualities()
+    this.loadMusicQualities()
+  }
+
+  private async openDownloadQualitySheet(): Promise<void> {
+    if (this.downloading) {
+      BubbleTip.show(this.getUIContext(), `正在下载 · ${this.downloadProgress}%`)
+      return
+    }
+    const song = this.playerStore.currentSong
+    if (!song.id) { return }
+    const token = ++this.downloadQualityToken
+    this.downloadTarget = song
+    this.downloadSongName = song.name
+    this.downloadQualities = []
+    this.preferredDownloadLevel = ''
+    this.downloadQualityError = ''
+    this.downloadQualityLoading = true
+    this.activeSheet = 'downloadQuality'
+    try {
+      const qualities = await SongQualityService.available(song.id)
+      if (token !== this.downloadQualityToken) { return }
+      this.downloadQualities = qualities
+      this.preferredDownloadLevel = SongQualityService.candidates(AppSettings.defaultDownloadQuality, qualities)[0] || ''
+    } catch (error) {
+      if (token === this.downloadQualityToken) {
+        this.downloadQualityError = error instanceof Error ? error.message : '音质查询失败，点击重试'
+      }
+    } finally {
+      if (token === this.downloadQualityToken) { this.downloadQualityLoading = false }
     }
   }
 
@@ -918,81 +917,73 @@ export struct Play {
     }
   }
 
-  private async downloadSong(): Promise<void> {
-    const downloadSong = this.playerStore.currentSong
-    BubbleTip.show(this.getUIContext(), '正在获取下载地址…')
+  private async downloadSong(level: string): Promise<void> {
+    const song = this.downloadTarget
+    if (!song || this.downloading || this.downloadQualityLoading) { return }
+    const context = this.getUIContext().getHostContext() as common.UIAbilityContext
+    this.downloading = true
+    this.activeSheet = ''
     this.downloadProgress = 0
+    let tempPath = ''
     try {
-      let downloadUrl: string = ''
-      let fileType: string = 'mp3'
-
-      const params: ApiParam[] = [
-        { key: 'id', value: downloadSong.id },
-        { key: 'level', value: AppSettings.defaultDownloadQuality }
-      ]
+      BubbleTip.show(this.getUIContext(), '正在获取下载地址…')
+      const resource = await SongQualityService.download(song.id, level)
+      const qualityTitle = SongQualityService.title(resource.actualLevel)
+      BubbleTip.show(this.getUIContext(), `正在下载 · ${qualityTitle}`)
+      tempPath = `${context.cacheDir}/song_${song.id}_${Date.now()}.audio`
+      const task = await request.downloadFile(context, {
+        url: resource.url,
+        filePath: tempPath,
+        header: { 'Referer': 'https://music.163.com/' },
+        enableMetered: true,
+        background: false
+      })
+      task.on('progress', (received: number, total: number) => {
+        if (total > 0) { this.downloadProgress = Math.min(99, Math.floor(received * 100 / total)) }
+      })
+      await new Promise<void>((resolve, reject) => {
+        task.on('complete', () => resolve())
+        task.on('fail', (code: number) => reject(new Error(`下载失败 (${code})`)))
+      })
+      const source = fileIo.openSync(tempPath, fileIo.OpenMode.READ_ONLY)
       try {
-        const response = await ApiClient.get<SongDownloadUrlResponse>('/song/download/url/v1', params)
-        if (response.code === 200 && response.data && response.data.url && response.data.url.length > 0 &&
-          String(response.data.id) === downloadSong.id && !response.data.freeTrialInfo) {
-          downloadUrl = response.data.url
-          fileType = response.data.type || 'mp3'
+        const fileSize = fileIo.statSync(source.fd).size
+        if (fileSize <= 0 || (resource.size > 0 && resource.size !== fileSize)) {
+          throw new Error('音频文件下载不完整，请重试')
         }
-      } catch (_e) {
-      }
-
-      if (downloadUrl.length === 0) {
-        BubbleTip.show(this.getUIContext(), '当前歌曲或账号没有可下载资源')
-        return
-      }
-      const extension = fileType
-      const safeName = `${downloadSong.name}-${downloadSong.author}`
-        .replace(/[\\/:*?"<>|]/g, '_')
-      const context = this.getUIContext().getHostContext() as common.UIAbilityContext
-      const audioPicker = new picker.AudioViewPicker(context)
-      const saveOptions = new picker.AudioSaveOptions()
-      saveOptions.newFileNames = [`${safeName}.${extension}`]
-      const uris = await audioPicker.save(saveOptions)
-      if (uris.length === 0) {
-        BubbleTip.show(this.getUIContext(), '已取消下载')
-        return
-      }
-      this.downloadProgress = 10
-      BubbleTip.show(this.getUIContext(), '正在下载音频…')
-      const tempPath = `${context.cacheDir}/song_${downloadSong.id}_${Date.now()}.${extension}`
-      try {
-        const task = await request.downloadFile(context, {
-          url: downloadUrl,
-          filePath: tempPath,
-          header: {
-            'Cookie': ApiClient.cookie,
-            'Referer': 'https://music.163.com/'
-          },
-          enableMetered: true,
-          background: false
-        })
-        task.on('progress', (received: number, total: number) => {
-          if (total > 0) { this.downloadProgress = Math.floor(received * 100 / total) }
-        })
-        await new Promise<void>((resolve, reject) => {
-          task.on('complete', () => resolve())
-          task.on('fail', (code: number) => reject(new Error(`下载失败 (${code})`)))
-        })
-        const source = fileIo.openSync(tempPath, fileIo.OpenMode.READ_ONLY)
+        const header = new ArrayBuffer(64)
+        const bytesRead = fileIo.readSync(source.fd, header, { offset: 0, length: 64 })
+        const extension = AudioFileFormat.extension(resource.url, resource.type, resource.encodeType,
+          new Uint8Array(header, 0, bytesRead))
+        const safeName = this.safeCoverFileName(`${song.name}-${song.author}`)
+        // Choose the destination after verifying the actual file format, then copy the bytes unchanged.
+        const audioPicker = new picker.AudioViewPicker(context)
+        const saveOptions = new picker.AudioSaveOptions()
+        saveOptions.newFileNames = [`${safeName}.${extension}`]
+        const uris = await audioPicker.save(saveOptions)
+        if (uris.length === 0) {
+          BubbleTip.show(this.getUIContext(), '已取消保存')
+          return
+        }
         const target = fileIo.openSync(uris[0],
           fileIo.OpenMode.CREATE | fileIo.OpenMode.READ_WRITE | fileIo.OpenMode.TRUNC)
         try {
-          fileIo.copyFileSync(source.fd, target.fd)
+          await fileIo.copyFile(tempPath, target.fd)
         } finally {
-          fileIo.closeSync(source)
           fileIo.closeSync(target)
         }
         this.downloadProgress = 100
-        BubbleTip.show(this.getUIContext(), `下载完成：${safeName}.${extension}`)
+        BubbleTip.show(this.getUIContext(), `下载完成：${safeName}.${extension} · ${qualityTitle}`)
       } finally {
-        if (fileIo.accessSync(tempPath)) { fileIo.unlinkSync(tempPath) }
+        fileIo.closeSync(source)
       }
     } catch (error) {
       BubbleTip.show(this.getUIContext(), error instanceof Error ? error.message : '下载失败')
+    } finally {
+      this.downloading = false
+      if (tempPath) {
+        try { if (fileIo.accessSync(tempPath)) { fileIo.unlinkSync(tempPath) } } catch (_error) {}
+      }
     }
   }
 
@@ -1400,6 +1391,9 @@ export struct Play {
       this.SheetHeader('选择播放音质', `当前：${this.playerStore.qualityTitle()} · 目标：${this.playerStore.requestedQualityTitle()}`)
       if (this.qualityLoading) {
         LoadingProgress().width(36).height(36).color('#ef233c').margin({ top: 28 })
+      } else if (this.qualityError) {
+        Text(`${this.qualityError} · 点击重试`).fontSize(14).fontColor('#a9a9b0').margin({ top: 28 })
+          .onClick(() => this.loadMusicQualities())
       } else if (this.availableQualities.length === 0) {
         Text('暂无可用音质').fontSize(14).fontColor('#888890').margin({ top: 28 })
       } else {
@@ -1436,6 +1430,39 @@ export struct Play {
         .layoutWeight(1)
       }
     }
+  }
+
+  @Builder
+  private DownloadQualitySheet() {
+    Column() {
+      this.SheetHeader('选择下载音质', this.downloadSongName)
+      if (this.downloadQualityLoading) {
+        LoadingProgress().width(36).height(36).color('#ef233c').margin({ top: 28 })
+      } else if (this.downloadQualityError) {
+        Text(`${this.downloadQualityError} · 点击重试`).fontSize(14).fontColor('#a9a9b0').margin({ top: 28 })
+          .onClick(() => this.openDownloadQualitySheet())
+      } else if (this.downloadQualities.length === 0) {
+        Text('暂无可下载音质').fontSize(14).fontColor('#888890').margin({ top: 28 })
+      } else {
+        Text('按原始音频格式保存，实际音质以账号可下载资源为准')
+          .fontSize(11).fontColor('#888890').padding({ left: 20, right: 20, bottom: 8 })
+        List({ space: 4 }) {
+          ForEach(this.downloadQualities, (item: QualityOption) => {
+            ListItem() {
+              Row({ space: 12 }) {
+                Column({ space: 4 }) {
+                  Text(item.level === this.preferredDownloadLevel ? `${item.title} · 默认可用` : item.title)
+                    .fontSize(15).fontColor(item.level === this.preferredDownloadLevel ? '#ef233c' : '#eeeeee')
+                  Text(item.description).fontSize(11).fontColor('#777777')
+                }.layoutWeight(1).alignItems(HorizontalAlign.Start)
+                SymbolGlyph($r('sys.symbol.arrow_down_circle')).fontSize(22).fontColor(['#a9a9b0'])
+              }.width('100%').padding({ left: 20, right: 20, top: 12, bottom: 12 })
+                .onClick(() => this.downloadSong(item.level))
+            }
+          }, (item: QualityOption) => item.level)
+        }.layoutWeight(1)
+      }
+    }.height('100%')
   }
 
   @Builder
@@ -1785,6 +1812,8 @@ export struct Play {
       Column() {
         if (this.activeSheet === 'quality') {
           this.QualitySheet()
+        } else if (this.activeSheet === 'downloadQuality') {
+          this.DownloadQualitySheet()
         } else if (this.activeSheet === 'queue') {
           this.QueueSheet()
         } else if (this.activeSheet === 'comments') {
@@ -1796,7 +1825,7 @@ export struct Play {
         }
       }
       .width('100%')
-      .height(this.activeSheet === 'quality' ? '52%' : this.activeSheet === 'more' ? '28%' : '68%')
+      .height(this.activeSheet === 'quality' || this.activeSheet === 'downloadQuality' ? '62%' : this.activeSheet === 'more' ? '28%' : '68%')
       .backgroundColor('#19191f')
       .borderRadius({ topLeft: 28, topRight: 28 })
       .shadow({ radius: 28, color: 'rgba(0,0,0,0.45)', offsetY: -5 })
@@ -2040,7 +2069,7 @@ export struct Play {
 
             Row() {
             this.SmallAction($r('sys.symbol.folder_badge_plus'), '收藏歌单', () => this.openCollectSheet())
-            this.SmallAction($r('sys.symbol.arrow_down_circle'), '下载', () => this.downloadSong())
+            this.SmallAction($r('sys.symbol.arrow_down_circle'), '下载', () => this.openDownloadQualitySheet())
             this.SmallAction($r('sys.symbol.arrow_right_up_and_square'), '分享', () => this.shareSong())
             this.SmallAction($r('sys.symbol.info_circle'), '歌曲百科', () => {
               this.pageStack.pushPathByName('SongWikiPage', this.playerStore.currentSong)

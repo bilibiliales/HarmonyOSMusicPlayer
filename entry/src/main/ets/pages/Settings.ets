@@ -5,6 +5,9 @@ import { AppSettings } from '../services/AppSettings'
 import { BubbleTip } from '../services/BubbleTip'
 import { PlayerStore } from '../stores/PlayerStore'
 import { playerController } from '../services/PlayerController'
+import { AuthStore } from '../stores/AuthStore'
+import { UserSettings, playRecordVisibilityPatch } from '../models/userSettings'
+import { UserSettingsService } from '../services/UserSettingsService'
 
 @Component
 struct QualitySelector {
@@ -29,6 +32,17 @@ export struct SettingsPage {
   @Consume('pageStack') pageStack: NavPathStack
   @Consume('topAvoidHeight') topAvoidHeight: number
   @Consume('playerStore') playerStore: PlayerStore
+  @Consume('authStore') authStore: AuthStore
+  @State privacySettings: UserSettings = {}
+  @State privacyAllowed: boolean = false
+  @State privacyLoading: boolean = false
+  @State privacySaving: boolean = false
+  @State privacyMessage: string = ''
+  @State privacyReady: boolean = false
+  private privacyRequest: number = 0
+  private privacyCookie: string = ''
+  private privacyVisible: boolean = false
+  private privacyReloadPending: boolean = false
   @State serverUrl: string = ApiClient.baseUrl
   @State aiBaseUrl: string = AppSettings.aiBaseUrl
   @State aiApiKey: string = AppSettings.aiApiKey
@@ -38,6 +52,96 @@ export struct SettingsPage {
   @State defaultDownloadQuality: string = AppSettings.defaultDownloadQuality
   @State backgroundPlaybackEnabled: boolean = AppSettings.backgroundPlaybackEnabled
   @State changingPlayback: boolean = false
+
+  aboutToDisappear(): void { this.privacyRequest++; this.privacyVisible = false }
+
+  private privacyAccountMatches(uid: string, cookie: string): boolean {
+    return this.authStore.loggedIn && this.authStore.userId === uid && ApiClient.cookie === cookie
+  }
+
+  private async loadPrivacySettings(): Promise<void> {
+    if (this.privacySaving) { this.privacyReloadPending = true; return }
+    const request = ++this.privacyRequest
+    const uid = this.authStore.userId
+    const cookie = ApiClient.cookie
+    this.privacyReady = false
+    this.privacyMessage = ''
+    this.privacySettings = {}
+    if (!this.authStore.loggedIn) { this.privacyLoading = false; this.privacyAllowed = false; return }
+    this.privacyLoading = true
+    try {
+      const settings = await UserSettingsService.read(uid)
+      if (request !== this.privacyRequest || !this.privacyAccountMatches(uid, cookie)) { return }
+      this.privacySettings = settings
+      this.privacyCookie = cookie
+      this.privacyAllowed = settings['allowPeopleCanSeeMyPlayRecord'] === true
+      this.privacyReady = typeof settings['allowPeopleCanSeeMyPlayRecord'] === 'boolean'
+      if (!this.privacyReady) { this.privacyMessage = '当前账号未返回可修改的听歌记录设置' }
+    } catch (error) {
+      if (request === this.privacyRequest) { this.privacyMessage = error instanceof Error ? error.message : '隐私设置读取失败' }
+    } finally { if (request === this.privacyRequest) { this.privacyLoading = false } }
+  }
+
+  private async changePlayRecordVisibility(allowed: boolean): Promise<void> {
+    if (this.privacySaving || !this.privacyReady || !this.authStore.loggedIn || this.privacyCookie !== ApiClient.cookie ||
+      allowed === this.privacySettings['allowPeopleCanSeeMyPlayRecord']) { return }
+    const uid = this.authStore.userId
+    const cookie = ApiClient.cookie
+    const request = ++this.privacyRequest
+    this.privacySaving = true
+    this.privacyAllowed = allowed
+    this.privacyMessage = ''
+    try {
+      const result = await UserSettingsService.updateAndRead(uid, playRecordVisibilityPatch(allowed))
+      if (request !== this.privacyRequest || !this.privacyAccountMatches(uid, cookie)) { return }
+      if (result.settings) { this.privacySettings = result.settings }
+      this.privacyReady = !!result.settings && typeof result.settings['allowPeopleCanSeeMyPlayRecord'] === 'boolean'
+      this.privacyAllowed = this.privacySettings['allowPeopleCanSeeMyPlayRecord'] === true
+      this.privacyMessage = result.confirmed ? '' : result.message
+      BubbleTip.show(this.getUIContext(), result.message)
+    } catch (error) {
+      if (request === this.privacyRequest) {
+        this.privacyAllowed = this.privacySettings['allowPeopleCanSeeMyPlayRecord'] === true
+        this.privacyReady = false
+        this.privacyMessage = error instanceof Error ? error.message : '设置修改失败'
+      }
+    } finally {
+      this.privacySaving = false
+      if (this.privacyReloadPending && this.privacyVisible) {
+        this.privacyReloadPending = false
+        this.loadPrivacySettings()
+      }
+    }
+  }
+
+  @Builder
+  private PrivacySection() {
+    Column({ space: 12 }) {
+      Text('隐私设置').width('100%').fontSize(16).fontWeight(FontWeight.Bold).fontColor('#ffffff')
+      if (!this.authStore.loggedIn) {
+        Text('登录后管理账号隐私设置').fontSize(12).fontColor('#92929a')
+        Button('去登录').backgroundColor('#ef233c').onClick(() => this.pageStack.pushPathByName('LoginPage', null))
+      } else if (this.privacyLoading) {
+        LoadingProgress().width(28).height(28).color('#ef233c')
+      } else {
+        Row({ space: 12 }) {
+          Column({ space: 6 }) {
+            Text('允许他人查看我的听歌记录').fontSize(14).fontColor('#eeeeee')
+            Text(this.privacySaving ? '正在保存并确认…' : '控制他人对听歌记录的访问')
+              .fontSize(11).fontColor('#92929a')
+          }.layoutWeight(1).alignItems(HorizontalAlign.Start)
+          Toggle({ type: ToggleType.Switch, isOn: this.privacyAllowed }).selectedColor('#ef233c')
+            .enabled(this.privacyReady && !this.privacySaving && this.privacyCookie === ApiClient.cookie)
+            .onChange((allowed: boolean) => this.changePlayRecordVisibility(allowed))
+        }.width('100%')
+        if (this.privacyMessage) {
+          Text(this.privacyMessage).width('100%').fontSize(12).fontColor('#ff8291')
+          Button('重新读取').fontSize(12).backgroundColor('#29292f').enabled(!this.privacySaving)
+            .onClick(() => this.loadPrivacySettings())
+        }
+      }
+    }.width('100%').padding(18).backgroundColor('#1b1b20').borderRadius(20)
+  }
 
   private async changeBackgroundPlayback(enabled: boolean): Promise<void> {
     if (this.changingPlayback || enabled === AppSettings.backgroundPlaybackEnabled) { return }
@@ -105,6 +209,7 @@ export struct SettingsPage {
         }.height(56).constraintSize({ minHeight: 56 }).width('100%').padding({ left: 16, right: 16 })
         Scroll() {
           Column({ space: 16 }) {
+            this.PrivacySection()
             Column({ space: 12 }) {
               Text('默认播放设置').width('100%').fontSize(16).fontWeight(FontWeight.Bold).fontColor('#ffffff')
               Row({ space: 12 }) {
@@ -159,6 +264,9 @@ export struct SettingsPage {
           }.width('100%').padding({ left: 16, right: 16, top: 12, bottom: 32 })
         }.width('100%').layoutWeight(1)
       }.width('100%').height('100%').backgroundColor('#121215')
-    }.hideTitleBar(true)
+    }.hideTitleBar(true).onShown(() => {
+      this.privacyVisible = true
+      this.loadPrivacySettings()
+    }).onHidden(() => this.privacyVisible = false)
   }
 }

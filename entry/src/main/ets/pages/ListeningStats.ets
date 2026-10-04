@@ -2,6 +2,8 @@ import {
   ListenDataResponse,
   ListenDataValue,
   ListenReportData,
+  ListenReportSection,
+  ListenReportAgeSection,
   ListenReportLanguageSection,
   ListenReportResponse,
   ListenReportStyleSection,
@@ -139,117 +141,141 @@ export struct ListeningStatsPage {
     return map[period] || period
   }
 
+  private periodLabel(): string {
+    const day = this.activeChart()?.days[0]
+    return this.currentPeriod === 'week' ? '本周' : day ? `${Number(day.key.substring(5, 7))}月` : '本月'
+  }
+
+  private percent(value?: string): number { return Math.max(0, Math.min(100, parseFloat(value || '0') || 0)) }
+
+  @Builder
+  private CardHeading(title: string) {
+    Text(title).width('100%').fontSize(28).fontWeight(FontWeight.Bold).fontColor('#55555f')
+  }
+
   @Builder
   private TopSongSection(report: ListenReportData | null) {
-    if (report?.topSongBlock?.sections && report.topSongBlock.sections.length > 0) {
-      Column({ space: 8 }) {
-        Text('收听 TOP 歌曲').fontSize(14).fontColor('#ffffff').fontWeight(FontWeight.Medium)
-          .width('100%')
-        ForEach(report.topSongBlock.sections, (section: ListenReportTopSongSection) => {
-          Row({ space: 10 }) {
-            if (section.picUrl) {
-              Image(section.picUrl).width(44).height(44).borderRadius(8).objectFit(ImageFit.Cover)
-            } else {
-              Stack() {
-                SymbolGlyph($r('sys.symbol.music')).fontSize(22).fontColor(['#55555d'])
-              }.width(44).height(44).borderRadius(8).backgroundColor('#25252c')
-            }
-            Column({ space: 4 }) {
-              Text(section.songName || '').fontSize(13).fontColor('#ededf0').maxLines(1)
-              Text(section.field || '').fontSize(10).fontColor('#77777f')
-            }
-            .layoutWeight(1).alignItems(HorizontalAlign.Start)
-            Text(section.text || '').fontSize(12).fontColor('#ef233c')
+    if (report?.topSongBlock?.sections?.length) {
+      Column({ space: 18 }) {
+        Row({ space: 18 }) {
+          Column({ space: 16 }) {
+            this.CardHeading(`${this.periodLabel()}\n单曲`)
+            Text('TOP').fontSize(15).fontWeight(FontWeight.Bold).fontColor('#ff6577')
+            Text(report.topSongBlock.sections[0].text || '').fontSize(30).fontWeight(FontWeight.Bold).fontColor('#ffffff')
+            Text(report.topSongBlock.sections[0].songName || '').fontSize(23).fontWeight(FontWeight.Bold)
+              .fontColor('#ededf0').maxLines(2)
+          }.layoutWeight(1).alignItems(HorizontalAlign.Start)
+          if (report.topSongBlock.sections[0].picUrl) {
+            Image(report.topSongBlock.sections[0].picUrl).width(108).height(108).borderRadius(12).objectFit(ImageFit.Cover)
           }
-          .width('100%').height(56)
+        }.width('100%').alignItems(VerticalAlign.Top)
+        ForEach(report.topSongBlock.sections.slice(1, 3), (section: ListenReportTopSongSection, index: number) => {
+          Row({ space: 14 }) {
+            Image(section.picUrl || '').width(64).height(64).borderRadius(10).objectFit(ImageFit.Cover)
+            Column({ space: 4 }) {
+              Text(`收听 TOP ${index + 2}`).fontSize(11).fontColor('#ff6577')
+              Text(section.text || '').fontSize(22).fontWeight(FontWeight.Bold).fontColor('#ffffff')
+              Text(section.songName || '').fontSize(13).fontColor('#b5b5bc').maxLines(1)
+            }.layoutWeight(1).alignItems(HorizontalAlign.Start)
+          }.width('100%')
         })
-      }
-      .width('100%').padding(16).backgroundColor('#1b1b20').borderRadius(16)
+      }.width('100%').padding(20).backgroundColor('#1b1b20').borderRadius(22)
     }
   }
 
   @Builder
   private TopArtistSection(report: ListenReportData | null) {
-    if (report?.topArtistBlock?.sections && report.topArtistBlock.sections.length > 0) {
-      Column({ space: 8 }) {
-        Text('收听 TOP 歌手').fontSize(14).fontColor('#ffffff').fontWeight(FontWeight.Medium)
-          .width('100%')
-        ForEach(report.topArtistBlock.sections, (section: ListenReportTopArtistSection) => {
-          Row({ space: 10 }) {
-            if (section.picUrl) {
-              Image(section.picUrl).width(44).height(44).borderRadius(22).objectFit(ImageFit.Cover)
-            } else {
-              Stack() {
-                SymbolGlyph($r('sys.symbol.person')).fontSize(22).fontColor(['#55555d'])
-              }.width(44).height(44).borderRadius(22).backgroundColor('#25252c')
-            }
-            Column({ space: 4 }) {
-              Text(section.artistName || '').fontSize(13).fontColor('#ededf0').maxLines(1)
-              Text(section.field || '').fontSize(10).fontColor('#77777f')
-            }
-            .layoutWeight(1).alignItems(HorizontalAlign.Start)
-            Text(section.text || '').fontSize(12).fontColor('#ef233c')
-          }
-          .width('100%').height(56)
+    if (report?.topArtistBlock?.sections?.length) {
+      Column({ space: 18 }) {
+        Row({ space: 18 }) {
+          Column({ space: 14 }) {
+            this.CardHeading(`${this.periodLabel()}\n音乐人`)
+            Text('TOP').fontSize(15).fontColor('#ff6577').fontWeight(FontWeight.Bold)
+            Text(report.topArtistBlock.sections[0].text || '').fontSize(28).fontColor('#ffffff').fontWeight(FontWeight.Bold)
+            Text(report.topArtistBlock.sections[0].artistName || '').fontSize(22).fontColor('#ededf0').maxLines(2)
+          }.layoutWeight(1).alignItems(HorizontalAlign.Start)
+          Image(report.topArtistBlock.sections[0].picUrl || '').width(108).height(108).borderRadius(54).objectFit(ImageFit.Cover)
+        }.width('100%').alignItems(VerticalAlign.Top)
+        ForEach(report.topArtistBlock.sections.slice(1), (section: ListenReportTopArtistSection) => {
+          Row({ space: 14 }) {
+            Image(section.picUrl || '').width(60).height(60).borderRadius(30).objectFit(ImageFit.Cover)
+            Column({ space: 5 }) {
+              Text(section.field || '').fontSize(11).fontColor('#ff6577')
+              Text(section.text || '').fontSize(20).fontColor('#ffffff').fontWeight(FontWeight.Bold)
+              Text(section.artistName || '').fontSize(13).fontColor('#b5b5bc').maxLines(1)
+            }.layoutWeight(1).alignItems(HorizontalAlign.Start)
+          }.width('100%')
         })
-      }
-      .width('100%').padding(16).backgroundColor('#1b1b20').borderRadius(16)
+      }.width('100%').padding(20).backgroundColor('#1b1b20').borderRadius(22)
     }
   }
 
   @Builder
   private StyleSection(report: ListenReportData | null) {
-    if (report?.topStyleBlock?.sections && report.topStyleBlock.sections.length > 0) {
-      Column({ space: 8 }) {
-        Row() {
-          Text('听歌风格偏好').fontSize(14).fontColor('#ffffff').fontWeight(FontWeight.Medium)
-          Text(report.topStyleBlock.genreName || '').fontSize(12).fontColor('#ef233c')
-            .margin({ left: 8 })
-        }.width('100%')
-        ForEach(report.topStyleBlock.sections.slice(0, 5), (section: ListenReportStyleSection) => {
-          Row() {
-            Text(section.genreName || '').fontSize(12).fontColor('#b5b5bc').width(60)
-            Row() {
-              Row()
-                .width(`${Number(section.percent) || 0}%`)
-                .height('100%')
-                .backgroundColor('#ef233c')
-                .borderRadius(3)
-            }
-            .layoutWeight(1).height(8).backgroundColor('#25252c').borderRadius(3)
-            Text(`${section.percent}%`).fontSize(10).fontColor('#77777f').width(36).textAlign(TextAlign.End)
-          }
-          .width('100%')
+    if (report?.topStyleBlock?.sections?.length) {
+      Column({ space: 18 }) {
+        this.CardHeading(`${this.periodLabel()}曲风`)
+        Column({ space: 6 }) {
+          Text('TOP').fontSize(15).fontColor('#ff6577').fontWeight(FontWeight.Bold)
+          Text(report.topStyleBlock.genreName || report.topStyleBlock.sections[0].genreName || '')
+            .fontSize(28).fontWeight(FontWeight.Bold).fontColor('#ffffff')
+        }.width('100%').alignItems(HorizontalAlign.Start)
+        ForEach(report.topStyleBlock.sections.slice(0, 3), (section: ListenReportStyleSection) => {
+          Row({ space: 8 }) {
+            Stack({ alignContent: Alignment.Start }) {
+              Row().width(`${this.percent(section.percent)}%`).constraintSize({ minWidth: 60 }).height(26)
+                .borderRadius(13).linearGradient({ angle: 90, colors: [['#ef233c', 0], ['#ff6577', 1]] })
+              Text(section.genreName || '').fontSize(12).fontColor('#ffffff').padding({ left: 10 })
+            }.layoutWeight(1).height(26)
+            Text(`${this.percent(section.percent)}%`).fontSize(18).fontWeight(FontWeight.Bold).fontColor('#ededf0').width(48)
+          }.width('100%')
         })
-      }
-      .width('100%').padding(16).backgroundColor('#1b1b20').borderRadius(16)
+      }.width('100%').padding(20).backgroundColor('#1b1b20').borderRadius(22)
+    }
+  }
+
+  @Builder
+  private AgeSection(report: ListenReportData | null) {
+    if (report?.topAgeBlock?.sections?.length) {
+      Column({ space: 22 }) {
+        this.CardHeading(`${this.periodLabel()}听歌年代`)
+        ForEach(report.topAgeBlock.sections, (section: ListenReportAgeSection) => {
+          Row({ space: 16 }) {
+            Text(section.age || '').width(72).fontSize(19).fontWeight(FontWeight.Bold).fontColor('#ededf0')
+            Column().width(2).height(58).backgroundColor('#383840')
+            if (section.picUrl) { Image(section.picUrl).width(58).height(58).borderRadius(8).objectFit(ImageFit.Cover) }
+            Column({ space: 6 }) {
+              Text(`${section.playSongNum || 0} 首`).fontSize(24).fontWeight(FontWeight.Bold).fontColor('#ffffff')
+              if (section.songName) { Text(section.songName).fontSize(12).fontColor('#9999a1').maxLines(1) }
+            }.layoutWeight(1).alignItems(HorizontalAlign.Start)
+          }.width('100%')
+        })
+      }.width('100%').padding(20).backgroundColor('#1b1b20').borderRadius(22)
     }
   }
 
   @Builder
   private LanguageSection(report: ListenReportData | null) {
-    if (report?.topLanguageBlock?.sections && report.topLanguageBlock.sections.length > 0) {
-      Column({ space: 8 }) {
-        Text('语种偏好').fontSize(14).fontColor('#ffffff').fontWeight(FontWeight.Medium).width('100%')
-        ForEach(report.topLanguageBlock.sections, (section: ListenReportLanguageSection) => {
-          Row() {
-            Text(section.language || '').fontSize(12).fontColor('#b5b5bc').width(44)
-            Row() {
-              Row()
-                .width(`${Number(section.percent) || 0}%`)
-                .height('100%')
-                .backgroundColor('#7f76ff')
-                .borderRadius(3)
-            }
-            .layoutWeight(1).height(8).backgroundColor('#25252c').borderRadius(3)
-            Text(`${section.percent}%`).fontSize(10).fontColor('#77777f').width(36).textAlign(TextAlign.End)
-            Text(section.songName || '').fontSize(10).fontColor('#55555d')
-              .layoutWeight(1).textAlign(TextAlign.End).maxLines(1)
-          }
-          .width('100%')
-        })
-      }
-      .width('100%').padding(16).backgroundColor('#1b1b20').borderRadius(16)
+    if (report?.topLanguageBlock?.sections?.length) {
+      Column({ space: 20 }) {
+        this.CardHeading(`${this.periodLabel()}听歌语言`)
+        Row({ space: 12 }) {
+          ForEach(report.topLanguageBlock.sections.slice(0, 3), (section: ListenReportLanguageSection, index: number) => {
+            Column({ space: 7 }) {
+              if (index === 0) { Text('TOP').fontSize(12).fontColor('#ff6577').fontWeight(FontWeight.Bold) }
+              Text(`${this.percent(section.percent)}%`).fontSize(index === 0 ? 30 : 24).fontWeight(FontWeight.Bold).fontColor('#ffffff')
+              Text(section.language || '').fontSize(18).fontColor('#ededf0')
+              if (section.picUrl) {
+                Image(section.picUrl).width('100%').aspectRatio(1).objectFit(ImageFit.Cover).borderRadius(8)
+              } else {
+                Column().width('100%').height(Math.max(18, this.percent(section.percent) * 1.6))
+                  .borderRadius({ topLeft: 8, topRight: 8 }).backgroundColor('#ef233c')
+              }
+              Text(section.songName || '').fontSize(10).fontColor('#9999a1').maxLines(1)
+            }.layoutWeight(1).alignItems(HorizontalAlign.Start)
+          })
+        }.width('100%').alignItems(VerticalAlign.Bottom)
+      }.width('100%').padding(20).backgroundColor('#1b1b20').borderRadius(22)
     }
   }
 
@@ -293,18 +319,19 @@ export struct ListeningStatsPage {
     }
   }
 
-  private dayValue(day: ListeningDay): string {
-    if (day.future) { return '—' }
-    if (!day.reported) { return '—' }
-    if (day.minutes <= 0) { return '0分' }
-    if (day.minutes < 1) { return '<1分' }
-    return day.minutes >= 60 ? `${Number((day.minutes / 60).toFixed(1))}时` : `${Math.floor(day.minutes)}分`
+  @Builder
+  private DayBubble(day: ListeningDay) {
+    Column({ space: 5 }) {
+      Text(day.key.replace(/-/g, '.')).fontSize(12).fontWeight(FontWeight.Bold).fontColor('#ffffff')
+      Text(day.future ? '尚未到来' : !day.reported ? '暂无数据' : `听歌 ${this.formatPlayDuration(day.minutes)}`)
+        .fontSize(14).fontColor('#eeeeee')
+    }.padding(12)
   }
 
-  private dayDescription(chart: ListeningPeriod): string {
-    const day = chart.days.find((item: ListeningDay) => item.key === this.selectedDay)
-    if (!day) { return this.currentPeriod === 'week' ? '点击柱形查看当天时长' : '点击日期查看当天时长' }
-    return `${day.key} · ${day.future ? '尚未到来' : !day.reported ? '暂无数据' : this.formatPlayDuration(day.minutes)}`
+  private calendarCells(chart: ListeningPeriod): ListeningDay[] {
+    const cells: ListeningDay[] = []
+    chart.rows.forEach((week: ListeningDay[]) => week.forEach((day: ListeningDay) => cells.push(day)))
+    return cells
   }
 
   @Builder
@@ -325,81 +352,101 @@ export struct ListeningStatsPage {
 
   @Builder
   private WeekBars(chart: ListeningPeriod) {
-    Row({ space: 6 }) {
+    Row({ space: 8 }) {
       Column() {
         Text(this.formatPlayDuration(chart.axisMinutes)).fontSize(9).fontColor('#77777f')
         Blank()
         Text(this.formatPlayDuration(chart.axisMinutes / 2)).fontSize(9).fontColor('#77777f')
         Blank()
-        Text('0分').fontSize(9).fontColor('#77777f')
-      }.width(36).height(184).margin({ bottom: 38 })
-      Row({ space: 5 }) {
-        ForEach(chart.days, (day: ListeningDay) => {
-          Column({ space: 6 }) {
-            Column() {
-              Blank()
-              Text(this.dayValue(day)).fontSize(9).fontWeight(FontWeight.Medium)
-                .fontColor(listeningDayColor(day)).textAlign(TextAlign.Center)
-                .width('100%')
-                .height(day.minutes > 0 ? Math.max(28, day.minutes / chart.axisMinutes * 184) : 22)
-                .backgroundColor(listeningDayBackground(day)).borderRadius(22)
-                .border({ width: this.selectedDay === day.key ? 1 : 0, color: '#ff8190' })
-            }.width('100%').height(184)
-            Text(day.weekday).fontSize(11).fontColor('#9999a1')
-            Text(day.key.substring(5).replace('-', '/')).fontSize(9).fontColor('#66666e')
-          }.layoutWeight(1).onClick(() => this.selectedDay = day.key)
-        }, (day: ListeningDay) => day.key)
-      }.layoutWeight(1).alignItems(VerticalAlign.Bottom)
-    }.width('100%').alignItems(VerticalAlign.Bottom).margin({ top: 12 })
+        Text('0分钟').fontSize(9).fontColor('#77777f')
+      }.width(38).height(190).margin({ bottom: 30 })
+      Stack({ alignContent: Alignment.Bottom }) {
+        Column() {
+          Divider().color('#303038')
+          Blank()
+          Divider().color('#303038')
+          Blank()
+          Divider().color('#303038')
+        }.width('100%').height(190).margin({ bottom: 30 })
+        Row({ space: 6 }) {
+          ForEach(chart.days, (day: ListeningDay) => {
+            Column({ space: 10 }) {
+              Column() {
+                Blank()
+                Column().width('100%').height(day.minutes > 0 ? Math.max(8, day.minutes / chart.axisMinutes * 190) : 2)
+                  .backgroundColor(listeningDayBackground(day)).borderRadius(24)
+                  .linearGradient({ angle: 180, colors: [
+                    [day.minutes >= 60 ? '#ef233c' : listeningDayBackground(day), 0],
+                    [day.minutes >= 60 ? '#ff6577' : listeningDayBackground(day), 1]
+                  ] })
+                  .bindPopup(this.selectedDay === day.key, {
+                    builder: () => { this.DayBubble(day) }, placement: Placement.Top, popupColor: '#303038',
+                    onStateChange: (event) => { if (!event.isVisible && this.selectedDay === day.key) { this.selectedDay = '' } }
+                  })
+              }.width('100%').height(190)
+              Text(day.weekday).fontSize(12).fontColor('#9999a1').height(20)
+            }.layoutWeight(1).onClick(() => this.selectedDay = this.selectedDay === day.key ? '' : day.key)
+          }, (day: ListeningDay) => day.key)
+        }.width('100%').alignItems(VerticalAlign.Bottom)
+      }.layoutWeight(1).height(220)
+    }.width('100%').alignItems(VerticalAlign.Bottom).margin({ top: 28 })
   }
 
   @Builder
   private MonthCalendar(chart: ListeningPeriod) {
-    Column({ space: 10 }) {
+    Column({ space: 14 }) {
+      GridRow({ columns: 7, gutter: { x: 7, y: 9 } }) {
+        ForEach(this.calendarCells(chart), (day: ListeningDay) => {
+          GridCol() {
+            Stack() {
+              if (day.day > 0) {
+                Circle().width('100%').height('100%').fill(listeningDayBackground(day))
+                  .stroke(day.minutes > 0 ? 'transparent' : '#393941').strokeWidth(1).strokeDashArray([2, 2])
+                Text(day.day.toString()).fontSize(15).fontWeight(FontWeight.Bold).fontColor(listeningDayColor(day))
+              }
+            }.width('100%').aspectRatio(1)
+              .onClick(() => { if (day.day > 0) { this.selectedDay = this.selectedDay === day.key ? '' : day.key } })
+              .bindPopup(day.day > 0 && this.selectedDay === day.key, {
+                builder: () => { this.DayBubble(day) }, placement: Placement.Top, popupColor: '#303038',
+                onStateChange: (event) => { if (!event.isVisible && this.selectedDay === day.key) { this.selectedDay = '' } }
+              })
+          }
+        }, (day: ListeningDay) => day.key)
+      }.width('100%')
       Row() {
         ForEach(['日', '一', '二', '三', '四', '五', '六'], (label: string) => {
-          Text(label).layoutWeight(1).fontSize(11).fontColor('#85858e').textAlign(TextAlign.Center)
+          Text(label).layoutWeight(1).fontSize(12).fontColor('#85858e').textAlign(TextAlign.Center)
         })
       }.width('100%')
-      ForEach(chart.rows, (week: ListeningDay[]) => {
-        Row() {
-          ForEach(week, (day: ListeningDay) => {
-            Column({ space: 4 }) {
-              if (day.day > 0) {
-                Text(day.day.toString()).width(32).height(32).borderRadius(16)
-                  .fontSize(12).fontWeight(FontWeight.Medium).textAlign(TextAlign.Center)
-                  .backgroundColor(listeningDayBackground(day)).fontColor(listeningDayColor(day))
-                  .border({ width: this.selectedDay === day.key ? 1 : 0, color: '#ff8190' })
-                Text(this.dayValue(day)).fontSize(9).fontColor(day.minutes > 0 ? '#ff6577' : '#66666e')
-              }
-            }.layoutWeight(1).height(52).justifyContent(FlexAlign.Center)
-              .onClick(() => { if (day.day > 0) { this.selectedDay = day.key } })
-          }, (day: ListeningDay) => day.key)
-        }.width('100%')
-      })
-    }.width('100%').margin({ top: 12 })
+    }.width('100%').margin({ top: 14 })
   }
 
   @Builder
   private DurationCard(chart: ListeningPeriod) {
-    Column({ space: 14 }) {
-      Text(this.currentPeriod === 'week' ? '本周听歌时长' : '本月听歌时长')
-        .width('100%').fontSize(22).fontWeight(FontWeight.Bold).fontColor('#a3a3ad')
-      Text(this.formatPlayDuration(chart.totalMinutes)).width('100%')
-        .fontSize(30).fontWeight(FontWeight.Bold).fontColor('#ffffff').textAlign(TextAlign.End)
+    Column({ space: 12 }) {
+      this.CardHeading(`${this.periodLabel()}收听时长`)
+      Text() {
+        if (chart.totalMinutes >= 60) {
+          Span(Math.floor(chart.totalMinutes / 60).toString()).fontSize(44).fontWeight(FontWeight.Bold)
+          Span('小时').fontSize(21).fontWeight(FontWeight.Medium)
+        }
+        Span(Math.floor(chart.totalMinutes % 60).toString()).fontSize(44).fontWeight(FontWeight.Bold)
+        Span('分').fontSize(21).fontWeight(FontWeight.Medium)
+      }.width('100%').fontColor('#ffffff').textAlign(TextAlign.End).margin({ top: 12 })
       Text(`已听 ${chart.listenedDays}/${chart.days.length} 天`).width('100%')
-        .fontSize(12).fontColor('#9999a1').textAlign(TextAlign.End)
+        .fontSize(13).fontColor('#9999a1').textAlign(TextAlign.End)
       if (this.currentPeriod === 'week') { this.WeekBars(chart) } else { this.MonthCalendar(chart) }
-      Text(this.dayDescription(chart)).width('100%').fontSize(12).fontColor('#b5b5bd')
-        .textAlign(TextAlign.Center).constraintSize({ minHeight: 30 })
-      Row({ space: 6 }) {
-        Column().width(8).height(8).borderRadius(4).backgroundColor('rgba(239,35,60,0.22)')
-        Text('不足1小时').fontSize(10).fontColor('#ff6577')
-        Blank().width(12)
-        Column().width(8).height(8).borderRadius(4).backgroundColor('#ef233c')
-        Text('1小时及以上').fontSize(10).fontColor('#9999a1')
-      }.width('100%').justifyContent(FlexAlign.Center)
-    }.width('100%').padding(16).backgroundColor('#1b1b20').borderRadius(22)
+      if (this.activeReport()?.listenTimeDistributionBlock?.sections?.length) {
+        Row({ space: 12 }) {
+          ForEach(this.activeReport()!.listenTimeDistributionBlock!.sections!.slice(0, 2), (section: ListenReportSection) => {
+            Column({ space: 7 }) {
+              Text(section.valueA || section.value || '').fontSize(26).fontWeight(FontWeight.Bold).fontColor('#ffffff')
+              Text(section.textB || section.field || '').fontSize(12).fontColor('#ff6577')
+            }.layoutWeight(1)
+          })
+        }.width('100%').padding({ top: 14, bottom: 4 })
+      }
+    }.width('100%').padding(20).backgroundColor('#1b1b20').borderRadius(22)
   }
 
   @Builder
@@ -408,6 +455,7 @@ export struct ListeningStatsPage {
       this.TopSongSection(report)
       this.TopArtistSection(report)
       this.StyleSection(report)
+      this.AgeSection(report)
       this.LanguageSection(report)
       this.TimeDistributionSection(report)
     }
@@ -420,9 +468,10 @@ export struct ListeningStatsPage {
         Row() {
           SymbolGlyph($r('sys.symbol.chevron_left'))
             .fontSize(24).fontColor(['#ffffff']).onClick(() => this.pageStack.pop())
-          Text('听歌足迹')
-            .layoutWeight(1).fontSize(18).fontWeight(FontWeight.Bold)
-            .fontColor('#ffffff').textAlign(TextAlign.Center)
+          Column({ space: 3 }) {
+            Text('听歌足迹').fontSize(18).fontWeight(FontWeight.Bold).fontColor('#ffffff')
+            Text(`总时长 ${this.formatTotalDuration()}`).fontSize(11).fontColor('#92929a')
+          }.layoutWeight(1)
           Column().width(24)
         }
         .height(56).width('100%').padding({ left: 16, right: 16 })
@@ -444,15 +493,6 @@ export struct ListeningStatsPage {
         } else {
           Scroll() {
             Column({ space: 16 }) {
-              Column({ space: 10 }) {
-                Text('累计听歌').fontSize(13).fontColor('#d7b7bb')
-                Text(this.formatTotalDuration())
-                  .fontSize(34).fontWeight(FontWeight.Bold).fontColor('#ffffff')
-                Text(`累计收听 ${this.totalSongCount()} 首歌曲`)
-                  .fontSize(11).fontColor('#d7b7bb')
-              }
-              .width('100%').padding(24).borderRadius(24)
-              .linearGradient({ angle: 135, colors: [['#7d2735', 0], ['#28253d', 1]] })
 
               if (this.activeChart()) {
                 Text(this.activeChart()!.title).width('100%').fontSize(16).fontWeight(FontWeight.Medium)

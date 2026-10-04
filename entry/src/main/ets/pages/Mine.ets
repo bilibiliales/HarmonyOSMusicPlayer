@@ -1390,19 +1390,23 @@ export struct Mine {
   }
 
   @Builder
+  private SpecialPlaylistCover(cover: string, kind: string) {
+    Stack() {
+      if (cover) { Image(cover).width('100%').height('100%').objectFit(ImageFit.Cover) }
+      Column().width('100%').height('100%').backgroundColor('rgba(0,0,0,0.35)')
+      SymbolGlyph(kind === 'recent' ? $r('sys.symbol.clock') :
+        kind === 'record' ? $r('sys.symbol.sort') : $r('sys.symbol.heart_fill'))
+        .fontSize(26).fontColor(['#ffffff'])
+    }.width('100%').height('100%').backgroundColor('#2a2a2a').borderRadius(8).clip(true)
+  }
+
+  @Builder
   LikedSongsSection() {
     Column() {
       Row({ space: 8 }) {
-        Stack() {
-          SymbolGlyph($r('sys.symbol.heart_fill'))
-            .fontSize(22)
-            .fontColor(['#c0392b'])
-        }
-        .width(56)
-        .height(56)
-        .borderRadius(8)
-        .backgroundColor('#2a2a2a')
-        .alignContent(Alignment.Center)
+        Column() {
+          this.SpecialPlaylistCover(this.likedSongs[0]?.img || '', 'liked')
+        }.width(56).height(56)
 
         Column({ space: 4 }) {
           Text('我喜欢的音乐')
@@ -1473,7 +1477,7 @@ export struct Mine {
             .objectFit(ImageFit.Cover)
             if (item.specialType) {
               SymbolGlyph(item.specialType === 'recent' ? $r('sys.symbol.clock') : $r('sys.symbol.sort'))
-                .fontSize(26).fontColor(['#ffffff']).shadow({ radius: 4, color: '#333333' })
+                .fontSize(26).fontColor(['#ffffff'])
             }
           }.width(56).height(56)
           Column({ space: 4 }) {
@@ -1770,24 +1774,12 @@ export struct Mine {
         GridCol() {
           Column({ space: 6 }) {
             Stack() {
-              Image(item.cover)
-                .width('100%')
-                .aspectRatio(1)
-                .borderRadius(8)
-                .objectFit(ImageFit.Cover)
-
-              if (item.isLiked) {
-                SymbolGlyph($r('sys.symbol.heart_fill'))
-                  .fontSize(14)
-                  .fontColor(['#c0392b'])
-                  .position({ right: 6, top: 6 })
+              if (item.isLiked || item.specialType === 'recent' || item.specialType === 'record') {
+                this.SpecialPlaylistCover(item.cover, item.isLiked ? 'liked' : item.specialType || '')
+              } else {
+                Image(item.cover).width('100%').height('100%').objectFit(ImageFit.Cover).borderRadius(8)
               }
-              if (item.specialType) {
-                SymbolGlyph(item.specialType === 'recent' ? $r('sys.symbol.clock') : $r('sys.symbol.sort'))
-                  .fontSize(30).fontColor(['#ffffff']).shadow({ radius: 4, color: '#333333' })
-              }
-            }
-            .width('100%')
+            }.width('100%').aspectRatio(1)
 
             Text(item.name)
               .fontSize(12)

@@ -31,7 +31,7 @@ import {
 } from '../models'
 import { recommendList, songs } from '../constants'
 import { ApiClient } from '../services/ApiClient'
-import { DiscoveryPlaylistsService } from '../services/DiscoveryPlaylistsService'
+import { DiscoveryPlaylistsService, FM_ICON } from '../services/DiscoveryPlaylistsService'
 import { playerController } from '../services/PlayerController'
 import { AuthStore } from '../stores/AuthStore'
 import { resizeImageUrl } from '../services/ImageUrl'
@@ -53,6 +53,7 @@ struct Recommend {
   @State dailyPlaylists: playlistType[] = []
   @State dailyRecommendSongs: songItemType[] = []
   @State personalizedNewSongColumns: SongColumn[] = []
+  @State fmCover: string = ''
   @State radarPlaylists: playlistType[] = []
   @State radioCards: ProgramCard[] = []
   @State programCards: ProgramCard[] = []
@@ -100,6 +101,7 @@ struct Recommend {
       this.loadDailySongs(),
       this.loadPersonalizedNewSongs(),
       this.loadRadar(),
+      this.loadFmCover(),
       this.loadNewSongCovers(),
       this.loadRadioCards(),
       this.loadProgramCards(),
@@ -315,6 +317,11 @@ struct Recommend {
     } finally {
       this.heartModeLoading = false
     }
+  }
+
+  private async loadFmCover(): Promise<boolean> {
+    try { this.fmCover = (await DiscoveryPlaylistsService.fm())[0]?.img || ''; return !!this.fmCover }
+    catch (_error) { return false }
   }
 
   private async loadRadar(): Promise<boolean> {
@@ -768,6 +775,16 @@ struct Recommend {
                 Text('心动模式').width(132).fontSize(14).fontWeight(FontWeight.Bold).fontColor('#f0f0f3')
                 Text('红心歌曲与相似推荐').width(132).fontSize(10).fontColor('#77777f').maxLines(1)
               }.alignItems(HorizontalAlign.Start).onClick(() => this.openHeartMode())
+
+              Column({ space: 8 }) {
+                Stack() {
+                  Image(this.fmCover || FM_ICON).width(132).height(132).borderRadius(17).objectFit(ImageFit.Cover)
+                  Image(FM_ICON).width(46).height(46).borderRadius(23)
+                }.width(132).height(132)
+                Text('私人FM').width(132).fontSize(14).fontWeight(FontWeight.Bold).fontColor('#f0f0f3')
+                Text('为你推荐的下一首').width(132).fontSize(10).fontColor('#77777f')
+              }.alignItems(HorizontalAlign.Start).onClick(() =>
+                this.pageStack.pushPathByName('PlaylistDetailPage', DiscoveryPlaylistsService.playlist()))
 
               ForEach(this.personalizedPlaylists, (item: playlistType) => {
                 Column({ space: 8 }) {

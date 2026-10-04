@@ -593,7 +593,7 @@ export interface ListenTimeBlock {
 }
 
 export interface ListenDurationDetail {
-  period: string
+  period: string | number
   duration: number
   podcastDuration?: number
   audiobookDuration?: number
@@ -646,6 +646,8 @@ export interface ListenReportTopStyleBlock {
 }
 
 export interface ListenReportAgeSection {
+  picUrl?: string
+  songName?: string
   age?: string
   playSongNum?: number
 }
@@ -655,6 +657,7 @@ export interface ListenReportTopAgeBlock {
 }
 
 export interface ListenReportLanguageSection {
+  picUrl?: string
   language?: string
   percent?: string
   playSongNum?: number
@@ -667,8 +670,8 @@ export interface ListenReportTopLanguageBlock {
 
 export interface ListenReportData {
   type?: string
-  startTime?: number
-  endTime?: number
+  startTime?: number | string
+  endTime?: number | string
   listenTimeBlock?: ListenTimeBlock
   listenTimeDistributionBlock?: ListenTimeDistributionBlock
   topSongBlock?: ListenReportTopSongBlock

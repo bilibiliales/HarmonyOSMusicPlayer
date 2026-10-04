@@ -15,7 +15,7 @@ import {
   songItemType
 } from '../models'
 import { ApiClient } from '../services/ApiClient'
-import { DiscoveryPlaylistsService, FM_ICON } from '../services/DiscoveryPlaylistsService'
+import { DiscoveryPlaylistsService } from '../services/DiscoveryPlaylistsService'
 import { playerController } from '../services/PlayerController'
 import { resizeImageUrl } from '../services/ImageUrl'
 import { RankingPage } from './Ranking'
@@ -33,7 +33,6 @@ struct Find {
   @State message: string = ''
   @State isRefreshing: boolean = false
   @State failedImages: Set<string> = new Set()
-  @State fmCover: string = ''
   @State currentSection: number = 0
   @State transitionDirection: number = 1
   private readonly sectionTitles: string[] = ['发现', '排行榜', '曲风', '电台', '数字专辑', '助眠解压']
@@ -143,7 +142,6 @@ struct Find {
   }
 
   private async loadData(refresh: boolean): Promise<void> {
-    this.loadFmCover()
     this.loading = this.blocks.length === 0
     this.message = ''
     await this.loadBanners()
@@ -184,9 +182,6 @@ struct Find {
     }
   }
 
-  private async loadFmCover(): Promise<void> {
-    try { this.fmCover = (await DiscoveryPlaylistsService.fm())[0]?.img || '' } catch (_error) {}
-  }
 
   private formatCount(value: number): string {
     if (value >= 100000000) {
@@ -433,18 +428,6 @@ struct Find {
             .borderRadius(18).clip(true)
           }
 
-          Row({ space: 12 }) {
-            Stack() {
-              Image(this.fmCover || FM_ICON).width(64).height(64).borderRadius(12)
-              Image(FM_ICON).width(28).height(28).borderRadius(14)
-            }
-            Column({ space: 6 }) {
-              Text('私人FM').fontSize(16).fontColor('#ffffff').fontWeight(FontWeight.Bold)
-              Text('打开私人推荐歌单').fontSize(12).fontColor('#77777f')
-            }.layoutWeight(1).alignItems(HorizontalAlign.Start)
-            SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(18).fontColor(['#888890'])
-          }.width('100%').padding(16).onClick(() =>
-            this.pageStack.pushPathByName('PlaylistDetailPage', DiscoveryPlaylistsService.playlist()))
 
           if (this.loading) {
             Column({ space: 12 }) {
