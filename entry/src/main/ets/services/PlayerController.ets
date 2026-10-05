@@ -10,6 +10,7 @@ import { PlaybackAction, PlaybackControlBridge } from './PlaybackControlBridge'
 import { ListeningScrobble } from './ListeningScrobble'
 import { SongAudioResource, SongQualityService } from './SongQualityService'
 import { MemoryAudioLoad } from './MemoryAudioSource'
+import { CloudService } from './CloudService'
 
 export class PlayerController {
   private static instance: PlayerController = new PlayerController()
@@ -596,7 +597,9 @@ export class PlayerController {
 
   private async resolveSongResource(song: songItemType, requestToken: number): Promise<SongAudioResource> {
     let resource: SongAudioResource | undefined
-    if (song.isVoice) {
+    if (song.isCloud) {
+      resource = await CloudService.playback(song.id)
+    } else if (song.isVoice) {
       resource = await SongQualityService.playbackAtLevel(song.id, 'standard')
       if (!resource && song.url) {
         resource = { url: song.url, requestedLevel: '', selectedLevel: '', actualLevel: '',
@@ -721,6 +724,15 @@ export class PlayerController {
     this.store.setQueue(queue, safeIndex, preservePlayback)
     this.persistState()
     await this.playAt(this.store.currentIndex, autoPlay)
+  }
+
+  async insertNext(songs: songItemType[]): Promise<void> {
+    if (!this.store || songs.length === 0) { return }
+    if (!this.store.hasQueue()) { await this.setQueue(songs, 0, false); return }
+    const queue = this.store.queue.slice()
+    queue.splice(this.store.currentIndex + 1, 0, ...songs)
+    this.store.setQueue(queue, this.store.currentIndex, true)
+    this.persistState()
   }
 
   async toggle(): Promise<void> {

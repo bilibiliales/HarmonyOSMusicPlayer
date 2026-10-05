@@ -1052,6 +1052,12 @@ export struct Mine {
       Column() {
       this.HeaderSection()
       this.StatsSection()
+      Row({ space: 10 }) {
+        SymbolGlyph($r('sys.symbol.cloud')).fontSize(20).fontColor(['#dddddf'])
+        Text('我的云盘').fontSize(14).fontColor('#eeeeee').layoutWeight(1)
+        SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(14).fontColor(['#888890'])
+      }.width('100%').height(44).padding({ left: 20, right: 20 })
+        .onClick(() => this.openProtectedPage('CloudDrivePage'))
       this.SubTabBar()
       Refresh({ refreshing: $$this.isRefreshing }) {
         Scroll() {

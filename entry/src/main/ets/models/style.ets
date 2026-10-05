@@ -43,6 +43,7 @@ export interface StylePatternText {
 export interface StyleProfessionalReview {
   templateContent?: string
   pattern?: Record<string, StylePatternText>
+  dataTip?: string
 }
 
 export interface StyleFavouriteSong {
@@ -63,6 +64,7 @@ export interface StyleDetailData {
   songNum?: string
   artistNum?: string
   professionalReviews?: StyleProfessionalReview
+  tagPortrait?: StyleProfessionalReview
   favouriteSong?: StyleFavouriteSong
   tabs?: string[]
 }

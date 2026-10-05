@@ -22,6 +22,8 @@ import {
 } from '../models/api'
 import { playlistType, SongArtist, songItemType } from '../models/music'
 import { ApiClient } from '../services/ApiClient'
+import { StyleDetailPageParam, StyleListResponse } from '../models/style'
+import { styleTagId, findStyleByName } from '../services/StylePresentation'
 import { playerController } from '../services/PlayerController'
 import { PlayerStore } from '../stores/PlayerStore'
 
@@ -118,11 +120,13 @@ export struct SongWiki {
             return
           }
           const title = creative.uiElement?.mainTitle?.title || '百科信息'
+          const isStyle = title.includes('曲风') || /style|genre/i.test(creative.creativeType || '')
+          if (isStyle) { items.forEach((item: WikiValueItem) => { item.resourceType = 'STYLE' }) }
           fields.push({
             title: title,
             creativeType: creative.creativeType || '',
             items: items,
-            expandable: this.isMovieField(title, creative.creativeType || '') && items.length > 1
+            expandable: (isStyle || this.isMovieField(title, creative.creativeType || '')) && items.length > 1
           })
         })
         return
@@ -352,6 +356,20 @@ export struct SongWiki {
 
   private async openWikiItem(item: WikiValueItem): Promise<void> {
     const resourceType = item.resourceType.toUpperCase()
+    let tagId = styleTagId(resourceType, item.resourceId, item.targetUrl)
+    if (tagId > 0 || /STYLE|GENRE|MUSIC_TAG|MUSICTAG/.test(resourceType)) {
+      try {
+        if (!tagId) {
+          const response = await ApiClient.get<StyleListResponse>('/style/list')
+          tagId = findStyleByName(response.data || [], item.title)?.tagId || 0
+        }
+        if (!tagId) { throw new Error('暂未找到该曲风的详情') }
+        const param: StyleDetailPageParam = { tagId: tagId, name: item.title, cover: item.image }
+        this.detailSheetVisible = false
+        this.pageStack.pushPathByName('StyleDetailPage', param)
+      } catch (error) { this.actionMessage = error instanceof Error ? error.message : '曲风详情打开失败' }
+      return
+    }
     if (resourceType === 'SONG' && item.resourceId) {
       const similarSong: songItemType = {
         id: item.resourceId,

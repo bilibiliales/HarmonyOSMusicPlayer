@@ -15,6 +15,7 @@ export interface songItemType {
   playCount?: number
   sourceId?: string
   isVoice?: boolean
+  isCloud?: boolean
 }
 
 export interface SongArtist {

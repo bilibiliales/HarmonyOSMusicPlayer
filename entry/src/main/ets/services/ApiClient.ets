@@ -113,7 +113,7 @@ export class ApiClient {
   }
 
   static async upload<T>(path: string, params: ApiParam[], fileField: string, fileName: string,
-    fileData: ArrayBuffer, contentType: string): Promise<T> {
+    fileData: ArrayBuffer, contentType: string, readTimeout: number = 30000): Promise<T> {
     const request = http.createHttp()
     try {
       const formData: http.MultiFormData[] = params
@@ -133,7 +133,7 @@ export class ApiClient {
         multiFormDataList: formData,
         expectDataType: http.HttpDataType.STRING,
         connectTimeout: 15000,
-        readTimeout: 30000,
+        readTimeout: readTimeout,
         usingCache: false
       })
       if (response.responseCode < 200 || response.responseCode >= 300) {

@@ -5,6 +5,7 @@ import Mine from './Mine'
 import Moment from './Moment'
 import Recommend from './Recommend'
 import { Play } from './Play'
+import { CloudDrivePage } from './CloudDrive'
 import { PlaylistDetail } from './PlaylistDetail'
 import { RecentPlaybackPage, RecentPlaybackParam } from './RecentPlayback'
 import { Login } from './Login'
@@ -119,6 +120,8 @@ struct HomeIndex {
   PageMap(name: string, param: object) {
     if (name === 'PlayPage') {
       Play()
+    } else if (name === 'CloudDrivePage') {
+      CloudDrivePage()
     } else if (name === 'RecentPlaybackPage') {
       RecentPlaybackPage({ pageParam: (param || {}) as RecentPlaybackParam })
     } else if (name === 'PlaylistDetailPage') {

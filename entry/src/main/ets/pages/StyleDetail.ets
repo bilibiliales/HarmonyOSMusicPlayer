@@ -17,6 +17,7 @@ import {
   StyleSongResponse
 } from '../models'
 import { ApiClient } from '../services/ApiClient'
+import { styleReviewText } from '../services/StylePresentation'
 import { resizeImageUrl } from '../services/ImageUrl'
 import { playerController } from '../services/PlayerController'
 
@@ -51,7 +52,8 @@ export struct StyleDetailPage {
       this.message = '曲风参数无效'
       return
     }
-    await Promise.all([this.loadDetail(), this.loadCurrentResources(true)])
+    await this.loadDetail()
+    if (this.detail) { await this.loadCurrentResources(true) }
     this.loading = false
   }
 
@@ -60,12 +62,19 @@ export struct StyleDetailPage {
       const response = await ApiClient.get<StyleDetailResponse>('/style/detail', [
         { key: 'tagId', value: this.pageParam.tagId.toString() }
       ])
-      if (response.code === 200) {
-        this.detail = response.data
-      }
+      if (response.code !== 200 || !response.data) { throw new Error('曲风详情加载失败') }
+      this.detail = response.data
+      this.currentTab = this.availableTabs()[0] || 'songs'
     } catch (error) {
       this.message = error instanceof Error ? error.message : '曲风详情加载失败'
     }
+  }
+
+  private availableTabs(): string[] {
+    const tabs = (this.detail?.tabs || ['song']).map((tab: string) =>
+      tab === 'song' ? 'songs' : tab === 'album' ? 'albums' : tab === 'playlist' ? 'playlists' :
+        tab === 'artist' ? 'artists' : tab).filter((tab: string) => ['songs', 'albums', 'playlists', 'artists'].includes(tab))
+    return tabs.length ? tabs : ['songs']
   }
 
   private cursorOf(tab: string): number {
@@ -111,7 +120,7 @@ export struct StyleDetailPage {
   }
 
   private async loadCurrentResources(reset: boolean = false): Promise<void> {
-    if (this.resourceLoading || (!this.resourceMore && !reset)) {
+    if (!this.detail || this.resourceLoading || (!this.resourceMore && !reset)) {
       return
     }
     const tab = this.currentTab
@@ -168,7 +177,7 @@ export struct StyleDetailPage {
   }
 
   private switchTab(tab: string): void {
-    if (this.currentTab === tab) {
+    if (this.currentTab === tab || this.resourceLoading) {
       return
     }
     this.currentTab = tab
@@ -254,6 +263,24 @@ export struct StyleDetailPage {
 
   @Builder
   private Description() {
+    if (this.detail?.parentNames) {
+      Text(this.detail.parentNames).fontSize(12).fontColor('#9999a1').padding({ left: 17, right: 17, top: 12 })
+    }
+    if (styleReviewText(this.detail?.professionalReviews)) {
+      Column({ space: 10 }) {
+        Text('你的曲风偏好').fontSize(17).fontWeight(FontWeight.Bold).fontColor('#ffffff')
+        Text(styleReviewText(this.detail?.professionalReviews)).fontSize(14).lineHeight(23).fontColor('#c0c0c8')
+      }.width('100%').alignItems(HorizontalAlign.Start).padding(17)
+    }
+    if (styleReviewText(this.detail?.tagPortrait)) {
+      Column({ space: 10 }) {
+        Text('曲风画像').fontSize(17).fontWeight(FontWeight.Bold).fontColor('#ffffff')
+        Text(styleReviewText(this.detail?.tagPortrait)).fontSize(13).lineHeight(22).fontColor('#b0b0b8')
+        if (this.detail?.tagPortrait?.dataTip) {
+          Text(this.detail.tagPortrait.dataTip).fontSize(11).fontColor('#77777f')
+        }
+      }.width('100%').alignItems(HorizontalAlign.Start).padding(17)
+    }
     if (this.detail?.desc) {
       Text(this.detail.desc).width('100%').fontSize(13).lineHeight(21).fontColor('#a7a7af')
         .padding({ left: 17, right: 17, top: 15, bottom: 15 })
@@ -271,13 +298,17 @@ export struct StyleDetailPage {
         }.layoutWeight(1).alignItems(HorizontalAlign.Start)
       }.width('100%').padding(11).backgroundColor('#1d1d22').borderRadius(14)
         .margin({ left: 16, right: 16, bottom: 13 })
+        .onClick(() => {
+          const song = this.detail?.favouriteSong?.favouriteSong
+          if (song) { playerController.setQueue([mapApiSong(song)], 0, true) }
+        })
     }
   }
 
   @Builder
   private ResourceTabs() {
     Row() {
-      ForEach(['songs', 'albums', 'playlists', 'artists'], (tab: string) => {
+      ForEach(this.availableTabs(), (tab: string) => {
         Column({ space: 7 }) {
           Text(tab === 'songs' ? '歌曲' : tab === 'albums' ? '专辑' : tab === 'playlists' ? '歌单' : '歌手')
             .fontSize(13).fontWeight(this.currentTab === tab ? FontWeight.Bold : FontWeight.Regular)
@@ -388,6 +419,7 @@ export struct StyleDetailPage {
               } else if (!this.tabHasData(this.currentTab)) {
                 Text(this.message || '暂无内容').width('100%').height(160).fontSize(12).fontColor('#77777f')
                   .textAlign(TextAlign.Center)
+                Button('重试').backgroundColor('#303038').onClick(() => this.detail ? this.loadCurrentResources(true) : this.loadPage())
               } else {
                 Text(this.resourceMore ? '继续上滑加载更多' : '已经到底了').width('100%').height(52)
                   .fontSize(10).fontColor('#66666e').textAlign(TextAlign.Center)
