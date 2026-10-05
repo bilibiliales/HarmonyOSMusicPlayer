@@ -1470,14 +1470,10 @@ export struct Mine {
       ForEach(this.createdWithListening().slice(0, 6), (item: playlistType) => {
         Row({ space: 12 }) {
           Stack() {
-          Image(item.cover)
-            .width(48)
-            .height(48)
-            .borderRadius(8)
-            .objectFit(ImageFit.Cover)
-            if (item.specialType) {
-              SymbolGlyph(item.specialType === 'recent' ? $r('sys.symbol.clock') : $r('sys.symbol.sort'))
-                .fontSize(26).fontColor(['#ffffff'])
+            if (item.isLiked || item.specialType === 'recent' || item.specialType === 'record') {
+              this.SpecialPlaylistCover(item.cover, item.isLiked ? 'liked' : item.specialType || '')
+            } else {
+              Image(item.cover).width(56).height(56).borderRadius(8).objectFit(ImageFit.Cover)
             }
           }.width(56).height(56)
           Column({ space: 4 }) {
@@ -1717,14 +1713,10 @@ export struct Mine {
       ForEach(this.currentPlaylists(), (item: playlistType) => {
         Row({ space: 12 }) {
           Stack() {
-          Image(item.cover)
-            .width(56)
-            .height(56)
-            .borderRadius(8)
-            .objectFit(ImageFit.Cover)
-            if (item.specialType) {
-              SymbolGlyph(item.specialType === 'recent' ? $r('sys.symbol.clock') : $r('sys.symbol.sort'))
-                .fontSize(26).fontColor(['#ffffff'])
+            if (item.isLiked || item.specialType === 'recent' || item.specialType === 'record') {
+              this.SpecialPlaylistCover(item.cover, item.isLiked ? 'liked' : item.specialType || '')
+            } else {
+              Image(item.cover).width(56).height(56).borderRadius(8).objectFit(ImageFit.Cover)
             }
           }.width(56).height(56)
 

@@ -1,6 +1,8 @@
 import { UserLevelResponse } from '../models/api'
 import { ApiClient } from '../services/ApiClient'
 import { AuthStore } from '../stores/AuthStore'
+import { LevelTaskRing } from '../components/LevelTaskRing'
+import { levelTaskProgress } from '../services/UserLevelProgress'
 
 @Component
 export struct UserLevelPage {
@@ -23,10 +25,6 @@ export struct UserLevelPage {
     if (this.animationTimer >= 0) { clearTimeout(this.animationTimer) }
   }
 
-  private progress(current: number, target: number): number {
-    return target > 0 ? Math.max(0, Math.min(100, current * 100 / target)) : this.response.full ? 100 : 0
-  }
-
   private animateProgress(): void {
     this.levelProgress = 0
     this.songProgress = 0
@@ -35,8 +33,8 @@ export struct UserLevelPage {
     this.animationTimer = setTimeout(() => {
       this.getUIContext().animateTo({ duration: 1100, curve: Curve.EaseOut }, () => {
         this.levelProgress = Math.max(0, Math.min(100, (this.response.data?.level || 0) * 10))
-        this.songProgress = this.progress(this.response.data?.nowPlayCount || 0, this.response.data?.nextPlayCount || 0)
-        this.loginProgress = this.progress(this.response.data?.nowLoginCount || 0, this.response.data?.nextLoginCount || 0)
+        this.songProgress = levelTaskProgress(this.response.data!.nowPlayCount, this.response.data!.nextPlayCount, this.response.full)
+        this.loginProgress = levelTaskProgress(this.response.data!.nowLoginCount, this.response.data!.nextLoginCount, this.response.full)
       })
     }, 80)
   }
@@ -65,20 +63,6 @@ export struct UserLevelPage {
         if (this.response.data) { this.animateProgress() }
       }
     }
-  }
-
-  @Builder
-  private ProgressRing(value: number, remaining: number, label: string, unit: string, color: string) {
-    Column({ space: 16 }) {
-      Stack() {
-        Progress({ value: value, total: 100, type: ProgressType.Ring })
-          .width(112).height(112).color(color).backgroundColor('#303038')
-          .style({ strokeWidth: 5, enableSmoothEffect: true })
-        Text(this.response.full ? '已达成' : `还需 ${Math.max(0, remaining)} ${unit}`)
-          .fontSize(13).fontColor('#d0d0d7').maxLines(1)
-      }.width(112).height(112)
-      Text(label).fontSize(15).fontColor('#92929a')
-    }.layoutWeight(1).alignItems(HorizontalAlign.Center)
   }
 
   @Builder
@@ -135,10 +119,12 @@ export struct UserLevelPage {
           }
         }.width('100%')
         Row({ space: 12 }) {
-          this.ProgressRing(this.songProgress, this.response.data!.nextPlayCount - this.response.data!.nowPlayCount,
-            '听歌量', '首', '#ff6577')
-          this.ProgressRing(this.loginProgress, this.response.data!.nextLoginCount - this.response.data!.nowLoginCount,
-            '登录天数', '天', '#65bedc')
+          LevelTaskRing({ value: this.songProgress,
+            remaining: Math.max(0, this.response.data!.nextPlayCount - this.response.data!.nowPlayCount),
+            label: '听歌量', unit: '首', color: '#ff6577' }).layoutWeight(1)
+          LevelTaskRing({ value: this.loginProgress,
+            remaining: Math.max(0, this.response.data!.nextLoginCount - this.response.data!.nowLoginCount),
+            label: '登录天数', unit: '天', color: '#65bedc' }).layoutWeight(1)
         }.width('100%')
       }.width('100%').padding({ left: 20, right: 20, top: 24, bottom: 30 })
     }.width('100%').backgroundColor('#1b1b20').borderRadius(22)

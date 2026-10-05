@@ -102,6 +102,7 @@ export struct Play {
 
   aboutToAppear(): void {
     if (!this.playerStore.hasQueue()) {
+      this.pageStack.pop()
       return
     }
     this.liked = this.playerStore.currentSong.liked || false
@@ -155,6 +156,7 @@ export struct Play {
       return
     }
     this.lyricTimer = setInterval(() => {
+      if (!this.playerStore.hasQueue()) { return }
       if (this.loadedLyricSongId !== this.playerStore.currentSong.id && !this.lyricsLoading) {
         this.loadLyrics()
         this.loadRedCount()
@@ -1465,6 +1467,11 @@ export struct Play {
     }.height('100%')
   }
 
+  private closeSheet(): void {
+    this.activeSheet = ''
+    if (!this.playerStore.hasQueue()) { this.pageStack.pop() }
+  }
+
   @Builder
   private QueueSheet() {
     Column() {
@@ -1492,11 +1499,11 @@ export struct Play {
                   Text(item.author).fontSize(11).fontColor('#77777f').maxLines(1)
                 }
                 .layoutWeight(1).alignItems(HorizontalAlign.Start)
+                  .onClick(() => this.selectQueueSong(index))
                 SymbolGlyph($r('sys.symbol.xmark')).fontSize(15).fontColor(['#66666e'])
                   .onClick(() => playerController.removeAt(index))
               }
               .height(58).padding({ left: 18, right: 18 })
-              .onClick(() => this.selectQueueSong(index))
             }
           })
         }
@@ -1504,7 +1511,6 @@ export struct Play {
         Text('清空播放列表').width('100%').height(48).fontSize(13).fontColor('#ef4058')
           .textAlign(TextAlign.Center).onClick(async () => {
             await playerController.clearQueue()
-            this.activeSheet = ''
           })
       }
     }
@@ -1544,32 +1550,6 @@ export struct Play {
       .enabled(!this.coverSaving && this.playerStore.currentSong.img.length > 0)
       .onClick(() => this.saveCoverFromMenu())
     }
-  }
-
-  @Builder
-  private EmptyPlayer() {
-    Column() {
-      Row() {
-        SymbolGlyph($r('sys.symbol.chevron_left')).fontSize(24).fontColor(['#ffffff'])
-          .onClick(() => this.pageStack.pop())
-        Text('播放器').layoutWeight(1).fontSize(17).fontWeight(FontWeight.Bold)
-          .fontColor('#ffffff').textAlign(TextAlign.Center)
-        Blank().width(24)
-      }
-      .width('100%').height(58).padding({ left: 18, right: 18 })
-      Column({ space: 14 }) {
-        Stack() {
-          SymbolGlyph($r('sys.symbol.music')).fontSize(52).fontColor(['#686872'])
-        }
-        .width(112).height(112).borderRadius(56).backgroundColor('#222229')
-        Text('播放列表为空').fontSize(20).fontWeight(FontWeight.Bold).fontColor('#d7d7dc')
-        Text('请从推荐、发现、搜索或歌单中选择歌曲').fontSize(12).fontColor('#73737c')
-      }
-      .layoutWeight(1).justifyContent(FlexAlign.Center)
-      Text('暂无歌曲可播放').width('86%').height(48).fontSize(14).fontColor('#66666e')
-        .textAlign(TextAlign.Center).backgroundColor('#202027').borderRadius(24).margin({ bottom: 32 })
-    }
-    .width('100%').height('100%').backgroundColor('#121215')
   }
 
   @Builder
@@ -1720,7 +1700,7 @@ export struct Play {
       SymbolGlyph($r('sys.symbol.xmark_circle_fill'))
         .fontSize(24)
         .fontColor(['#686870'])
-        .onClick(() => this.activeSheet = '')
+        .onClick(() => this.closeSheet())
     }
     .width('100%')
     .height(68)
@@ -1808,7 +1788,7 @@ export struct Play {
         .width('100%')
         .height('100%')
         .backgroundColor('rgba(0,0,0,0.58)')
-        .onClick(() => this.activeSheet = '')
+        .onClick(() => this.closeSheet())
       Column() {
         if (this.activeSheet === 'quality') {
           this.QualitySheet()
@@ -1837,9 +1817,6 @@ export struct Play {
 
   build() {
     NavDestination() {
-      if (!this.playerStore.hasQueue()) {
-        this.EmptyPlayer()
-      } else {
         Stack() {
         Image(this.playerStore.currentSong.img)
           .width('100%')
@@ -2115,7 +2092,6 @@ export struct Play {
         .width('100%')
         .height('100%')
         .backgroundColor('#121215')
-      }
     }
     .hideTitleBar(true)
   }

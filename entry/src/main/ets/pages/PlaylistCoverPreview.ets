@@ -12,6 +12,7 @@ export interface PlaylistCoverPreviewPageParam {
   commentCount: number;
   tags?: string[];
   description?: string;
+  contentType?: string;
 }
 
 @Component
@@ -145,9 +146,11 @@ export struct PlaylistCoverPreview {
             
             // 统计信息
             Row({ space: 20 }) {
+              if (this.pageParam.contentType !== 'album') {
               Row({ space: 6 }) {
                 SymbolGlyph($r('sys.symbol.play_fill')).fontSize(16).fontColor(['#d0d0d5'])
                 Text(`${this.formatCount(this.playCount)} 播放`).fontSize(12).fontColor('#d0d0d5')
+              }
               }
               Row({ space: 6 }) {
                 SymbolGlyph($r('sys.symbol.heart')).fontSize(16).fontColor(['#d0d0d5'])
@@ -192,7 +195,7 @@ export struct PlaylistCoverPreview {
                   .fontColor('#ffffff').fontSize(16).fontWeight(FontWeight.Medium)
               }
             }
-            .width(200).height(44).backgroundColor('#ff6577').borderRadius(22)
+            .width(200).height(44).backgroundColor('#ef233c').borderRadius(22)
             .margin({ top: 32 }).enabled(!this.coverSaving)
             .onClick(() => this.saveCoverToGallery())
           }

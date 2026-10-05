@@ -16,6 +16,7 @@ import { ApiClient } from '../services/ApiClient'
 import { playerController } from '../services/PlayerController'
 import { AuthStore } from '../stores/AuthStore'
 import { ShareSheet } from '../components/ShareSheet'
+import { PlaylistCoverPreviewPageParam } from './PlaylistCoverPreview'
 
 @Component
 export struct AlbumDetail {
@@ -57,6 +58,18 @@ export struct AlbumDetail {
     this.albumArtist = this.pageParam.artist || ''
     this.shareParam = { type: 'album', id: this.pageParam.id, name: this.albumName, img: this.albumCover }
     this.loadDetail()
+  }
+
+  private previewCover(): void {
+    if (!this.albumCover) { return }
+    const param: PlaylistCoverPreviewPageParam = {
+      playlist: { id: this.pageParam.id, name: this.albumName, cover: this.albumCover,
+        count: this.songCount, creator: this.albumArtist },
+      playCount: 0, collectCount: this.subCount, commentCount: this.commentCount,
+      tags: [this.albumType, this.albumPublishTime, this.albumCompany].filter((value: string) => value.length > 0),
+      description: this.albumDesc, contentType: 'album'
+    }
+    this.pageStack.pushPathByName('PlaylistCoverPreviewPage', param)
   }
 
   private async loadDetail(): Promise<void> {
@@ -414,6 +427,7 @@ export struct AlbumDetail {
                     .borderRadius(12)
                     .objectFit(ImageFit.Cover)
                     .shadow({ radius: 16, color: 'rgba(0,0,0,0.35)', offsetY: 4 })
+                    .onClick(() => this.previewCover())
                   Column({ space: 6 }) {
                     Text(this.albumName)
                       .fontSize(18)
