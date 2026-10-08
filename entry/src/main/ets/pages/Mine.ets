@@ -1,3 +1,6 @@
+import { EventUpdates } from '../services/EventUpdates'
+import { EventPresentation } from '../services/EventPresentation'
+import { EventCard } from '../components/EventCard'
 import { ListeningPlaylistService } from '../services/ListeningPlaylistService'
 import { userPlaylists } from '../constants'
 import { playlistType, songItemType } from '../models'
@@ -6,16 +9,8 @@ import {
   AlbumSublistResponse,
   ApiParam,
   ApiSong,
-  CommentApiItem,
-  CommentResponse,
   DjRadioItem,
   DjSublistResponse,
-  EventCommentItem,
-  EventCommentResponse,
-  EventDetailPageParam,
-  EventForwardData,
-  EventJsonData,
-  EventPicture,
   LikeListResponse,
   ListenDataResponse,
   LoginStatusResponse,
@@ -25,7 +20,6 @@ import {
   PlaylistCollectResponse,
   PlaylistImportStatusResponse,
   PlaylistImportTaskResponse,
-  ShareResourceResponse,
   SongDetailResponse,
   SubscribedAlbum,
   UserDetailResponse,
@@ -35,6 +29,7 @@ import {
   UserPlaylistResponse,
   VipInfoResponse
 } from '../models/api'
+import { RadioPageParam } from '../models/radio'
 import { ApiClient } from '../services/ApiClient'
 import { playerController } from '../services/PlayerController'
 import { resizeImageUrl } from '../services/ImageUrl'
@@ -111,17 +106,6 @@ export struct Mine {
   @State eventsLoading: boolean = false
   @State eventsLasttime: number = -1
   @State eventsHasMore: boolean = true
-  @State eventComments: EventCommentItem[] = []
-  @State commentSheetVisible: boolean = false
-  @State commentLoading: boolean = false
-  @State commentTotal: number = 0
-  @State selectedCommentType: number = 6
-  @State selectedCommentResourceId: string = ''
-  @State selectedCommentThreadId: string = ''
-  @State selectedCommentEventId: number = 0
-  @State commentTitle: string = '动态评论'
-  @State commentInput: string = ''
-  @State commentSubmitting: boolean = false
   @State eventMessage: string = ''
   @State listenRankItems: songItemType[] = []
   @State listenRankError: string = ''
@@ -648,317 +632,25 @@ export struct Mine {
     }
   }
 
-  private threadIdOf(item: UserEventItem): string {
-    return item.info.threadId || `A_EV_2_${item.id}_${item.user.userId}`
+  private stopEventUpdates?: () => void
+
+  aboutToAppear(): void { this.watchEventUpdates() }
+
+  private watchEventUpdates(): void {
+    this.stopEventUpdates?.()
+    this.stopEventUpdates = EventUpdates.subscribe((item: UserEventItem, deleted: boolean) => {
+      this.applyLocalEventChange(item, deleted)
+    })
   }
 
-  private async loadEventComments(item: UserEventItem): Promise<void> {
-    this.selectedCommentType = 6
-    this.selectedCommentResourceId = ''
-    this.selectedCommentThreadId = this.threadIdOf(item)
-    this.selectedCommentEventId = item.id
-    this.commentTitle = '动态评论'
-    this.commentInput = ''
-    this.commentLoading = true
-    this.commentSheetVisible = true
-    try {
-      const response = await ApiClient.get<EventCommentResponse>('/comment/event', [
-        { key: 'threadId', value: this.selectedCommentThreadId },
-        { key: 'limit', value: '30' }
-      ])
-      if (response.code === 200) {
-        this.eventComments = (response.hotComments || []).concat(response.comments || [])
-        this.commentTotal = response.total || 0
-      }
-    } catch (_error) {
-      this.eventComments = []
-    } finally {
-      this.commentLoading = false
-    }
+  aboutToDisappear(): void { this.stopEventUpdates?.() }
+
+  private applyEventChange(item: UserEventItem, deleted: boolean): void {
+    EventUpdates.publish(item, deleted)
   }
 
-  private async loadSongComments(songId: string, songName: string): Promise<void> {
-    this.selectedCommentType = 0
-    this.selectedCommentResourceId = songId
-    this.selectedCommentThreadId = ''
-    this.selectedCommentEventId = 0
-    this.commentTitle = `${songName} · 评论`
-    this.commentInput = ''
-    this.commentLoading = true
-    this.commentSheetVisible = true
-    try {
-      const response = await ApiClient.get<CommentResponse>('/comment/music', [
-        { key: 'id', value: songId },
-        { key: 'limit', value: '30' }
-      ])
-      const source = (response.hotComments || []).concat(response.comments || [])
-      this.eventComments = source.map((comment: CommentApiItem) => {
-        const mapped: EventCommentItem = {
-          commentId: comment.commentId,
-          content: comment.content,
-          time: 0,
-          timeStr: comment.timeStr,
-          likedCount: comment.likedCount,
-          liked: comment.liked || false,
-          user: {
-            userId: 0,
-            nickname: comment.user.nickname,
-            avatarUrl: comment.user.avatarUrl,
-            followed: false,
-            mutual: false
-          }
-        }
-        return mapped
-      })
-      this.commentTotal = response.total || this.eventComments.length
-    } catch (_error) {
-      this.eventComments = []
-    } finally {
-      this.commentLoading = false
-    }
-  }
-
-  private async toggleCommentLike(comment: EventCommentItem): Promise<void> {
-    const nextLiked = !(comment.liked || false)
-    const params: ApiParam[] = [
-      { key: 'type', value: this.selectedCommentType.toString() },
-      { key: 'cid', value: comment.commentId.toString() },
-      { key: 't', value: nextLiked ? '1' : '0' }
-    ]
-    if (this.selectedCommentType === 6) {
-      params.push({ key: 'threadId', value: this.selectedCommentThreadId })
-    } else {
-      params.push({ key: 'id', value: this.selectedCommentResourceId })
-    }
-    try {
-      const response = await ApiClient.get<OperationResponse>('/comment/like', params)
-      if (response.code === 200) {
-        comment.liked = nextLiked
-        comment.likedCount = Math.max(0, comment.likedCount + (nextLiked ? 1 : -1))
-        this.eventComments = this.eventComments.map((item: EventCommentItem) => item)
-      }
-    } catch (_error) {
-    }
-  }
-
-  private async submitComment(): Promise<void> {
-    const content = this.commentInput.trim()
-    if (!content || this.commentSubmitting) {
-      return
-    }
-    this.commentSubmitting = true
-    const params: ApiParam[] = [
-      { key: 't', value: '1' },
-      { key: 'type', value: this.selectedCommentType.toString() },
-      { key: 'content', value: content }
-    ]
-    if (this.selectedCommentType === 6) {
-      params.push({ key: 'threadId', value: this.selectedCommentThreadId })
-    } else {
-      params.push({ key: 'id', value: this.selectedCommentResourceId })
-    }
-    try {
-      const response = await ApiClient.get<OperationResponse>('/comment', params)
-      if (response.code === 200) {
-        this.commentInput = ''
-        if (this.selectedCommentType === 6) {
-          const event = this.userEvents.find((item: UserEventItem) => item.id === this.selectedCommentEventId)
-          if (event) {
-            event.info.commentCount = (event.info.commentCount || 0) + 1
-            await this.loadEventComments(event)
-          }
-        } else {
-          await this.loadSongComments(this.selectedCommentResourceId, this.commentTitle.replace(' · 评论', ''))
-        }
-      }
-    } catch (_error) {
-    } finally {
-      this.commentSubmitting = false
-    }
-  }
-
-  private async deleteEvent(evId: number): Promise<void> {
-    try {
-      const response = await ApiClient.get<OperationResponse>('/event/del', [
-        { key: 'evId', value: evId.toString() }
-      ])
-      if (response.code === 200) {
-        this.userEvents = this.userEvents.filter((item: UserEventItem) => item.id !== evId)
-      }
-    } catch (_error) {
-    }
-  }
-
-  private async shareEvent(item: UserEventItem): Promise<void> {
-    try {
-      const response = await ApiClient.get<ShareResourceResponse>('/event/forward', [
-        { key: 'evId', value: item.id.toString() },
-        { key: 'uid', value: this.authStore.userId },
-        { key: 'forwards', value: '转发动态' }
-      ])
-      if (response.code === 200) {
-        item.info.shareCount = (item.info.shareCount || 0) + 1
-        this.userEvents = this.userEvents.map((event: UserEventItem) => event)
-        this.eventMessage = '动态已转发'
-      }
-    } catch (error) {
-      this.eventMessage = error instanceof Error ? error.message : '动态转发失败'
-    }
-  }
-
-  private async likeEvent(item: UserEventItem): Promise<void> {
-    const nextLiked = !(item.info.liked || false)
-    try {
-      const response = await ApiClient.get<OperationResponse>('/resource/like', [
-        { key: 'type', value: '6' },
-        { key: 'threadId', value: this.threadIdOf(item) },
-        { key: 't', value: nextLiked ? '1' : '0' }
-      ])
-      if (response.code === 200) {
-        item.info.liked = nextLiked
-        item.info.likedCount = Math.max(0, (item.info.likedCount || 0) + (nextLiked ? 1 : -1))
-        this.userEvents = this.userEvents.map((event: UserEventItem) => event)
-      }
-    } catch (error) {
-      this.eventMessage = error instanceof Error ? error.message : '动态点赞失败'
-    }
-  }
-
-  private eventContent(item: UserEventItem): string {
-    try {
-      const data = JSON.parse(item.json) as EventJsonData
-      return data.msg || data.title || '分享了一条动态'
-    } catch (_error) {
-      return '分享了一条动态'
-    }
-  }
-
-  private eventPictureUrl(picture: EventPicture): string {
-    const url = picture.rectangleUrl || picture.squareUrl || picture.pcSquareUrl || picture.originUrl || ''
-    return resizeImageUrl(url, 520, 420)
-  }
-
-  private eventSong(item: UserEventItem): songItemType | null {
-    try {
-      const data = JSON.parse(item.json) as EventJsonData
-      return data.song ? mapApiSong(data.song) : null
-    } catch (_error) {
-      return null
-    }
-  }
-
-  private async playEventSong(item: UserEventItem): Promise<void> {
-    const song = this.eventSong(item)
-    if (!song) {
-      return
-    }
-    const queue = this.playerStore.queue.map((queueSong: songItemType) => queueSong)
-    let index = queue.findIndex((queueSong: songItemType) => queueSong.id === song.id)
-    if (index < 0) {
-      queue.push(song)
-      index = queue.length - 1
-    }
-    await playerController.setQueue(queue, index, true)
-    this.pageStack.pushPathByName('PlayPage', null)
-  }
-
-  private async toggleEventSongLike(item: UserEventItem): Promise<void> {
-    const song = this.eventSong(item)
-    if (!song) {
-      return
-    }
-    const songId = Number(song.id)
-    const nextLiked = !this.likedSongIds.includes(songId)
-    try {
-      const response = await ApiClient.get<OperationResponse>('/like', [
-        { key: 'id', value: song.id },
-        { key: 'like', value: nextLiked.toString() }
-      ])
-      if (response.code === 200) {
-        if (nextLiked) {
-          this.likedSongIds.push(songId)
-        } else {
-          this.likedSongIds = this.likedSongIds.filter((id: number) => id !== songId)
-        }
-      }
-    } catch (_error) {
-    }
-  }
-
-  private openEventDetail(item: UserEventItem): void {
-    const param: EventDetailPageParam = { event: item, canDelete: true }
-    this.pageStack.pushPathByName('EventDetailPage', param)
-  }
-
-  private forwardEvent(item: UserEventItem): EventForwardData | null {
-    try {
-      const data = JSON.parse(item.json) as EventJsonData
-      return data.event || null
-    } catch (_error) {
-      return null
-    }
-  }
-
-  private forwardContent(forward: EventForwardData): string {
-    try {
-      const data = JSON.parse(forward.json || '') as EventJsonData
-      return data.msg || data.title || forward.actName || '源动态'
-    } catch (_error) {
-      return forward.actName || '源动态'
-    }
-  }
-
-  private forwardEventItem(forward: EventForwardData): UserEventItem {
-    return {
-      id: forward.id || 0,
-      type: forward.type,
-      eventTime: forward.eventTime,
-      showTime: forward.showTime,
-      json: forward.json || '',
-      user: forward.user || { userId: 0, nickname: '', avatarUrl: '', followed: false, mutual: false },
-      info: forward.info || { commentCount: 0, likedCount: 0, shareCount: 0 },
-      pics: forward.pics,
-      actName: forward.actName
-    }
-  }
-
-  @Builder
-  private ForwardEventCard(forward: EventForwardData) {
-    Column({ space: 7 }) {
-      Row({ space: 7 }) {
-        Image(resizeImageUrl(forward.user?.avatarUrl || '', 64, 64))
-          .width(24).height(24).borderRadius(12).objectFit(ImageFit.Cover)
-        Text(forward.user?.nickname || '源动态作者').fontSize(12).fontColor('#ededf0').maxLines(1)
-      }
-      .width('100%')
-      Text(this.forwardContent(forward)).width('100%').fontSize(12).lineHeight(18).fontColor('#9999a1')
-        .maxLines(3).textOverflow({ overflow: TextOverflow.Ellipsis })
-      if ((forward.pics || []).length > 0) {
-        Image(this.eventPictureUrl((forward.pics || [])[0]))
-          .width('100%').height(120).borderRadius(9).objectFit(ImageFit.Cover)
-      }
-    }
-    .width('100%').padding(10).backgroundColor('#202026').borderRadius(11)
-    .onClick(() => this.openEventDetail(this.forwardEventItem(forward)))
-  }
-
-  private formatEventTime(timestamp: number): string {
-    if (!timestamp) {
-      return ''
-    }
-    const date = new Date(timestamp)
-    const now = new Date()
-    const diff = now.getTime() - date.getTime()
-    if (diff < 60000) {
-      return '刚刚'
-    }
-    if (diff < 3600000) {
-      return `${Math.floor(diff / 60000)}分钟前`
-    }
-    if (diff < 86400000) {
-      return `${Math.floor(diff / 3600000)}小时前`
-    }
-    return `${date.getMonth() + 1}月${date.getDate()}日`
+  private applyLocalEventChange(item: UserEventItem, deleted: boolean): void {
+    this.userEvents = EventPresentation.changeList(this.userEvents, item, deleted)
   }
 
   private async startPlaylistImport(): Promise<void> {
@@ -1052,12 +744,6 @@ export struct Mine {
       Column() {
       this.HeaderSection()
       this.StatsSection()
-      Row({ space: 10 }) {
-        SymbolGlyph($r('sys.symbol.cloud')).fontSize(20).fontColor(['#dddddf'])
-        Text('我的云盘').fontSize(14).fontColor('#eeeeee').layoutWeight(1)
-        SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(14).fontColor(['#888890'])
-      }.width('100%').height(44).padding({ left: 20, right: 20 })
-        .onClick(() => this.openProtectedPage('CloudDrivePage'))
       this.SubTabBar()
       Refresh({ refreshing: $$this.isRefreshing }) {
         Scroll() {
@@ -1105,13 +791,6 @@ export struct Mine {
       if (this.musicCategory === 'recent') {
         this.loadRecentData()
       }
-    })
-    .bindSheet(this.commentSheetVisible, this.CommentSheetContent(), {
-      height: '60%',
-      backgroundColor: '#19191f',
-      showClose: false,
-      dragBar: false,
-      onDisappear: () => this.commentSheetVisible = false
     })
     .bindSheet(this.importSheetVisible, this.ImportSheetContent(), {
       height: '70%',
@@ -2057,7 +1736,10 @@ export struct Mine {
             .layoutWeight(1).alignItems(HorizontalAlign.Start)
             SymbolGlyph($r('sys.symbol.ellipsis_circle')).fontSize(18).fontColor(['#66666e'])
           }
-          .width('100%').height(72).padding({ left: 16, right: 16 })
+          .width('100%').height(72).padding({ left: 16, right: 16 }).onClick(() => {
+            const param: RadioPageParam = { id: String(item.id), name: item.name, cover: item.picUrl }
+            this.pageStack.pushPathByName('RadioDetailPage', param)
+          })
         })
         if (this.djHasMore) {
           Text('加载更多').width('100%').height(44).fontSize(12).fontColor('#77777f')
@@ -2104,83 +1786,10 @@ export struct Mine {
         .width('100%').height(200).justifyContent(FlexAlign.Center)
       } else {
         ForEach(this.userEvents.filter((event: UserEventItem) => event.id > 0), (item: UserEventItem) => {
-          Column({ space: 8 }) {
-            Row({ space: 8 }) {
-              Image(item.user.avatarUrl).width(32).height(32).borderRadius(16).objectFit(ImageFit.Cover)
-              Text(item.user.nickname).fontSize(13).fontWeight(FontWeight.Medium).fontColor('#ffffff')
-              Text(this.formatEventTime(item.showTime || item.eventTime || 0))
-                .fontSize(10).fontColor('#66666e')
-            }
-            .width('100%')
-            .onClick(() => this.openEventDetail(item))
-            Text(this.eventContent(item)).width('100%').fontSize(13).lineHeight(20).fontColor('#b5b5bc')
-              .onClick(() => this.openEventDetail(item))
-            if (this.forwardEvent(item)) {
-              this.ForwardEventCard(this.forwardEvent(item)!)
-            }
-            if ((item.pics || []).length > 0) {
-              Scroll() {
-                Row({ space: 8 }) {
-                  ForEach(item.pics || [], (picture: EventPicture) => {
-                    Image(this.eventPictureUrl(picture))
-                      .width((item.pics || []).length === 1 ? 260 : 116)
-                      .height((item.pics || []).length === 1 ? 210 : 116)
-                      .sourceSize({ width: 520, height: 420 })
-                      .borderRadius(12).objectFit(ImageFit.Cover)
-                      .onClick(() => this.openEventDetail(item))
-                  })
-                }
-              }
-              .width('100%').scrollable(ScrollDirection.Horizontal).scrollBar(BarState.Off)
-            }
-            if (this.eventSong(item)) {
-              Row({ space: 10 }) {
-                Image(this.eventSong(item)?.img || '')
-                  .width(54).height(54).borderRadius(10).objectFit(ImageFit.Cover)
-                  .onClick(() => this.playEventSong(item))
-                Column({ space: 4 }) {
-                  Text(this.eventSong(item)?.name || '').fontSize(13).fontColor('#ededf0').maxLines(1)
-                  Text(this.eventSong(item)?.author || '').fontSize(10).fontColor('#77777f').maxLines(1)
-                }
-                .layoutWeight(1).alignItems(HorizontalAlign.Start)
-                SymbolGlyph(this.likedSongIds.includes(Number(this.eventSong(item)?.id || '0')) ?
-                  $r('sys.symbol.heart_fill') : $r('sys.symbol.heart'))
-                  .fontSize(20)
-                  .fontColor([this.likedSongIds.includes(Number(this.eventSong(item)?.id || '0')) ? '#ef233c' : '#77777f'])
-                  .onClick(() => this.toggleEventSongLike(item))
-                SymbolGlyph($r('sys.symbol.ellipsis_bubble'))
-                  .fontSize(20).fontColor(['#77777f'])
-                  .onClick(() => this.loadSongComments(this.eventSong(item)?.id || '',
-                    this.eventSong(item)?.name || '歌曲'))
-                SymbolGlyph($r('sys.symbol.play_circle_fill'))
-                  .fontSize(23).fontColor(['#ffffff'])
-                  .onClick(() => this.playEventSong(item))
-              }
-              .width('100%').padding(10).backgroundColor('#25252b').borderRadius(12)
-            }
-            Row({ space: 24 }) {
-              Row({ space: 4 }) {
-                SymbolGlyph($r('sys.symbol.arrow_right_up_and_square')).fontSize(16).fontColor(['#77777f'])
-                Text(`${item.info.shareCount || 0}`).fontSize(10).fontColor('#77777f')
-              }.onClick(() => this.shareEvent(item))
-              Row({ space: 4 }) {
-                SymbolGlyph($r('sys.symbol.ellipsis_bubble')).fontSize(16).fontColor(['#77777f'])
-                Text(`${item.info.commentCount || 0}`).fontSize(10).fontColor('#77777f')
-              }.onClick(() => this.loadEventComments(item))
-              Row({ space: 4 }) {
-                SymbolGlyph(item.info.liked ? $r('sys.symbol.heart_fill') : $r('sys.symbol.heart'))
-                  .fontSize(16).fontColor([item.info.liked ? '#ef233c' : '#77777f'])
-                Text(`${item.info.likedCount || 0}`).fontSize(10)
-                  .fontColor(item.info.liked ? '#ef233c' : '#77777f')
-              }.onClick(() => this.likeEvent(item))
-              SymbolGlyph($r('sys.symbol.trash')).fontSize(16).fontColor(['#55555d'])
-                .onClick(() => this.deleteEvent(item.id))
-            }
-            .width('100%')
-          }
-          .width('100%').padding(16).backgroundColor('#1b1b20').borderRadius(16)
-          .margin({ bottom: 8 })
-        })
+          EventCard({ item: item,
+            onChanged: (event: UserEventItem, deleted: boolean) => this.applyEventChange(event, deleted) })
+            .margin({ bottom: 8 })
+        }, (item: UserEventItem) => item.id.toString())
         if (this.eventsHasMore) {
           Text('加载更多').width('100%').height(44).fontSize(12).fontColor('#77777f')
             .textAlign(TextAlign.Center).onClick(() => this.loadUserEvents())
@@ -2194,68 +1803,6 @@ export struct Mine {
     .width('100%').padding({ left: 16, right: 16, bottom: 24 })
   }
 
-  @Builder
-  CommentSheetContent() {
-    Column() {
-      Row() {
-        Column({ space: 3 }) {
-          Text(`${this.commentTitle} · ${this.commentTotal}`).fontSize(17).fontWeight(FontWeight.Bold).fontColor('#ffffff')
-          Text('可以发布评论，点击红心可点赞或取消点赞').fontSize(10).fontColor('#77777f')
-        }
-        .layoutWeight(1).alignItems(HorizontalAlign.Start)
-        SymbolGlyph($r('sys.symbol.xmark_circle_fill')).fontSize(24).fontColor(['#686870'])
-          .onClick(() => this.commentSheetVisible = false)
-      }
-      .height(66).padding({ left: 20, right: 20 })
-      if (this.commentLoading) {
-        LoadingProgress().layoutWeight(1).width(42).color('#ef233c')
-      } else if (this.eventComments.length === 0) {
-        Column({ space: 10 }) {
-          SymbolGlyph($r('sys.symbol.ellipsis_bubble')).fontSize(38).fontColor(['#55555d'])
-          Text('暂无评论').fontSize(12).fontColor('#77777f')
-        }
-        .layoutWeight(1).justifyContent(FlexAlign.Center)
-      } else {
-        List({ space: 14 }) {
-          ForEach(this.eventComments, (item: EventCommentItem) => {
-            ListItem() {
-              Row({ space: 10 }) {
-                Image(item.user.avatarUrl).width(36).height(36).borderRadius(18).objectFit(ImageFit.Cover)
-                Column({ space: 6 }) {
-                  Row() {
-                    Text(item.user.nickname).layoutWeight(1).fontSize(12).fontColor('#a9a9b0')
-                    Row({ space: 4 }) {
-                      SymbolGlyph(item.liked ? $r('sys.symbol.heart_fill') : $r('sys.symbol.heart'))
-                        .fontSize(14).fontColor([item.liked ? '#ef233c' : '#77777f'])
-                      Text(`${item.likedCount}`).fontSize(10).fontColor(item.liked ? '#ef233c' : '#77777f')
-                    }
-                    .onClick(() => this.toggleCommentLike(item))
-                  }
-                  Text(item.content).fontSize(13).lineHeight(20).fontColor('#ededf0')
-                }
-                .layoutWeight(1).alignItems(HorizontalAlign.Start)
-              }
-              .padding({ left: 18, right: 18 })
-            }
-          })
-        }
-        .layoutWeight(1)
-      }
-      Row({ space: 10 }) {
-        TextInput({ text: this.commentInput, placeholder: '写下你的评论…' })
-          .layoutWeight(1).height(42).fontSize(13).fontColor('#ffffff')
-          .placeholderColor('#66666e').backgroundColor('#25252b').borderRadius(18)
-          .onChange((value: string) => this.commentInput = value)
-          .onSubmit(() => this.submitComment())
-        Button(this.commentSubmitting ? '发送中' : '发送')
-          .height(40).fontSize(12).fontColor('#ffffff').backgroundColor('#ef233c')
-          .borderRadius(18).enabled(!this.commentSubmitting && this.commentInput.trim().length > 0)
-          .onClick(() => this.submitComment())
-      }
-      .width('100%').padding({ left: 14, right: 14, top: 8, bottom: 12 })
-    }
-    .width('100%').height('100%')
-  }
 
   navigateToPlaylist(playlist: playlistType) {
     if (playlist.specialType === 'recent') {

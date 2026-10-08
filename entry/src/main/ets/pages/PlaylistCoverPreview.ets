@@ -13,6 +13,8 @@ export interface PlaylistCoverPreviewPageParam {
   tags?: string[];
   description?: string;
   contentType?: string;
+  songCountText?: string;
+  artistCountText?: string;
 }
 
 @Component
@@ -127,81 +129,94 @@ export struct PlaylistCoverPreview {
           Row() {
             SymbolGlyph($r('sys.symbol.chevron_left')).fontSize(24).fontColor(['#ffffff'])
               .onClick(() => this.pageStack.pop())
-            Text('封面预览').layoutWeight(1).fontSize(17).fontWeight(FontWeight.Bold)
+            Text(this.pageParam.contentType === 'style' ? '曲风介绍' : '封面预览').layoutWeight(1).fontSize(17).fontWeight(FontWeight.Bold)
               .fontColor('#ffffff').textAlign(TextAlign.Center)
             // 添加更多选项按钮（留空占位）
             SymbolGlyph($r('sys.symbol.ellipsis_circle')).fontSize(22).fontColor(['#ffffff']).visibility(Visibility.Hidden)
           }
           .width('100%').height(56)
 
-          // 主要内容区域
-          Column() {
-            // 封面图片
-            Image(this.playlist.cover).width(300).height(300).borderRadius(18).objectFit(ImageFit.Cover)
-              .shadow({ radius: 18, color: 'rgba(0,0,0,0.32)', offsetY: 8 })
-            
-            // 大标题
-            Text(this.playlist.name).fontSize(24).fontWeight(FontWeight.Bold).fontColor('#ffffff').maxLines(3)
-              .margin({ top: 24 })
-            
-            // 统计信息
-            Row({ space: 20 }) {
-              if (this.pageParam.contentType !== 'album') {
-              Row({ space: 6 }) {
-                SymbolGlyph($r('sys.symbol.play_fill')).fontSize(16).fontColor(['#d0d0d5'])
-                Text(`${this.formatCount(this.playCount)} 播放`).fontSize(12).fontColor('#d0d0d5')
-              }
-              }
-              Row({ space: 6 }) {
-                SymbolGlyph($r('sys.symbol.heart')).fontSize(16).fontColor(['#d0d0d5'])
-                Text(`${this.formatCount(this.collectCount)} 收藏`).fontSize(12).fontColor('#d0d0d5')
-              }
-              Row({ space: 6 }) {
-                SymbolGlyph($r('sys.symbol.ellipsis_bubble')).fontSize(16).fontColor(['#d0d0d5'])
-                Text(`${this.formatCount(this.commentCount)} 评论`).fontSize(12).fontColor('#d0d0d5')
-              }
-            }
-            .margin({ top: 12 })
-            
-            // 标签组hi
-            if (this.tags && this.tags.length > 0) {
-              Flex({ direction: FlexDirection.Row, wrap: FlexWrap.Wrap, justifyContent: FlexAlign.Start,
-                alignItems: ItemAlign.Center }) {
-                ForEach(this.tags, (tag: string, index: number) => {
-                  Text(tag).fontSize(12).fontColor('#ffffff')
-                    .padding({ left: 12, right: 12, top: 6, bottom: 6 })
-                    .backgroundColor('#333339').borderRadius(16)
-                    .margin(4)
-                })
-              }
-              .padding({ left: 8 })
-              .margin({ top: 16 })
-            }
-            
-            // 描述文字
-            if (this.description && this.description.length > 0) {
-              Text(this.description).fontSize(14).fontColor('#a9a9b0').maxLines(5)
-                .margin({ top: 16, left: 24, right: 24 })
-            }
-            
-            Button() {
-              Row({ space: 8 }) {
-                if (this.coverSaving) {
-                  LoadingProgress().width(18).height(18).color('#ffffff')
-                } else {
-                  SymbolGlyph($r('sys.symbol.arrow_down_circle')).fontSize(18).fontColor(['#ffffff'])
+          // 封面与完整介绍共用滚动区域，长文本不截断。
+          Scroll() {
+            Column() {
+              // 封面图片
+              Image(this.playlist.cover).width(300).height(300).borderRadius(18).objectFit(ImageFit.Cover)
+                .shadow({ radius: 18, color: 'rgba(0,0,0,0.32)', offsetY: 8 })
+
+              // 大标题
+              Text(this.playlist.name).fontSize(24).fontWeight(FontWeight.Bold).fontColor('#ffffff').maxLines(3)
+                .margin({ top: 24 })
+
+              // 统计信息
+              if (this.pageParam.contentType === 'style') {
+                Row({ space: 20 }) {
+                  if (this.pageParam.songCountText) {
+                    Text(this.pageParam.songCountText + ' 首歌曲').fontSize(12).fontColor('#d0d0d5')
+                  }
+                  if (this.pageParam.artistCountText) {
+                    Text(this.pageParam.artistCountText + ' 位歌手').fontSize(12).fontColor('#d0d0d5')
+                  }
+                }.margin({ top: 12 })
+              } else {
+                Row({ space: 20 }) {
+                  if (this.pageParam.contentType !== 'album') {
+                  Row({ space: 6 }) {
+                    SymbolGlyph($r('sys.symbol.play_fill')).fontSize(16).fontColor(['#d0d0d5'])
+                    Text(`${this.formatCount(this.playCount)} 播放`).fontSize(12).fontColor('#d0d0d5')
+                  }
+                  }
+                  Row({ space: 6 }) {
+                    SymbolGlyph($r('sys.symbol.heart')).fontSize(16).fontColor(['#d0d0d5'])
+                    Text(`${this.formatCount(this.collectCount)} 收藏`).fontSize(12).fontColor('#d0d0d5')
+                  }
+                  Row({ space: 6 }) {
+                    SymbolGlyph($r('sys.symbol.ellipsis_bubble')).fontSize(16).fontColor(['#d0d0d5'])
+                    Text(`${this.formatCount(this.commentCount)} 评论`).fontSize(12).fontColor('#d0d0d5')
+                  }
                 }
-                Text(this.coverSaving ? '正在保存…' : '保存封面')
-                  .fontColor('#ffffff').fontSize(16).fontWeight(FontWeight.Medium)
+                .margin({ top: 12 })
               }
+
+              // 标签
+              if (this.tags && this.tags.length > 0) {
+                Flex({ direction: FlexDirection.Row, wrap: FlexWrap.Wrap, justifyContent: FlexAlign.Start,
+                  alignItems: ItemAlign.Center }) {
+                  ForEach(this.tags, (tag: string, index: number) => {
+                    Text(tag).fontSize(12).fontColor('#ffffff')
+                      .padding({ left: 12, right: 12, top: 6, bottom: 6 })
+                      .backgroundColor('#333339').borderRadius(16)
+                      .margin(4)
+                  })
+                }
+                .padding({ left: 8 })
+                .margin({ top: 16 })
+              }
+
+              // 描述文字
+              if (this.description && this.description.length > 0) {
+                Text(this.description).width('100%').fontSize(14).lineHeight(24).fontColor('#a9a9b0')
+                  .padding({ top: 16, left: 6, right: 6 })
+              }
+
+              Button() {
+                Row({ space: 8 }) {
+                  if (this.coverSaving) {
+                    LoadingProgress().width(18).height(18).color('#ffffff')
+                  } else {
+                    SymbolGlyph($r('sys.symbol.arrow_down_circle')).fontSize(18).fontColor(['#ffffff'])
+                  }
+                  Text(this.coverSaving ? '正在保存…' : '保存封面')
+                    .fontColor('#ffffff').fontSize(16).fontWeight(FontWeight.Medium)
+                }
+              }
+              .width(200).height(44).backgroundColor('#ef233c').borderRadius(22)
+              .margin({ top: 32 }).enabled(!this.coverSaving && this.playlist.cover.length > 0)
+              .onClick(() => this.saveCoverToGallery())
             }
-            .width(200).height(44).backgroundColor('#ef233c').borderRadius(22)
-            .margin({ top: 32 }).enabled(!this.coverSaving)
-            .onClick(() => this.saveCoverToGallery())
-          }
-          .width('100%').height('100%').alignSelf(ItemAlign.Center).justifyContent(FlexAlign.Center)
+            .width('100%').padding({ top: 20, bottom: 36 })
+          }.width('100%').layoutWeight(1).scrollBar(BarState.Off)
         }
-        .width('100%').padding({ left: 18, right: 18 })
+        .width('100%').height('100%').padding({ left: 18, right: 18 })
       }
       .width('100%').height('100%').backgroundColor('#121215')
     }

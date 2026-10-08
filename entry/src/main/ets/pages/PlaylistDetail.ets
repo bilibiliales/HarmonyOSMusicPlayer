@@ -1,17 +1,18 @@
+import { CommentService } from '../services/CommentService'
+import { ResourceComments } from '../components/ResourceComments'
+import { CommentResource } from '../models/CommentResource'
 import { common } from '@kit.AbilityKit'
 import { ListeningPlaylistService } from '../services/ListeningPlaylistService'
 import { DiscoveryPlaylistsService, FM_ICON } from '../services/DiscoveryPlaylistsService'
 import {
-  CommentResponse,
   mapApiSong,
-  mapComment,
   OperationResponse,
   PlaylistDetailResponse,
   PlaylistDynamicResponse,
   SharePageParam,
   UserProfilePageParam
 } from '../models/api'
-import { MusicComment, playlistType, songItemType } from '../models/music'
+import { playlistType, songItemType } from '../models/music'
 import { ApiClient } from '../services/ApiClient'
 import { playerController } from '../services/PlayerController'
 import { AuthStore } from '../stores/AuthStore'
@@ -41,8 +42,6 @@ export struct PlaylistDetail {
   @State playCount: number = 0
   @State subscribed: boolean = false
   @State commentSheetVisible: boolean = false
-  @State commentsLoading: boolean = false
-  @State comments: MusicComment[] = []
   @State shareSheetVisible: boolean = false
   @State ownerMenuVisible: boolean = false
   @State songMenuVisible: boolean = false
@@ -157,11 +156,7 @@ export struct PlaylistDetail {
         // 获取评论数（通过commentThreadId获取评论总数）
         if (response.playlist.commentThreadId) {
           try {
-            const commentResponse = await ApiClient.get<CommentResponse>('/comment/playlist', [
-              { key: 'id', value: this.playlist.id },
-              { key: 'limit', value: '0' }  // 只需要总数，不需要具体内容
-            ])
-            this.commentCount = commentResponse.total || 0
+            this.commentCount = await CommentService.count(this.commentResource())
           } catch (commentError) {
             // 如果无法获取评论数，则保持默认值
             console.error('获取评论数失败:', commentError)
@@ -396,23 +391,22 @@ export struct PlaylistDetail {
     }
   }
 
-  private async openComments(): Promise<void> {
-    if (this.playlist.specialType) { return }
-    this.commentSheetVisible = true
-    this.commentsLoading = true
-    try {
-      const response = await ApiClient.get<CommentResponse>('/comment/playlist', [
-        { key: 'id', value: this.playlist.id },
-        { key: 'limit', value: '40' }
-      ])
-      const source = response.hotComments && response.hotComments.length > 0 ? response.hotComments : response.comments
-      this.comments = (source || []).map((item) => mapComment(item))
-      this.commentCount = response.total || this.commentCount
-    } catch (_error) {
-      this.comments = []
-    } finally {
-      this.commentsLoading = false
-    }
+
+  private openComments(): void {
+    if (!this.playlist.specialType) { this.commentSheetVisible = true }
+  }
+
+  private commentResource(): CommentResource {
+    return { id: this.playlist.id, type: 2, title: this.playlist.name }
+  }
+
+  @Builder
+  private CommentSheet() {
+    ResourceComments({
+      resource: this.commentResource(),
+      onClose: () => this.commentSheetVisible = false,
+      onCountChange: (total: number) => this.commentCount = total
+    })
   }
 
   @Builder
@@ -426,54 +420,6 @@ export struct PlaylistDetail {
     .onClick(onClick)
   }
 
-  @Builder
-  private CommentSheet() {
-    Stack({ alignContent: Alignment.Bottom }) {
-      Column().width('100%').height('100%').backgroundColor('rgba(0,0,0,0.58)')
-        .onClick(() => this.commentSheetVisible = false)
-      Column() {
-        Row() {
-          Column({ space: 3 }) {
-            Text(`歌单评论 · ${this.commentCount}`).fontSize(17).fontWeight(FontWeight.Bold).fontColor('#ffffff')
-            Text(this.playlist.name).fontSize(10).fontColor('#77777f').maxLines(1)
-          }
-          .layoutWeight(1).alignItems(HorizontalAlign.Start)
-          SymbolGlyph($r('sys.symbol.xmark_circle_fill')).fontSize(24).fontColor(['#66666e'])
-            .onClick(() => this.commentSheetVisible = false)
-        }
-        .height(66).padding({ left: 20, right: 20 })
-        if (this.commentsLoading) {
-          LoadingProgress().layoutWeight(1).width(42).color('#ef233c')
-        } else if (this.comments.length === 0) {
-          Text('暂无评论').layoutWeight(1).fontSize(13).fontColor('#77777f')
-        } else {
-          List({ space: 14 }) {
-            ForEach(this.comments, (item: MusicComment) => {
-              ListItem() {
-                Row({ space: 10 }) {
-                  Image(item.user.avatarUrl).width(36).height(36).borderRadius(18).objectFit(ImageFit.Cover)
-                  Column({ space: 6 }) {
-                    Row() {
-                      Text(item.user.nickname).layoutWeight(1).fontSize(12).fontColor('#a9a9b0')
-                      Text(`♡ ${item.likedCount}`).fontSize(10).fontColor('#77777f')
-                    }
-                    Text(item.content).fontSize(13).lineHeight(20).fontColor('#ededf0')
-                  }
-                  .layoutWeight(1).alignItems(HorizontalAlign.Start)
-                }
-                .padding({ left: 18, right: 18 })
-              }
-            })
-          }
-          .layoutWeight(1)
-        }
-      }
-      .width('100%').height('68%').backgroundColor('#19191f')
-      .borderRadius({ topLeft: 28, topRight: 28 })
-      .transition(TransitionEffect.translate({ y: 600 }).animation({ duration: 260, curve: Curve.EaseOut }))
-    }
-    .width('100%').height('100%')
-  }
 
   @Builder
   private MenuOption(icon: Resource, title: string, description: string, danger: boolean, action: () => void) {
@@ -803,9 +749,6 @@ export struct PlaylistDetail {
           this.MenuSheetOverlay('delete')
         }
 
-        if (this.commentSheetVisible) {
-          this.CommentSheet()
-        }
 
         if (this.shareSheetVisible) {
           ShareSheet({
@@ -816,6 +759,10 @@ export struct PlaylistDetail {
         }
       }
       .width('100%').height('100%')
+      .bindSheet(this.commentSheetVisible, this.CommentSheet(), {
+        height: '72%', backgroundColor: '#19191f', showClose: false, dragBar: true,
+        onDisappear: () => this.commentSheetVisible = false
+      })
     }
     .hideTitleBar(true)
   }

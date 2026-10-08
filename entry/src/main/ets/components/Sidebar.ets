@@ -33,10 +33,11 @@ export struct Sidebar {
 
   private menuItems: SidebarMenuItem[] = [
     { icon: $r('sys.symbol.envelope_fill'), title: '消息中心', subtitle: '私信、评论与系统通知', available: true, route: 'MessageCenterPage' },
-    { icon: $r('sys.symbol.clock'), title: '最近播放', subtitle: '持久化历史记录尚未接入', available: false },
-    { icon: $r('sys.symbol.arrow_down_circle'), title: '本地与下载', subtitle: '媒体库扫描尚未接入', available: false },
+    { icon: $r('sys.symbol.clock'), title: '最近播放', subtitle: '歌曲、声音及更多播放记录', available: true, route: 'RecentPlaybackPage' },
+    { icon: $r('sys.symbol.cloud'), title: '我的云盘', subtitle: '上传、管理与播放云盘音乐', available: true, route: 'CloudDrivePage' },
+    { icon: $r('sys.symbol.arrow_down_circle'), title: '本地与下载', subtitle: '下载管理、导入音乐与离线播放', available: true, route: 'LocalMusicPage' },
     { icon: $r('sys.symbol.wand_and_stars'), title: 'AI 写歌', subtitle: '风格改编、AI 作词与灵感创作', available: true, route: 'AiSongStudioPage' },
-    { icon: $r('sys.symbol.cart'), title: '云贝中心', subtitle: '依赖官方活动服务', available: false },
+    { icon: $r('sys.symbol.cart'), title: '云贝中心', subtitle: '签到、任务与收支记录', available: true, route: 'YunbeiPage' },
     { icon: $r('sys.symbol.gearshape'), title: '设置', subtitle: '播放与网络设置', available: true, route: 'SettingsPage' }
   ]
 
@@ -340,7 +341,7 @@ export struct Sidebar {
                 Image(this.authStore.avatarUrl)
                   .width(52)
                   .height(52)
-                  .borderRadius(18)
+                  .borderRadius(26)
                   .objectFit(ImageFit.Cover)
               } else {
                 Stack() {
@@ -350,7 +351,7 @@ export struct Sidebar {
                 }
                 .width(52)
                 .height(52)
-                .borderRadius(18)
+                .borderRadius(26)
                 .backgroundColor('rgba(255,255,255,0.12)')
               }
 
@@ -361,24 +362,6 @@ export struct Sidebar {
                   .fontColor('#ffffff')
                 Text(this.authStore.loggedIn ? '查看个人主页' : '登录后同步收藏与歌单')
                   .fontSize(11)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
                   .fontColor('#aaaab2')
               }
               .layoutWeight(1)

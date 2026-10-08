@@ -1,13 +1,12 @@
+import { ShareSheet } from '../components/ShareSheet'
+import { EventImages } from '../components/EventImages'
+import { ResourceComments } from '../components/ResourceComments'
+import { CommentResource } from '../models/CommentResource'
+import { EventPresentation } from '../services/EventPresentation'
 import {
-  ApiParam,
-  CommentApiItem,
-  CommentResponse,
-  EventCommentItem,
-  EventCommentResponse,
   EventDetailPageParam,
   EventForwardData,
   EventJsonData,
-  EventPicture,
   LikeListResponse,
   mapApiSong,
   MvPlayerPageParam,
@@ -38,33 +37,19 @@ export struct EventDetailPage {
   }
 
   @State event: UserEventItem = this.pageParam.event
-  @State comments: EventCommentItem[] = []
-  @State commentsLoading: boolean = false
   @State commentSheetVisible: boolean = false
   @State commentType: number = 6
-  @State commentInput: string = ''
-  @State commentSubmitting: boolean = false
+  @State shareVisible: boolean = false
+  @State shareDelete: boolean = false
   @State songLiked: boolean = false
-  @State previewPictureIndex: number = -1
-  @State previewPictureVisible: boolean = false
-  @State previewPictureMounted: boolean = false
-  private previewPictureClosing: boolean = false
+  @State eventLikeBusy: boolean = false
 
   aboutToAppear(): void {
     this.event = this.pageParam.event
-    this.previewPictureIndex = -1
-    this.previewPictureVisible = false
-    this.previewPictureMounted = false
-    this.previewPictureClosing = false
     this.loadSongLikedState()
+    if (this.pageParam.openComments) { this.openEventComments() }
   }
 
-  aboutToDisappear(): void {
-    this.previewPictureVisible = false
-    this.previewPictureMounted = false
-    this.previewPictureIndex = -1
-    this.previewPictureClosing = false
-  }
 
   private data(): EventJsonData {
     try {
@@ -147,7 +132,15 @@ export struct EventDetailPage {
       pics: source.pics,
       actName: source.actName
     }
-    const param: EventDetailPageParam = { event: sourceItem, canDelete: false }
+    const param: EventDetailPageParam = {
+      event: sourceItem,
+      onChanged: (item: UserEventItem, deleted: boolean) => {
+        const updated = EventPresentation.changeList([this.event], item, deleted)
+        if (updated.length > 0) { this.event = updated[0] }
+        this.pageParam.onChanged?.(item, deleted)
+        this.pageParam.onChanged?.(this.event, false)
+      }
+    }
     this.pageStack.pushPathByName('EventDetailPage', param)
   }
 
@@ -168,9 +161,6 @@ export struct EventDetailPage {
     this.pageStack.pushPathByName('UserProfilePage', param)
   }
 
-  private pictureUrl(picture: EventPicture): string {
-    return picture.originUrl || picture.rectangleUrl || picture.squareUrl || picture.pcSquareUrl || ''
-  }
 
   @Builder
   private SourceEventCard(source: EventForwardData) {
@@ -183,13 +173,7 @@ export struct EventDetailPage {
       Text(this.sourceContent(source)).width('100%').fontSize(13).lineHeight(20).fontColor('#aaaab2')
         .maxLines(5).textOverflow({ overflow: TextOverflow.Ellipsis })
       if ((source.pics || []).length > 0) {
-        Scroll() {
-          Row({ space: 7 }) {
-            ForEach(source.pics || [], (picture: EventPicture) => {
-              Image(this.pictureUrl(picture)).width(92).height(92).borderRadius(9).objectFit(ImageFit.Cover)
-            })
-          }
-        }.width('100%').scrollable(ScrollDirection.Horizontal).scrollBar(BarState.Off)
+        EventImages({ pictures: source.pics || [] })
       }
       if (this.sourceResourceTitle(source)) {
         Row({ space: 9 }) {
@@ -208,51 +192,6 @@ export struct EventDetailPage {
     }
     .width('100%').padding(12).backgroundColor('#19191e').borderRadius(13)
     .onClick(() => this.openSourceEvent(source))
-  }
-
-  private pictureAspectRatio(picture: EventPicture): number {
-    if (picture.width && picture.height && picture.width > 0 && picture.height > 0) {
-      return picture.width / picture.height
-    }
-    return 1
-  }
-
-  private pictureTransitionId(index: number): string {
-    return `event-picture-${this.event.id}-${index}`
-  }
-
-  private previewPicture(): EventPicture {
-    return (this.event.pics || [])[this.previewPictureIndex] || {}
-  }
-
-  private showPicture(index: number): void {
-    if (this.previewPictureClosing) {
-      return
-    }
-    this.previewPictureIndex = index
-    this.previewPictureMounted = true
-    this.getUIContext().animateTo({ duration: 360, curve: Curve.EaseInOut }, () => {
-      this.previewPictureVisible = true
-    })
-  }
-
-  private closePicture(): void {
-    if (!this.previewPictureVisible || !this.previewPictureMounted || this.previewPictureIndex < 0 ||
-      this.previewPictureClosing) {
-      return
-    }
-    this.previewPictureClosing = true
-    this.getUIContext().animateTo({
-      duration: 360,
-      curve: Curve.EaseInOut,
-      onFinish: () => {
-        this.previewPictureMounted = false
-        this.previewPictureIndex = -1
-        this.previewPictureClosing = false
-      }
-    }, () => {
-      this.previewPictureVisible = false
-    })
   }
 
   private formatTime(value: number): string {
@@ -328,211 +267,97 @@ export struct EventDetailPage {
   }
 
   private async toggleEventLike(): Promise<void> {
-    const nextLiked = !(this.event.info.liked || false)
+    if (!this.authStore.loggedIn) {
+      BubbleTip.show(this.getUIContext(), '请先登录')
+      return
+    }
+    if (this.eventLikeBusy) { return }
+    const account = this.authStore.userId
+    const nextLiked = !this.event.info.liked
+    this.eventLikeBusy = true
     try {
       const response = await ApiClient.get<OperationResponse>('/resource/like', [
         { key: 'type', value: '6' },
         { key: 'threadId', value: this.threadId() },
         { key: 't', value: nextLiked ? '1' : '0' }
       ])
-      if (response.code === 200) {
-        this.event.info.liked = nextLiked
-        this.event.info.likedCount = Math.max(0, this.event.info.likedCount + (nextLiked ? 1 : -1))
-        this.event = this.event
-      }
+      if (response.code !== 200) { throw new Error(response.message || '动态点赞失败') }
+      if (!this.authStore.loggedIn || account !== this.authStore.userId) { return }
+      const updated = EventPresentation.copy(this.event)
+      updated.info.liked = nextLiked
+      updated.info.likedCount = Math.max(0, this.event.info.likedCount + (nextLiked ? 1 : -1))
+      this.event = updated
+      this.pageParam.onChanged?.(this.event, false)
+      BubbleTip.show(this.getUIContext(), nextLiked ? '已点赞' : '已取消点赞')
     } catch (error) {
       BubbleTip.show(this.getUIContext(), error instanceof Error ? error.message : '动态点赞失败')
+    } finally {
+      this.eventLikeBusy = false
     }
   }
 
-  private async forwardEvent(): Promise<void> {
-    try {
-      const response = await ApiClient.get<OperationResponse>('/event/forward', [
-        { key: 'evId', value: this.event.id.toString() },
-        { key: 'uid', value: this.event.user.userId.toString() },
-        { key: 'forwards', value: '转发动态' }
-      ])
-      if (response.code === 200) {
-        this.event.info.shareCount += 1
-        this.event = this.event
-        BubbleTip.show(this.getUIContext(), '动态已转发')
-      }
-    } catch (error) {
-      BubbleTip.show(this.getUIContext(), error instanceof Error ? error.message : '动态转发失败')
-    }
+  private openShare(deleting: boolean = false): void {
+    this.shareDelete = deleting
+    this.shareVisible = true
   }
 
-  private async deleteEvent(): Promise<void> {
-    try {
-      const response = await ApiClient.get<OperationResponse>('/event/del', [
-        { key: 'evId', value: this.event.id.toString() }
-      ])
-      if (response.code === 200) {
-        this.pageParam.event.id = 0
-        this.event.id = 0
-        this.event = this.event
+  private moreOptions(): MenuElement[] {
+    const options: MenuElement[] = [{ value: '分享', action: () => this.openShare() }]
+    if (this.authStore.loggedIn && this.event.user.userId.toString() === this.authStore.userId) {
+      options.push({ value: '删除', action: () => this.openShare(true) })
+    }
+    return options
+  }
+
+  @Builder
+  private ShareOptions() {
+    ShareSheet({ shareParam: EventPresentation.share(this.event), visible: true, confirmDelete: this.shareDelete,
+      onClose: () => this.shareVisible = false,
+      onDeleted: () => {
+        this.pageParam.onChanged?.(this.event, true)
         this.pageStack.pop()
+      },
+      onShared: () => {
+        const updated = EventPresentation.copy(this.event)
+        updated.info.shareCount = (this.event.info.shareCount || 0) + 1
+        this.event = updated
+        this.pageParam.onChanged?.(this.event, false)
       }
-    } catch (error) {
-      BubbleTip.show(this.getUIContext(), error instanceof Error ? error.message : '动态删除失败')
-    }
+    })
   }
 
-  private async openEventComments(): Promise<void> {
+  private openEventComments(): void {
     this.commentType = 6
     this.commentSheetVisible = true
-    this.commentsLoading = true
-    try {
-      const response = await ApiClient.get<EventCommentResponse>('/comment/event', [
-        { key: 'threadId', value: this.threadId() },
-        { key: 'limit', value: '50' }
-      ])
-      this.comments = (response.hotComments || []).concat(response.comments || [])
-    } catch (_error) {
-      this.comments = []
-    } finally {
-      this.commentsLoading = false
-    }
   }
 
-  private async openSongComments(): Promise<void> {
-    const song = this.song()
-    if (!song) {
-      return
-    }
+  private openSongComments(): void {
+    if (!this.song()) { return }
     this.commentType = 0
     this.commentSheetVisible = true
-    this.commentsLoading = true
-    try {
-      const response = await ApiClient.get<CommentResponse>('/comment/music', [
-        { key: 'id', value: song.id },
-        { key: 'limit', value: '50' }
-      ])
-      const source = (response.hotComments || []).concat(response.comments || [])
-      this.comments = source.map((comment: CommentApiItem) => {
-        return {
-          commentId: comment.commentId,
-          content: comment.content,
-          time: 0,
-          timeStr: comment.timeStr,
-          likedCount: comment.likedCount,
-          liked: comment.liked || false,
-          user: { userId: 0, nickname: comment.user.nickname, avatarUrl: comment.user.avatarUrl,
-            followed: false, mutual: false }
-        } as EventCommentItem
-      })
-    } catch (_error) {
-      this.comments = []
-    } finally {
-      this.commentsLoading = false
-    }
   }
 
-  private commentParams(comment: EventCommentItem, nextLiked: boolean): ApiParam[] {
-    const params: ApiParam[] = [
-      { key: 'type', value: this.commentType.toString() },
-      { key: 'cid', value: comment.commentId.toString() },
-      { key: 't', value: nextLiked ? '1' : '0' }
-    ]
-    if (this.commentType === 6) {
-      params.push({ key: 'threadId', value: this.threadId() })
-    } else {
-      params.push({ key: 'id', value: this.song()?.id || '' })
-    }
-    return params
+  private commentResource(): CommentResource {
+    return this.commentType === 6 ?
+      { id: this.event.id.toString(), type: 6, threadId: this.threadId(), title: '动态评论' } :
+      { id: this.song()?.id || '', type: 0, title: '歌曲评论' }
   }
 
-  private async toggleCommentLike(comment: EventCommentItem): Promise<void> {
-    const nextLiked = !(comment.liked || false)
-    try {
-      const response = await ApiClient.get<OperationResponse>('/comment/like', this.commentParams(comment, nextLiked))
-      if (response.code === 200) {
-        comment.liked = nextLiked
-        comment.likedCount = Math.max(0, comment.likedCount + (nextLiked ? 1 : -1))
-        this.comments = this.comments.map((item: EventCommentItem) => item)
-      }
-    } catch (_error) {
-    }
-  }
-
-  private async submitComment(): Promise<void> {
-    const content = this.commentInput.trim()
-    if (!content || this.commentSubmitting) {
-      return
-    }
-    const params: ApiParam[] = [
-      { key: 't', value: '1' },
-      { key: 'type', value: this.commentType.toString() },
-      { key: 'content', value: content }
-    ]
-    if (this.commentType === 6) {
-      params.push({ key: 'threadId', value: this.threadId() })
-    } else {
-      params.push({ key: 'id', value: this.song()?.id || '' })
-    }
-    this.commentSubmitting = true
-    try {
-      const response = await ApiClient.get<OperationResponse>('/comment', params)
-      if (response.code === 200) {
-        this.commentInput = ''
-        if (this.commentType === 6) {
-          this.event.info.commentCount += 1
-          this.event = this.event
-          await this.openEventComments()
-        } else {
-          await this.openSongComments()
-        }
-      }
-    } catch (_error) {
-    } finally {
-      this.commentSubmitting = false
-    }
+  private updateCommentCount(total: number): void {
+    if (this.commentType !== 6 || total === this.event.info.commentCount) { return }
+    const updated = EventPresentation.copy(this.event)
+    updated.info.commentCount = total
+    this.event = updated
+    this.pageParam.onChanged?.(this.event, false)
   }
 
   @Builder
   private CommentSheet() {
-    Column() {
-      Row() {
-        Text(this.commentType === 6 ? `动态评论 · ${this.event.info.commentCount}` : '歌曲评论')
-          .layoutWeight(1).fontSize(17).fontWeight(FontWeight.Bold).fontColor('#ffffff')
-        SymbolGlyph($r('sys.symbol.xmark_circle_fill')).fontSize(24).fontColor(['#686870'])
-          .onClick(() => this.commentSheetVisible = false)
-      }
-      .height(60).padding({ left: 18, right: 18 })
-      if (this.commentsLoading) {
-        LoadingProgress().layoutWeight(1).width(42).color('#ef233c')
-      } else {
-        List({ space: 14 }) {
-          ForEach(this.comments, (comment: EventCommentItem) => {
-            ListItem() {
-              Row({ space: 10 }) {
-                Image(comment.user.avatarUrl).width(36).height(36)
-                  .sourceSize({ width: 80, height: 80 }).borderRadius(18).objectFit(ImageFit.Cover)
-                Column({ space: 5 }) {
-                  Row() {
-                    Text(comment.user.nickname).layoutWeight(1).fontSize(12).fontColor('#aaaab2')
-                    Row({ space: 4 }) {
-                      SymbolGlyph(comment.liked ? $r('sys.symbol.heart_fill') : $r('sys.symbol.heart'))
-                        .fontSize(14).fontColor([comment.liked ? '#ef233c' : '#77777f'])
-                      Text(`${comment.likedCount}`).fontSize(9).fontColor(comment.liked ? '#ef233c' : '#77777f')
-                    }.onClick(() => this.toggleCommentLike(comment))
-                  }
-                  Text(comment.content).fontSize(13).lineHeight(20).fontColor('#ededf0')
-                }.layoutWeight(1).alignItems(HorizontalAlign.Start)
-              }.padding({ left: 16, right: 16 })
-            }
-          })
-        }.layoutWeight(1)
-      }
-      Row({ space: 9 }) {
-        TextInput({ text: this.commentInput, placeholder: '写下你的评论…' })
-          .layoutWeight(1).height(42).fontColor('#ffffff').placeholderColor('#66666e')
-          .backgroundColor('#25252b').borderRadius(18).onChange((value: string) => this.commentInput = value)
-        Button(this.commentSubmitting ? '发送中' : '发送').height(40).backgroundColor('#ef233c')
-          .enabled(!this.commentSubmitting && this.commentInput.trim().length > 0)
-          .onClick(() => this.submitComment())
-      }.padding({ left: 14, right: 14, top: 8, bottom: 12 })
-    }.width('100%').height('100%')
+    ResourceComments({
+      resource: this.commentResource(),
+      onClose: () => this.commentSheetVisible = false,
+      onCountChange: (total: number) => this.updateCommentCount(total)
+    })
   }
 
   build() {
@@ -545,12 +370,8 @@ export struct EventDetailPage {
             .onClick(() => this.pageStack.pop())
           Text('动态详情').layoutWeight(1).fontSize(17).fontWeight(FontWeight.Bold)
             .fontColor('#ffffff').textAlign(TextAlign.Center)
-          if (this.pageParam.canDelete) {
-            SymbolGlyph($r('sys.symbol.trash')).fontSize(20).fontColor(['#ff6577'])
-              .onClick(() => this.deleteEvent())
-          } else {
-            Blank().width(20)
-          }
+          SymbolGlyph($r('sys.symbol.ellipsis_circle')).fontSize(23).fontColor(['#ffffff'])
+            .width(44).height(44).bindMenu(this.moreOptions())
           }.height(56).padding({ left: 16, right: 16 })
           Scroll() {
             Column({ space: 14 }) {
@@ -568,16 +389,7 @@ export struct EventDetailPage {
               this.SourceEventCard(this.sourceEvent()!)
             }
             if ((this.event.pics || []).length > 0) {
-              ForEach(this.event.pics || [], (picture: EventPicture, index: number) => {
-                if (this.previewPictureVisible && this.previewPictureIndex === index) {
-                  Column().width('100%').aspectRatio(this.pictureAspectRatio(picture))
-                } else {
-                  Image(this.pictureUrl(picture)).width('100%').aspectRatio(this.pictureAspectRatio(picture))
-                    .borderRadius(14).objectFit(ImageFit.Contain)
-                    .geometryTransition(this.pictureTransitionId(index), { follow: true })
-                    .onClick(() => this.showPicture(index))
-                }
-              }, (_picture: EventPicture, index: number) => `${this.event.id}-${index}`)
+              EventImages({ pictures: this.event.pics || [] })
             }
             if (this.song()) {
               Row({ space: 11 }) {
@@ -614,7 +426,7 @@ export struct EventDetailPage {
               Row({ space: 5 }) {
                 SymbolGlyph($r('sys.symbol.arrow_right_up_and_square')).fontSize(18).fontColor(['#77777f'])
                 Text(`${this.event.info.shareCount}`).fontSize(11).fontColor('#77777f')
-              }.layoutWeight(1).justifyContent(FlexAlign.Center).onClick(() => this.forwardEvent())
+              }.layoutWeight(1).justifyContent(FlexAlign.Center).onClick(() => this.openShare())
               Row({ space: 5 }) {
                 SymbolGlyph($r('sys.symbol.ellipsis_bubble')).fontSize(18).fontColor(['#77777f'])
                 Text(`${this.event.info.commentCount}`).fontSize(11).fontColor('#77777f')
@@ -633,20 +445,7 @@ export struct EventDetailPage {
           height: '68%', backgroundColor: '#19191f', showClose: false, dragBar: true,
           onDisappear: () => this.commentSheetVisible = false
         })
-        if (this.previewPictureMounted && this.previewPictureIndex >= 0) {
-          Stack() {
-            Column().width('100%').height('100%').backgroundColor('#000000')
-              .opacity(this.previewPictureVisible ? 1 : 0)
-              .animation({ duration: 240, curve: Curve.EaseInOut })
-            if (this.previewPictureVisible) {
-              Image(this.pictureUrl(this.previewPicture())).width('100%').height('100%')
-                .objectFit(ImageFit.Contain)
-                .geometryTransition(this.pictureTransitionId(this.previewPictureIndex), { follow: true })
-            }
-          }
-          .width('100%').height('100%')
-          .onClick(() => this.closePicture())
-        }
+        if (this.shareVisible) { this.ShareOptions() }
       }.width('100%').height('100%')
     }.hideTitleBar(true)
   }

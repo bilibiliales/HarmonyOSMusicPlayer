@@ -154,6 +154,7 @@ struct Find {
         response.data.blocks.forEach((block: HomepageBlock, index: number) => {
           if (DiscoveryPlaylistsService.isRadar(block) || (block.blockCode || '').includes('PERSONAL_FM')) { return }
           const normalized = this.normalizeBlock(block, index)
+          if (block.blockCode === 'HOMEPAGE_BLOCK_OLD_DRAGON_BALL' || normalized.title === '为你推荐') { return }
           if (normalized.creatives.length > 0) {
             result.push(normalized)
           }

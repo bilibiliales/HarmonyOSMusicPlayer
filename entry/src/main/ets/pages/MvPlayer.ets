@@ -1,3 +1,6 @@
+import { ResourceComments } from '../components/ResourceComments'
+import { CommentResource } from '../models/CommentResource'
+import { CommentService } from '../services/CommentService'
 import { common } from '@kit.AbilityKit'
 import { PiPWindow } from '@kit.ArkUI'
 import { request } from '@kit.BasicServicesKit'
@@ -5,8 +8,6 @@ import { fileIo, picker } from '@kit.CoreFileKit'
 import { media } from '@kit.MediaKit'
 import { SystemShareService, NearbyShareSession, ShareLink } from '../services/SystemShareService'
 import {
-  CommentApiItem,
-  CommentResponse,
   MvDetailArtist,
   MvDetailInfoResponse,
   MvDetailResponse,
@@ -48,10 +49,6 @@ export struct MvPlayerPage {
   @State mvDescription: string = ''
   @State likeSubmitting: boolean = false
   @State commentSheetVisible: boolean = false
-  @State commentsLoading: boolean = false
-  @State comments: CommentApiItem[] = []
-  @State commentInput: string = ''
-  @State commentSubmitting: boolean = false
   @State downloading: boolean = false
   @State downloadProgress: number = 0
   @State pipSupported: boolean = false
@@ -81,8 +78,8 @@ export struct MvPlayerPage {
     if (!this.pageParam.isVideo) {
       await this.loadMvDetail()
       await this.loadDetailInfo()
-      this.loadCommentSummary()
     }
+    this.loadCommentSummary()
     await this.loadVideoUrl(this.selectedResolution)
   }
 
@@ -369,19 +366,26 @@ export struct MvPlayerPage {
     }
   }
 
+
+  private commentResource(): CommentResource {
+    return { id: this.mvId, type: this.pageParam.isVideo ? 5 : 1, title: this.mvName }
+  }
+
   private async loadCommentSummary(): Promise<void> {
-    try {
-      const response = await ApiClient.get<CommentResponse>('/comment/mv', [
-        { key: 'id', value: this.mvId },
-        { key: 'limit', value: '1' },
-        { key: 'offset', value: '0' },
-        { key: 'timestamp', value: Date.now().toString() }
-      ])
-      if (response.code === 200 && response.total !== undefined) {
-        this.commentCount = response.total
-      }
-    } catch (_error) {
-    }
+    try { this.commentCount = await CommentService.count(this.commentResource()) } catch (_error) {}
+  }
+
+  private openComments(): void {
+    this.commentSheetVisible = true
+  }
+
+  @Builder
+  private CommentSheet() {
+    ResourceComments({
+      resource: this.commentResource(),
+      onClose: () => this.commentSheetVisible = false,
+      onCountChange: (total: number) => this.commentCount = total
+    })
   }
 
   private async loadMvDetail(): Promise<void> {
@@ -460,90 +464,9 @@ export struct MvPlayerPage {
       title: this.mvName || 'MV', description: this.mvArtistName || '分享 MV', label: 'MV', image: this.mvCover }
   }
 
-  private async openComments(): Promise<void> {
-    this.commentSheetVisible = true
-    await this.loadComments()
-  }
 
-  private async loadComments(): Promise<void> {
-    this.commentsLoading = true
-    try {
-      const response = await ApiClient.get<CommentResponse>('/comment/mv', [
-        { key: 'id', value: this.mvId },
-        { key: 'limit', value: '50' },
-        { key: 'offset', value: '0' }
-      ])
-      if (response.code === 200) {
-        const merged: CommentApiItem[] = []
-        const source = (response.hotComments || []).concat(response.comments || [])
-        source.forEach((comment: CommentApiItem) => {
-          if (!merged.some((item: CommentApiItem) => item.commentId === comment.commentId)) {
-            merged.push(comment)
-          }
-        })
-        this.comments = merged
-        this.commentCount = response.total || this.commentCount
-      }
-    } catch (error) {
-      this.actionMessage = error instanceof Error ? error.message : 'MV 评论加载失败'
-      this.comments = []
-    } finally {
-      this.commentsLoading = false
-    }
-  }
 
-  private async toggleCommentLike(comment: CommentApiItem): Promise<void> {
-    if (!this.authStore.loggedIn) {
-      this.pageStack.pushPathByName('LoginPage', null)
-      return
-    }
-    const nextLiked = !(comment.liked || false)
-    try {
-      const response = await ApiClient.get<OperationResponse>('/comment/like', [
-        { key: 'id', value: this.mvId },
-        { key: 'cid', value: comment.commentId.toString() },
-        { key: 't', value: nextLiked ? '1' : '0' },
-        { key: 'type', value: '1' }
-      ])
-      if (response.code === 200) {
-        comment.liked = nextLiked
-        comment.likedCount = Math.max(0, comment.likedCount + (nextLiked ? 1 : -1))
-        this.comments = this.comments.map((item: CommentApiItem) => item)
-      }
-    } catch (_error) {
-    }
-  }
 
-  private async submitComment(): Promise<void> {
-    const content = this.commentInput.trim()
-    if (!content || this.commentSubmitting) {
-      return
-    }
-    if (!this.authStore.loggedIn) {
-      this.pageStack.pushPathByName('LoginPage', null)
-      return
-    }
-    this.commentSubmitting = true
-    try {
-      const response = await ApiClient.get<OperationResponse>('/comment', [
-        { key: 't', value: '1' },
-        { key: 'type', value: '1' },
-        { key: 'id', value: this.mvId },
-        { key: 'content', value: content }
-      ])
-      if (response.code === 200) {
-        this.commentInput = ''
-        this.commentCount += 1
-        await this.loadComments()
-      } else {
-        this.actionMessage = response.message || '评论发布失败'
-      }
-    } catch (error) {
-      this.actionMessage = error instanceof Error ? error.message : '评论发布失败'
-    } finally {
-      this.commentSubmitting = false
-    }
-  }
 
   private safeFileName(): string {
     const base = (this.mvName || `MV_${this.mvId}`).replace(/[\\/:*?"<>|]/g, '_').trim()
@@ -709,58 +632,6 @@ export struct MvPlayerPage {
     }.layoutWeight(1).onClick(action)
   }
 
-  @Builder
-  private CommentSheet() {
-    Column() {
-      Row() {
-        Text(`MV 评论 · ${this.compactCount(this.commentCount)}`).layoutWeight(1)
-          .fontSize(17).fontWeight(FontWeight.Bold).fontColor('#ffffff')
-        SymbolGlyph($r('sys.symbol.xmark_circle_fill')).fontSize(24).fontColor(['#686870'])
-          .onClick(() => this.commentSheetVisible = false)
-      }.height(60).padding({ left: 18, right: 18 })
-      if (this.commentsLoading) {
-        Column({ space: 10 }) {
-          LoadingProgress().width(38).height(38).color('#ef233c')
-          Text('加载评论中…').fontSize(11).fontColor('#77777f')
-        }.layoutWeight(1).justifyContent(FlexAlign.Center)
-      } else if (this.comments.length === 0) {
-        Text('还没有评论，来留下第一条吧').layoutWeight(1).width('100%')
-          .fontSize(12).fontColor('#77777f').textAlign(TextAlign.Center)
-      } else {
-        List({ space: 15 }) {
-          ForEach(this.comments, (comment: CommentApiItem) => {
-            ListItem() {
-              Row({ space: 10 }) {
-                Image(comment.user.avatarUrl).width(38).height(38).borderRadius(19).objectFit(ImageFit.Cover)
-                Column({ space: 5 }) {
-                  Row() {
-                    Text(comment.user.nickname).layoutWeight(1).fontSize(12).fontColor('#aaaab2')
-                    Row({ space: 4 }) {
-                      SymbolGlyph(comment.liked ? $r('sys.symbol.heart_fill') : $r('sys.symbol.heart'))
-                        .fontSize(15).fontColor([comment.liked ? '#ef233c' : '#77777f'])
-                      Text(`${comment.likedCount}`).fontSize(9)
-                        .fontColor(comment.liked ? '#ef233c' : '#77777f')
-                    }.onClick(() => this.toggleCommentLike(comment))
-                  }
-                  Text(comment.content).width('100%').fontSize(13).lineHeight(20).fontColor('#ededf0')
-                  Text(comment.timeStr || '').fontSize(9).fontColor('#5f5f67')
-                }.layoutWeight(1).alignItems(HorizontalAlign.Start)
-              }.padding({ left: 16, right: 16 })
-            }
-          })
-        }.layoutWeight(1).scrollBar(BarState.Off)
-      }
-      Row({ space: 9 }) {
-        TextInput({ text: this.commentInput, placeholder: '写下你的评论…' })
-          .layoutWeight(1).height(42).fontColor('#ffffff').placeholderColor('#66666e')
-          .backgroundColor('#25252b').borderRadius(18).onChange((value: string) => this.commentInput = value)
-          .onSubmit(() => this.submitComment())
-        Button(this.commentSubmitting ? '发送中' : '发送').height(40).backgroundColor('#ef233c')
-          .enabled(!this.commentSubmitting && this.commentInput.trim().length > 0)
-          .onClick(() => this.submitComment())
-      }.padding({ left: 14, right: 14, top: 8, bottom: 12 })
-    }.width('100%').height('100%')
-  }
 
   build() {
     NavDestination() {
@@ -820,6 +691,12 @@ export struct MvPlayerPage {
                 () => this.downloading ? `${this.downloadProgress}%` : '', () => this.downloading,
                 () => this.downloadVideo())
             }.width('100%').padding({ top: 4, bottom: 4 })
+            } else {
+              Row() {
+                this.ActionButton(() => $r('sys.symbol.ellipsis_bubble'), () => '评论',
+                  () => this.compactCount(this.commentCount), () => false,
+                  () => this.openComments())
+              }.width('100%').padding({ top: 4, bottom: 4 })
             }
 
             Column({ space: 11 }) {

@@ -1,314 +1,240 @@
-import {
-  DjBannerItem,
-  DjBannerResponse,
-  DjProgramDetailResponse,
-  DjProgramTopItem,
-  DjProgramTopResponse,
-  mapApiSong,
-  ProgramItem,
-  songItemType
-} from '../models'
-import { ApiClient } from '../services/ApiClient'
-import { resizeImageUrl } from '../services/ImageUrl'
-import { playerController } from '../services/PlayerController'
+import { DjRadioItem } from '../models/api'
+import { ProgramItem } from '../models/home'
+import { RadioCategory, RadioPageParam } from '../models/radio'
+import { RadioService } from '../services/RadioService'
+import { RadioPlayback } from '../services/RadioPlayback'
+import { BubbleTip } from '../services/BubbleTip'
+import { RadioStationCard, RadioProgramRow } from '../components/RadioCards'
 
 @Component
 export struct RadioPage {
   @Consume('pageStack') pageStack: NavPathStack
   @Consume('topAvoidHeight') topAvoidHeight: number
   embedded: boolean = false
-  @State banners: DjBannerItem[] = []
-  @State programs: DjProgramTopItem[] = []
-  @State loading: boolean = true
-  @State loadingMore: boolean = false
-  @State more: boolean = true
+  @State categories: RadioCategory[] = []
+  @State recommendations: ProgramItem[] = []
+  @State stations: DjRadioItem[] = []
+  @State ranked: ProgramItem[] = []
+  @State category: number = 0
+  @State categoryName: string = '全部分类'
+  @State mode: string = 'recommend'
+  @State loading: boolean = false
   @State refreshing: boolean = false
+  @State more: boolean = true
   @State message: string = ''
-  @State updateTime: number = 0
-  private programOffset: number = 0
-  private readonly pageSize: number = 20
+  @State homeMessage: string = ''
+  @State categoryVisible: boolean = false
+  @State query: string = ''
+  @State playing: boolean = false
+  private token: number = 0
+  private homeToken: number = 0
+  private listOffset: number = 0
 
-  aboutToAppear(): void {
-    this.loadPage()
+  aboutToAppear(): void { this.loadHome() }
+  aboutToDisappear(): void { this.token++; this.homeToken++ }
+
+  private async loadHome(): Promise<void> {
+    const generation = ++this.homeToken
+    this.homeMessage = ''
+    await Promise.all([
+      RadioService.categories().then((items: RadioCategory[]) => {
+        if (generation === this.homeToken) { this.categories = items }
+      }).catch(() => { if (generation === this.homeToken) { this.homeMessage = '分类加载失败，可下拉重试' } }),
+      RadioService.recommendedPrograms().then((items: ProgramItem[]) => {
+        if (generation === this.homeToken) { this.recommendations = items }
+      }).catch(() => { if (generation === this.homeToken) { this.recommendations = [] } }),
+      this.loadList(true)
+    ])
   }
 
-  private async loadPage(): Promise<void> {
+  private async loadList(reset: boolean = false): Promise<void> {
+    if (!reset && (this.loading || !this.more || this.message)) { return }
+    const generation = ++this.token
+    if (reset) { this.listOffset = 0; this.stations = []; this.ranked = []; this.more = true }
     this.loading = true
     this.message = ''
-    await Promise.all([this.loadBanners(), this.loadPrograms(true)])
-    this.loading = false
-  }
-
-  private async loadBanners(): Promise<void> {
     try {
-      const response = await ApiClient.get<DjBannerResponse>('/dj/banner')
-      if (response.code === 200) {
-        this.banners = response.data || []
-      }
-    } catch (error) {
-      this.message = error instanceof Error ? error.message : '电台轮播加载失败'
-    }
-  }
-
-  private async loadPrograms(reset: boolean = false): Promise<void> {
-    if (this.loadingMore || (!this.more && !reset)) {
-      return
-    }
-    if (reset) {
-      this.programOffset = 0
-      this.programs = []
-      this.more = true
-    }
-    this.loadingMore = true
-    try {
-      const response = await ApiClient.get<DjProgramTopResponse>('/dj/program/toplist', [
-        { key: 'limit', value: this.pageSize.toString() },
-        { key: 'offset', value: this.programOffset.toString() }
-      ])
-      if (response.code === 200) {
-        const incoming = response.toplist || []
-        this.programs = this.programs.concat(incoming)
-        this.programOffset += incoming.length
-        this.more = incoming.length >= this.pageSize
-        this.updateTime = response.updateTime || this.updateTime
-      }
-    } catch (error) {
-      this.message = error instanceof Error ? error.message : '节目榜加载失败'
-    } finally {
-      this.loadingMore = false
-    }
-  }
-
-  private programCover(program: ProgramItem): string {
-    return program.coverUrl || program.radio?.picUrl || program.mainSong?.al?.picUrl || ''
-  }
-
-  private programAuthor(program: ProgramItem): string {
-    return program.dj?.brand || program.dj?.nickname || program.radio?.name || '网易云电台'
-  }
-
-  private programCategory(program: ProgramItem): string {
-    return program.categoryName || program.radio?.category || program.secondCategoryName ||
-      program.radio?.secondCategory || '电台节目'
-  }
-
-  private toSong(program: ProgramItem): songItemType | null {
-    if (!program.mainSong) {
-      return null
-    }
-    const song = mapApiSong(program.mainSong)
-    song.name = program.name || song.name
-    song.author = this.programAuthor(program)
-    song.img = this.programCover(program) || song.img
-    song.duration = program.duration || song.duration
-    return song
-  }
-
-  private async playProgram(program: ProgramItem): Promise<void> {
-    const song = this.toSong(program)
-    if (!song) {
-      this.message = '该节目暂时无法播放'
-      return
-    }
-    await playerController.setQueue([song], 0, true)
-    this.pageStack.pushPathByName('PlayPage', null)
-  }
-
-  private async playBanner(item: DjBannerItem): Promise<void> {
-    try {
-      const response = await ApiClient.get<DjProgramDetailResponse>('/dj/program/detail', [
-        { key: 'id', value: item.targetId.toString() }
-      ])
-      if (response.code === 200 && response.program) {
-        await this.playProgram(response.program)
+      if (this.mode === 'programs') {
+        const result = await RadioService.rankedPrograms(this.listOffset)
+        if (generation !== this.token) { return }
+        const incoming = result.programs || []
+        const added = incoming.filter((item: ProgramItem) => !this.ranked.some((old: ProgramItem) => old.id === item.id))
+        this.ranked = this.ranked.concat(added)
+        this.listOffset += incoming.length
+        this.more = !!result.more && added.length > 0
       } else {
-        this.message = '推荐节目暂时无法播放'
+        const result = await RadioService.stations(this.mode, this.category, this.listOffset)
+        if (generation !== this.token) { return }
+        const added = result.items.filter((item: DjRadioItem) => !this.stations.some((old: DjRadioItem) => old.id === item.id))
+        this.stations = this.stations.concat(added)
+        this.listOffset += result.items.length
+        this.more = result.more && added.length > 0
       }
     } catch (error) {
-      this.message = error instanceof Error ? error.message : '推荐节目加载失败'
+      if (generation === this.token) { this.message = error instanceof Error ? error.message : '电台加载失败' }
+    } finally {
+      if (generation === this.token) { this.loading = false }
     }
   }
 
-  private formatCount(value: number | undefined): string {
-    const count = value || 0
-    if (count >= 100000000) {
-      return `${(count / 100000000).toFixed(1)}亿`
-    }
-    if (count >= 10000) {
-      return `${(count / 10000).toFixed(1)}万`
-    }
-    return count.toString()
+  private chooseMode(mode: string): void {
+    if (mode === this.mode) { return }
+    this.mode = mode
+    this.query = ''
+    this.loadList(true)
   }
 
-  private formatDuration(value: number | undefined): string {
-    const seconds = Math.floor((value || 0) / 1000)
-    const minute = Math.floor(seconds / 60)
-    const remain = seconds % 60
-    return `${minute}:${remain < 10 ? '0' : ''}${remain}`
+  private chooseCategory(id: number, name: string): void {
+    this.categoryVisible = false
+    this.category = id
+    this.categoryName = name
+    if (this.mode === 'new' || this.mode === 'programs') { this.mode = 'recommend' }
+    this.query = ''
+    this.loadList(true)
   }
 
-  private updateText(): string {
-    if (!this.updateTime) {
-      return '实时更新'
-    }
-    const date = new Date(this.updateTime)
-    return `${date.getMonth() + 1}月${date.getDate()}日更新`
+  private openStation(id: number, name: string = '', cover: string = ''): void {
+    const param: RadioPageParam = { id: String(id), name: name, cover: cover }
+    this.pageStack.pushPathByName('RadioDetailPage', param)
   }
 
-  private rankChange(item: DjProgramTopItem): string {
-    if (item.lastRank < 0) {
-      return 'NEW'
-    }
-    const change = item.lastRank - item.rank
-    if (change > 0) {
-      return `↑${change}`
-    }
-    if (change < 0) {
-      return `↓${Math.abs(change)}`
-    }
-    return '—'
+  private async play(programs: ProgramItem[], index: number = 0): Promise<void> {
+    if (this.playing) { return }
+    this.playing = true
+    try {
+      await RadioPlayback.play(programs, index)
+      this.pageStack.pushPathByName('PlayPage', null)
+    } catch (error) { BubbleTip.show(this.getUIContext(), error instanceof Error ? error.message : '播放失败') }
+    finally { this.playing = false }
+  }
+
+  private openProgram(program: ProgramItem): void {
+    const param: RadioPageParam = { id: String(program.id), name: program.name, cover: RadioService.cover(program) }
+    this.pageStack.pushPathByName('RadioProgramPage', param)
+  }
+
+  private visibleStations(): DjRadioItem[] {
+    const query = this.query.trim().toLowerCase()
+    return this.stations.filter((item: DjRadioItem) => !query ||
+      (item.name + ' ' + (item.dj?.nickname || '')).toLowerCase().includes(query))
   }
 
   @Builder
-  private PageHeader() {
-    Row({ space: 12 }) {
-      SymbolGlyph($r('sys.symbol.chevron_left')).fontSize(24).fontColor(['#ffffff'])
-        .onClick(() => this.pageStack.pop())
-      Column({ space: 3 }) {
-        Text('电台').fontSize(25).fontWeight(FontWeight.Bold).fontColor('#ffffff')
-        Text('发现值得收听的声音节目').fontSize(11).fontColor('#6f6f77')
-      }.layoutWeight(1).alignItems(HorizontalAlign.Start)
-      Stack() {
-        SymbolGlyph($r('sys.symbol.magnifyingglass')).fontSize(19).fontColor(['#ddddE2'])
-      }.width(42).height(42).borderRadius(14).backgroundColor('#1e1e24')
-        .onClick(() => this.pageStack.pushPathByName('SearchPage', null))
-    }.width('100%').padding({ left: 16, right: 16, top: 14, bottom: 5 })
-  }
-
-  @Builder
-  private DiscoveryTabs() {
-    Scroll() {
-      Row({ space: 6 }) {
-      Text('发现').fontSize(13).fontColor('#85858e').padding({ left: 12, right: 12, top: 9, bottom: 9 })
-        .backgroundColor('#1d1d22').borderRadius(18).onClick(() => this.pageStack.pop())
-      Text('排行榜').fontSize(13).fontColor('#85858e').padding({ left: 12, right: 12, top: 9, bottom: 9 })
-        .backgroundColor('#1d1d22').borderRadius(18)
-        .onClick(() => this.pageStack.replacePathByName('RankingPage', null))
-      Text('曲风').fontSize(13).fontColor('#85858e').padding({ left: 12, right: 12, top: 9, bottom: 9 })
-        .backgroundColor('#1d1d22').borderRadius(18)
-        .onClick(() => this.pageStack.replacePathByName('StylePage', null))
-      Text('电台').fontSize(13).fontWeight(FontWeight.Bold).fontColor('#ffffff')
-        .padding({ left: 12, right: 12, top: 9, bottom: 9 }).backgroundColor('#ef233c').borderRadius(18)
-      Text('数字专辑').fontSize(13).fontColor('#85858e')
-        .padding({ left: 12, right: 12, top: 9, bottom: 9 }).backgroundColor('#1d1d22').borderRadius(18)
-        .onClick(() => this.pageStack.replacePathByName('DigitalAlbumPage', null))
-      Text('助眠解压').fontSize(13).fontColor('#85858e')
-        .padding({ left: 12, right: 12, top: 9, bottom: 9 }).backgroundColor('#1d1d22').borderRadius(18)
-        .onClick(() => this.pageStack.replacePathByName('SatiPage', null))
-      }.padding({ left: 16, right: 16 })
-    }.width('100%').scrollable(ScrollDirection.Horizontal).scrollBar(BarState.Off)
-      .margin({ top: 10, bottom: 4 })
-  }
-
-  @Builder
-  private BannerSection() {
-    if (this.banners.length > 0) {
-      Swiper() {
-        ForEach(this.banners, (item: DjBannerItem) => {
-          Stack({ alignContent: Alignment.BottomEnd }) {
-            Image(resizeImageUrl(item.pic, 760, 320)).width('100%').height('100%')
-              .sourceSize({ width: 760, height: 320 }).borderRadius(18).objectFit(ImageFit.Cover)
-            Text(item.typeTitle || '电台节目').fontSize(10).fontColor('#ffffff')
-              .padding({ left: 9, right: 9, top: 5, bottom: 5 }).backgroundColor('#d9364f')
-              .borderRadius({ topLeft: 10, bottomRight: 18 })
-          }.width('100%').height('100%').borderRadius(18).clip(true).onClick(() => this.playBanner(item))
-        }, (item: DjBannerItem) => item.targetId.toString())
-      }.width('92%').height(154).margin({ top: 12, bottom: 6 }).autoPlay(true).interval(4500)
-        .duration(450).loop(true).indicator(true).borderRadius(18).clip(true)
-    }
-  }
-
-  @Builder
-  private ProgramToplist() {
-    Row() {
-      Column({ space: 3 }) {
-        Text('电台节目榜').fontSize(19).fontWeight(FontWeight.Bold).fontColor('#ffffff')
-        Text(this.updateText()).fontSize(10).fontColor('#707078')
-      }.layoutWeight(1).alignItems(HorizontalAlign.Start)
-      SymbolGlyph($r('sys.symbol.podcast')).fontSize(20).fontColor(['#ef4058'])
-    }.width('100%').padding({ left: 16, right: 16, top: 22, bottom: 10 })
-
-    ForEach(this.programs, (item: DjProgramTopItem) => {
-      Row({ space: 11 }) {
-        Column({ space: 2 }) {
-          Text(`${item.rank}`).fontSize(18).fontWeight(FontWeight.Bold)
-            .fontColor(item.rank <= 3 ? '#ef4058' : '#777780')
-          Text(this.rankChange(item)).fontSize(8)
-            .fontColor(this.rankChange(item).startsWith('↑') ? '#ef6577' : '#66666e')
-        }.width(34)
-        Stack({ alignContent: Alignment.BottomEnd }) {
-          Image(resizeImageUrl(this.programCover(item.program), 160, 160)).width(68).height(68)
-            .sourceSize({ width: 160, height: 160 }).borderRadius(13).objectFit(ImageFit.Cover)
-          Text(this.formatDuration(item.program.duration)).fontSize(8).fontColor('#ffffff')
-            .padding({ left: 4, right: 4, top: 2, bottom: 2 }).margin(4)
-            .backgroundColor('rgba(0,0,0,0.58)').borderRadius(4)
-        }.width(68).height(68)
-        Column({ space: 5 }) {
-          Text(item.program.name).width('100%').fontSize(14).fontColor('#ededf0').maxLines(2)
-            .textOverflow({ overflow: TextOverflow.Ellipsis })
-          Text(`${this.programAuthor(item.program)} · ${this.programCategory(item.program)}`)
-            .width('100%').fontSize(10).fontColor('#77777f').maxLines(1)
-          Text(`${this.formatCount(item.program.listenerCount)} 次收听 · ${this.formatCount(item.program.likedCount)} 赞`)
-            .fontSize(9).fontColor('#65656d')
-        }.layoutWeight(1).alignItems(HorizontalAlign.Start)
-        SymbolGlyph($r('sys.symbol.play_circle_fill')).fontSize(26).fontColor(['#ffffff'])
-      }.width('100%').padding({ left: 13, right: 16, top: 8, bottom: 8 })
-        .onClick(() => this.playProgram(item.program))
-    }, (item: DjProgramTopItem) => item.program.id.toString())
-  }
-
-  @Builder
-  private PageContent(showChrome: boolean) {
-    Refresh({ refreshing: this.refreshing }) {
+  private CategoriesSheet() {
+    Column({ space: 16 }) {
+      Row() {
+        Text('电台分类').fontSize(20).fontWeight(FontWeight.Bold).fontColor('#ffffff').layoutWeight(1)
+        Text('关闭').fontSize(14).fontColor('#9999a4').onClick(() => this.categoryVisible = false)
+      }.width('100%')
       Scroll() {
-        Column() {
-          if (showChrome) {
-            Column().width('100%').height(this.topAvoidHeight)
-            this.PageHeader()
-            this.DiscoveryTabs()
-          }
-          this.BannerSection()
-          if (this.loading) {
-            LoadingProgress().width(42).height(42).color('#ef233c').margin({ top: 140 })
-          } else if (this.programs.length === 0) {
-            Text(this.message || '暂无电台节目').width('100%').height(280).fontSize(13).fontColor('#77777f')
-              .textAlign(TextAlign.Center)
-          } else {
-            this.ProgramToplist()
-            Row() {
-              if (this.loadingMore) {
-                LoadingProgress().width(24).height(24).color('#ef233c')
-              } else {
-                Text(this.more ? '继续上滑加载更多' : '已经到底了').fontSize(10).fontColor('#66666e')
-              }
-            }.width('100%').height(this.embedded ? 145 : 56).justifyContent(FlexAlign.Center)
-          }
+        Flex({ wrap: FlexWrap.Wrap }) {
+          Text('全部分类').fontSize(14).fontColor(this.category === 0 ? '#ff6577' : '#bbbbC5')
+            .padding(12).onClick(() => this.chooseCategory(0, '全部分类'))
+          ForEach(this.categories, (item: RadioCategory) => {
+            Text(item.name).fontSize(14).fontColor(this.category === item.id ? '#ff6577' : '#bbbbC5')
+              .padding(12).onClick(() => this.chooseCategory(item.id, item.name))
+          }, (item: RadioCategory) => String(item.id))
         }.width('100%')
-      }.width('100%').height('100%').scrollBar(BarState.Off).onReachEnd(() => this.loadPrograms())
-    }.width('100%').height('100%').backgroundColor('#121215').onRefreshing(async () => {
-      this.refreshing = true
-      await this.loadPage()
-      this.refreshing = false
-    })
+      }.layoutWeight(1).width('100%')
+    }.width('100%').height('100%').padding(22)
+  }
+
+  @Builder
+  private Header() {
+    if (!this.embedded) {
+      Row({ space: 12 }) {
+        SymbolGlyph($r('sys.symbol.chevron_left')).fontSize(24).fontColor(['#ffffff']).onClick(() => this.pageStack.pop())
+        Text('电台').fontSize(23).fontWeight(FontWeight.Bold).fontColor('#ffffff')
+      }.width('100%').height(56 + this.topAvoidHeight).padding({ left: 17, top: this.topAvoidHeight })
+    }
+    Row({ space: 12 }) {
+      Column({ space: 5 }) {
+        Text('音乐电台').fontSize(18).fontWeight(FontWeight.Bold).fontColor('#ffffff')
+        Text('DIFM · 电音 / 古典 / 爵士').fontSize(12).fontColor('#aaaaB5')
+      }.layoutWeight(1).alignItems(HorizontalAlign.Start)
+      SymbolGlyph($r('sys.symbol.podcast')).fontSize(28).fontColor(['#ff6577'])
+      SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(13).fontColor(['#9999a4'])
+    }.width('92%').padding(18).borderRadius(18).backgroundColor('#202027').margin({ top: 12, bottom: 16 })
+      .onClick(() => this.pageStack.pushPathByName('DifmPage', null))
+    Scroll() {
+      Row({ space: 22 }) {
+        Text(this.categoryName + ' ▾').fontSize(13).fontColor('#ff6577').onClick(() => this.categoryVisible = true)
+        ForEach(this.categories.slice(0, 8), (item: RadioCategory) => {
+          Text(item.name).fontSize(13).fontColor(this.category === item.id ? '#ff6577' : '#a0a0aa')
+            .onClick(() => this.chooseCategory(item.id, item.name))
+        }, (item: RadioCategory) => String(item.id))
+      }.padding({ left: 17, right: 17, top: 8, bottom: 8 })
+    }.width('100%').scrollable(ScrollDirection.Horizontal).scrollBar(BarState.Off)
+    if (this.homeMessage) { Text(this.homeMessage).fontSize(11).fontColor('#9999a4').padding(12) }
+  }
+
+  @Builder
+  private RecommendedPrograms() {
+    if (this.category === 0 && this.mode === 'recommend' && this.recommendations.length > 0) {
+      Row() {
+        Text('精选节目').fontSize(19).fontWeight(FontWeight.Bold).fontColor('#ffffff').layoutWeight(1)
+        Text(this.playing ? '准备播放…' : '播放全部').fontSize(12).fontColor('#ff6577')
+          .enabled(!this.playing).onClick(() => this.play(this.recommendations))
+      }.width('100%').padding({ left: 17, right: 17, top: 18, bottom: 8 })
+      ForEach(this.recommendations, (program: ProgramItem, index: number) => {
+        RadioProgramRow({ program: program, onPlay: () => this.play(this.recommendations, index),
+          onDetails: () => this.openProgram(program) })
+      }, (program: ProgramItem) => String(program.id))
+    }
+  }
+
+  @Builder
+  private Content() {
+    Refresh({ refreshing: this.refreshing }) {
+      List() {
+        ListItem() { Column() { this.Header(); this.RecommendedPrograms() }.width('100%') }
+        ListItem() {
+          Row({ space: 24 }) {
+            ForEach(this.category > 0 ? ['recommend', 'hot'] : ['recommend', 'hot', 'new', 'programs'], (mode: string) => {
+              Text(mode === 'recommend' ? '推荐电台' : mode === 'hot' ? '热门' : mode === 'new' ? '新晋' : '节目榜')
+                .fontSize(14).fontWeight(this.mode === mode ? FontWeight.Bold : FontWeight.Regular)
+                .fontColor(this.mode === mode ? '#ffffff' : '#85858f').onClick(() => this.chooseMode(mode))
+            })
+          }.width('100%').padding({ left: 17, right: 17, top: 20, bottom: 14 })
+        }
+        if (this.mode !== 'programs') {
+          ListItem() {
+            Search({ value: this.query, placeholder: '筛选已加载电台' }).margin({ left: 17, right: 17, bottom: 10 })
+              .fontColor('#eeeeF2').backgroundColor('#222229').onChange((value: string) => this.query = value)
+          }
+          ForEach(this.visibleStations(), (station: DjRadioItem) => {
+            ListItem() { RadioStationCard({ station: station, onOpen: () => this.openStation(station.id, station.name, station.picUrl) }) }
+          }, (station: DjRadioItem) => String(station.id))
+        } else {
+          ForEach(this.ranked, (program: ProgramItem, index: number) => {
+            ListItem() { RadioProgramRow({ program: program, rank: index + 1,
+              onPlay: () => this.play(this.ranked, index), onDetails: () => this.openProgram(program) }) }
+          }, (program: ProgramItem) => String(program.id))
+        }
+        ListItem() {
+          Column({ space: 12 }) {
+            if (this.loading) { LoadingProgress().width(30).height(30).color('#ef233c') }
+            else if (this.message) {
+              Text(this.message).fontSize(13).fontColor('#ff6577')
+              Button('重试').backgroundColor('#303038').onClick(() => { this.message = ''; this.loadList() })
+            } else {
+              Text((this.mode === 'programs' ? this.ranked.length === 0 : this.visibleStations().length === 0) ?
+                '暂无内容' : this.more ? '加载更多' : '已经到底了').fontSize(12).fontColor('#85858f')
+                .onClick(() => this.loadList())
+            }
+          }.width('100%').padding({ top: 20, bottom: this.embedded ? 145 : 40 })
+        }
+      }.width('100%').height('100%').scrollBar(BarState.Off).onReachEnd(() => this.loadList())
+    }.width('100%').height('100%').backgroundColor('#121215')
+      .onRefreshing(async () => { this.refreshing = true; await this.loadHome(); this.refreshing = false })
+      .bindSheet(this.categoryVisible, this.CategoriesSheet(), {
+        height: '62%', backgroundColor: '#19191f', showClose: false, dragBar: true,
+        onDisappear: () => this.categoryVisible = false
+      })
   }
 
   build() {
-    if (this.embedded) {
-      this.PageContent(false)
-    } else {
-      NavDestination() {
-        this.PageContent(true)
-      }.hideTitleBar(true).backgroundColor('#121215')
-    }
+    if (this.embedded) { this.Content() }
+    else { NavDestination() { this.Content() }.hideTitleBar(true).backgroundColor('#121215') }
   }
 }

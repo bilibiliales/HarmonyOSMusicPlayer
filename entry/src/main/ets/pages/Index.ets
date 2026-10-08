@@ -1,3 +1,5 @@
+import { LocalMusicPage } from './LocalMusic'
+import { YunbeiPage } from './Yunbei'
 import { songItemType, TabClass, playlistType } from '../models'
 import { tabsData } from '../constants'
 import Find from './Find'
@@ -33,6 +35,9 @@ import { RankingPage } from './Ranking'
 import { StylePage } from './Style'
 import { StyleDetailPage } from './StyleDetail'
 import { RadioPage } from './Radio'
+import { RadioDetailPage, RadioProgramPage } from './RadioDetail'
+import { DifmPage } from './Difm'
+import { RadioPageParam } from '../models/radio'
 import { DigitalAlbumPage } from './DigitalAlbum'
 import { DigitalAlbumDetailPage } from './DigitalAlbumDetail'
 import { SatiPage } from './Sati'
@@ -120,6 +125,10 @@ struct HomeIndex {
   PageMap(name: string, param: object) {
     if (name === 'PlayPage') {
       Play()
+    } else if (name === 'LocalMusicPage') {
+      LocalMusicPage()
+    } else if (name === 'YunbeiPage') {
+      YunbeiPage()
     } else if (name === 'CloudDrivePage') {
       CloudDrivePage()
     } else if (name === 'RecentPlaybackPage') {
@@ -174,6 +183,12 @@ struct HomeIndex {
       StylePage()
     } else if (name === 'StyleDetailPage') {
       StyleDetailPage({ pageParam: param as StyleDetailPageParam })
+    } else if (name === 'RadioDetailPage') {
+      RadioDetailPage({ pageParam: param as RadioPageParam })
+    } else if (name === 'RadioProgramPage') {
+      RadioProgramPage({ pageParam: param as RadioPageParam })
+    } else if (name === 'DifmPage') {
+      DifmPage()
     } else if (name === 'RadioPage') {
       RadioPage()
     } else if (name === 'DigitalAlbumPage') {

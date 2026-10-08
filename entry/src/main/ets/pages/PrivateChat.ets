@@ -329,6 +329,10 @@ export struct PrivateChatPage {
       } else if (shareType === 'album') {
         apiPath = '/send/album'
         params.push({ key: 'id', value: shareId })
+      } else if (shareType === 'event') {
+        apiPath = '/send/text'
+      } else {
+        throw new Error('暂不支持该分享类型')
       }
       const response = await ApiClient.get<SendMsgResponse>(apiPath, params)
       if (response.code === 200) {
@@ -337,9 +341,9 @@ export struct PrivateChatPage {
         selfMsg.time = Date.now()
         selfMsg.fromAvatar = this.authStore.avatarUrl
         selfMsg.toAvatar = this.pageParam.avatarUrl
-        selfMsg.type = shareType
+        selfMsg.type = shareType === 'event' ? 'text' : shareType
         const typeLabel = shareType === 'song' ? '单曲' : shareType === 'playlist' ? '歌单' : '专辑'
-        selfMsg.msg = `分享${typeLabel}: ${this.pageParam.nickname}`
+        selfMsg.msg = shareType === 'event' ? shareMsg : `分享${typeLabel}: ${this.pageParam.nickname}`
         this.messages = this.messages.concat([selfMsg])
         this.hasAutoShared = true
         setTimeout(() => {

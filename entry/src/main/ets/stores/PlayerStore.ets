@@ -25,6 +25,8 @@ export class PlayerStore {
   quality: string = 'exhigh'
   actualQuality: string = ''
   errorMessage: string = ''
+  desktopLyricsVisible: boolean = false
+  desktopLyricsLocked: boolean = false
 
   hasQueue(): boolean {
     return this.queue.length > 0 && this.currentIndex >= 0
@@ -111,6 +113,8 @@ export class PlayerStore {
   }
 
   qualityTitle(): string {
+    if (this.currentSong.localUri) { return (this.currentSong.localFormat || '本地音频').toUpperCase() }
+    if (this.currentSong.programId || this.currentSong.isDifm) { return '原始音源' }
     return QUALITY_OPTIONS.find((item) => item.level === this.actualQuality)?.title || '音质待确认'
   }
 

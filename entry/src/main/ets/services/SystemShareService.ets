@@ -15,6 +15,14 @@ export interface ShareLink {
   image?: string
 }
 
+export interface ShareText {
+  content: string
+  title: string
+  description: string
+  label: string
+  image?: string
+}
+
 export class SystemShareService {
   static readonly MAX_RECORDS: number = 500
   static readonly MAX_BYTES: number = 200 * 1024
@@ -71,9 +79,10 @@ export class SystemShareService {
   }
 
   static musicLink(param: SharePageParam): ShareLink {
-    const label = param.type === 'song' ? '歌曲' : param.type === 'playlist' ? '歌单' : '专辑'
+    const label = param.type === 'song' ? '歌曲' : param.type === 'playlist' ? '歌单' : param.type === 'event' ? '动态' : '专辑'
     return {
-      url: `https://music.163.com/${param.type}?id=${encodeURIComponent(param.id)}`,
+      url: `https://music.163.com/${param.type}?id=${encodeURIComponent(param.id)}` +
+        (param.type === 'event' ? '&uid=' + encodeURIComponent(param.eventUserId || '') : ''),
       title: param.name,
       description: param.author ? `${label} · ${param.author}` : `分享${label}「${param.name}」`,
       label: label,
@@ -138,11 +147,12 @@ export class SystemShareService {
     try {
       const host = SystemShareService.abilityContext || context
       const controller = new systemShare.ShareController(SystemShareService.data(records))
-      const isLink = records.every((record: systemShare.SharedRecord) =>
-        record.utd === uniformTypeDescriptor.UniformDataType.HYPERLINK)
+      const isCard = records.every((record: systemShare.SharedRecord) =>
+        record.utd === uniformTypeDescriptor.UniformDataType.HYPERLINK ||
+          record.utd === uniformTypeDescriptor.UniformDataType.PLAIN_TEXT)
       await controller.show(host, {
         selectionMode: records.length > 1 ? systemShare.SelectionMode.BATCH : systemShare.SelectionMode.SINGLE,
-        previewMode: isLink ? systemShare.SharePreviewMode.DEFAULT : systemShare.SharePreviewMode.DETAIL
+        previewMode: isCard ? systemShare.SharePreviewMode.DEFAULT : systemShare.SharePreviewMode.DETAIL
       })
     } catch (error) {
       const err = error as BusinessError
@@ -151,6 +161,23 @@ export class SystemShareService {
       console.error(`[SystemShare] launch failed: code=${code}, message=${message}`)
       throw new Error(`无法打开系统分享面板（${code}）：${message}`)
     }
+  }
+
+  static async showText(context: common.UIAbilityContext, text: ShareText): Promise<void> {
+    if (SystemShareService.launching) { return }
+    SystemShareService.launching = true
+    try {
+      const record: systemShare.SharedRecord = {
+        utd: uniformTypeDescriptor.UniformDataType.PLAIN_TEXT, content: text.content,
+        title: text.title, description: text.description, label: text.label
+      }
+      SystemShareService.validate([record])
+      if (text.image) {
+        const thumbnail = await SystemShareService.thumbnail(text.image)
+        if (thumbnail) { record.thumbnail = thumbnail }
+      }
+      await SystemShareService.present(context, [record])
+    } finally { SystemShareService.launching = false }
   }
 
   static async showLink(context: common.UIAbilityContext, link: ShareLink): Promise<void> {

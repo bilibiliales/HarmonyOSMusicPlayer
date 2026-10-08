@@ -8,6 +8,11 @@ export struct VinylRecord {
   private lastTick: number = 0
   private visible: boolean = false
 
+  aboutToAppear(): void {
+    this.visible = true
+    this.syncRotation()
+  }
+
   aboutToDisappear(): void {
     this.visible = false
     this.stopRotation()
@@ -38,6 +43,7 @@ export struct VinylRecord {
 
   build() {
     Stack() {
+      Stack() {
       Image($r('app.media.ic_cd'))
         .width(this.diameter).height(this.diameter).objectFit(ImageFit.Contain)
       if (this.coverUrl) {
@@ -52,6 +58,8 @@ export struct VinylRecord {
     .width(this.diameter).height(this.diameter)
     .borderRadius('50%').clip(true)
     .rotate({ angle: this.angle })
+    }
+    .width(this.diameter).height(this.diameter)
     .onVisibleAreaChange([0, 1], (_isVisible: boolean, ratio: number) => {
       this.visible = ratio > 0
       this.syncRotation()

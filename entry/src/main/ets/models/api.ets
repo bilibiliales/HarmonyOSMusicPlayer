@@ -807,6 +807,8 @@ export interface UserEventItem {
 export interface EventDetailPageParam {
   event: UserEventItem
   canDelete?: boolean
+  openComments?: boolean
+  onChanged?: (event: UserEventItem, deleted: boolean) => void
 }
 
 export interface UserEventResponse {
@@ -916,6 +918,7 @@ export interface UserPlaylistData {
 
 export interface UserPlaylistResponse {
   code: number
+  more?: boolean
   playlist?: ApiPlaylist[]
   data?: UserPlaylistData
 }
@@ -1293,8 +1296,9 @@ export interface DjRadioItem {
   programCount: number
   playCount: number
   rcmdText?: string
-  category: number
-  secondCategory: number
+  category: number | string
+  secondCategory: number | string
+  subed?: boolean
   creator?: ApiUser
   dj?: ApiUser
 }
@@ -1327,6 +1331,7 @@ export interface DjProgramResponse {
 
 export interface DjDetailResponse {
   code: number
+  data?: DjRadioItem
   djRadio?: DjRadioItem
 }
 
@@ -1505,11 +1510,12 @@ export interface EventLikeResponse {
 }
 
 export interface SharePageParam {
-  type: 'song' | 'playlist' | 'album'
+  type: 'song' | 'playlist' | 'album' | 'event'
   id: string
   name: string
   img: string
   author?: string
+  eventUserId?: string
 }
 
 export interface PrivateChatPageParam {

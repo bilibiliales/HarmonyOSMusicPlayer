@@ -1,3 +1,6 @@
+import { EventUpdates } from '../services/EventUpdates'
+import { EventPresentation } from '../services/EventPresentation'
+import { EventCard } from '../components/EventCard'
 import { common } from '@kit.AbilityKit'
 import { ListeningPlaylistService } from '../services/ListeningPlaylistService'
 import { ListeningPlaylistCard } from '../components/ListeningPlaylistCard'
@@ -71,6 +74,7 @@ export struct UserProfilePage {
   }
 
   aboutToAppear(): void {
+    this.watchEventUpdates()
     this.applyRelationHint()
     this.loadProfile()
     this.loadRecord()
@@ -322,118 +326,23 @@ export struct UserProfilePage {
     this.detail = this.detail
   }
 
-  private eventContent(item: UserEventItem): string {
-    try {
-      const data = JSON.parse(item.json) as EventJsonData
-      return data.msg || data.title || item.actName || '分享了一条动态'
-    } catch (_error) {
-      return item.actName || '分享了一条动态'
-    }
+  private stopEventUpdates?: () => void
+
+  private watchEventUpdates(): void {
+    this.stopEventUpdates?.()
+    this.stopEventUpdates = EventUpdates.subscribe((item: UserEventItem, deleted: boolean) => {
+      this.applyLocalEventChange(item, deleted)
+    })
   }
 
-  private pictureUrl(picture: EventPicture): string {
-    const url = picture.rectangleUrl || picture.squareUrl || picture.pcSquareUrl || picture.originUrl || ''
-    return resizeImageUrl(url, 720, 720)
+  aboutToDisappear(): void { this.stopEventUpdates?.() }
+
+  private applyEventChange(item: UserEventItem, deleted: boolean): void {
+    EventUpdates.publish(item, deleted)
   }
 
-  private formatEventTime(value: number): string {
-    if (value <= 0) {
-      return ''
-    }
-    const elapsed = Date.now() - value
-    if (elapsed < 60000) {
-      return '刚刚'
-    }
-    if (elapsed < 3600000) {
-      return `${Math.floor(elapsed / 60000)}分钟前`
-    }
-    if (elapsed < 86400000) {
-      return `${Math.floor(elapsed / 3600000)}小时前`
-    }
-    if (elapsed < 604800000) {
-      return `${Math.floor(elapsed / 86400000)}天前`
-    }
-    const date = new Date(value)
-    return `${date.getMonth() + 1}-${date.getDate()}`
-  }
-
-  private openEventDetail(item: UserEventItem): void {
-    const param: EventDetailPageParam = { event: item, canDelete: false }
-    this.pageStack.pushPathByName('EventDetailPage', param)
-  }
-
-  private forwardEvent(item: UserEventItem): EventForwardData | null {
-    try {
-      const data = JSON.parse(item.json) as EventJsonData
-      return data.event || null
-    } catch (_error) {
-      return null
-    }
-  }
-
-  private forwardContent(forward: EventForwardData): string {
-    try {
-      const data = JSON.parse(forward.json || '') as EventJsonData
-      return data.msg || data.title || forward.actName || '源动态'
-    } catch (_error) {
-      return forward.actName || '源动态'
-    }
-  }
-
-  private forwardEventItem(forward: EventForwardData): UserEventItem {
-    return {
-      id: forward.id || 0,
-      type: forward.type,
-      eventTime: forward.eventTime,
-      showTime: forward.showTime,
-      json: forward.json || '',
-      user: forward.user || { userId: 0, nickname: '', avatarUrl: '', followed: false, mutual: false },
-      info: forward.info || { commentCount: 0, likedCount: 0, shareCount: 0 },
-      pics: forward.pics,
-      actName: forward.actName
-    }
-  }
-
-  private openForwardEvent(forward: EventForwardData): void {
-    this.openEventDetail(this.forwardEventItem(forward))
-  }
-
-  @Builder
-  private ForwardEventCard(forward: EventForwardData) {
-    Column({ space: 7 }) {
-      Row({ space: 7 }) {
-        Image(resizeImageUrl(forward.user?.avatarUrl || '', 64, 64))
-          .width(24).height(24).borderRadius(12).objectFit(ImageFit.Cover)
-        Text(forward.user?.nickname || '源动态作者').fontSize(12).fontColor('#ededf0').maxLines(1)
-      }
-      .width('100%')
-      Text(this.forwardContent(forward)).width('100%').fontSize(12).lineHeight(18).fontColor('#9999a1')
-        .maxLines(3).textOverflow({ overflow: TextOverflow.Ellipsis })
-      if ((forward.pics || []).length > 0) {
-        Image(this.pictureUrl((forward.pics || [])[0]))
-          .width('100%').height(120).borderRadius(9).objectFit(ImageFit.Cover)
-      }
-    }
-    .width('100%').padding(10).backgroundColor('#202026').borderRadius(11)
-    .onClick(() => this.openForwardEvent(forward))
-  }
-
-  private eventSong(item: UserEventItem): songItemType | null {
-    try {
-      const data = JSON.parse(item.json) as EventJsonData
-      return data.song ? mapApiSong(data.song) : null
-    } catch (_error) {
-      return null
-    }
-  }
-
-  private async playEventSong(item: UserEventItem): Promise<void> {
-    const song = this.eventSong(item)
-    if (!song) {
-      return
-    }
-    await playerController.setQueue([song], 0, true)
-    this.pageStack.pushPathByName('PlayPage', null)
+  private applyLocalEventChange(item: UserEventItem, deleted: boolean): void {
+    this.events = EventPresentation.changeList(this.events, item, deleted)
   }
 
   private openRelation(type: string, title: string): void {
@@ -597,7 +506,7 @@ export struct UserProfilePage {
           .width('100%')
           .height('100%')
           .objectFit(ImageFit.Cover)
-          .blur(48)
+          .blur(32)
           .opacity(0.55)
       } else {
         Column()
@@ -608,11 +517,11 @@ export struct UserProfilePage {
       Column()
         .width('100%')
         .height('100%')
-        .linearGradient({ angle: 180, colors: [['rgba(15,15,20,0.22)', 0], ['#121215', 1]] })
+        .linearGradient({ angle: 180, colors: [['rgba(10,10,14,0.12)', 0], ['#121215', 1]] })
       Column({ space: 10 }) {
         Stack({ alignContent: Alignment.BottomEnd }) {
           Image(resizeImageUrl(this.detail?.profile.avatarUrl || '', 180, 180))
-            .width(88).height(88).sourceSize({ width: 180, height: 180 }).borderRadius(30).objectFit(ImageFit.Cover)
+            .width(88).height(88).sourceSize({ width: 180, height: 180 }).borderRadius(90).objectFit(ImageFit.Cover)
             .border({ width: 2, color: 'rgba(255,255,255,0.8)' })
           if (this.detail?.profile.userType === 4) {
             Image($r('app.media.ic_singer')).width(26).height(26).borderRadius(13)
@@ -683,7 +592,7 @@ export struct UserProfilePage {
       }
       .width('100%').padding({ bottom: 18 })
     }
-    .width('100%').height(280)
+    .width('100%').height(280 + this.topAvoidHeight + 54)
   }
 
   @Builder
@@ -728,26 +637,30 @@ export struct UserProfilePage {
     .width('100%').padding(24)
   }
 
+  @Builder
+  private ProfileNavigation() {
+    Column() {
+      Column().width('100%').height(this.topAvoidHeight)
+      Row() {
+        SymbolGlyph($r('sys.symbol.chevron_left'))
+          .fontSize(24).fontColor(['#ffffff']).width(44).height(44).onClick(() => this.pageStack.pop())
+        Text('用户主页').layoutWeight(1).fontSize(17).fontWeight(FontWeight.Bold)
+          .fontColor('#ffffff').textAlign(TextAlign.Center)
+        SymbolGlyph($r('sys.symbol.ellipsis_circle')).fontSize(22).fontColor(['#ffffff'])
+          .width(44).height(44)
+          .visibility(this.isOtherUser() ? Visibility.Visible : Visibility.Hidden)
+          .onClick(() => this.moreMenuVisible = true)
+      }
+      .height(54).width('100%').padding({ left: 6, right: 6 })
+    }
+    .width('100%')
+    .linearGradient({ angle: 180, colors: [['rgba(0,0,0,0.5)', 0], ['rgba(0,0,0,0)', 1]] })
+  }
+
   build() {
     NavDestination() {
-      Stack() {
-        if (this.detail?.profile.avatarUrl) {
-          Image(resizeImageUrl(this.detail.profile.avatarUrl, 720, 240))
-            .width('100%').height(this.topAvoidHeight + 54).objectFit(ImageFit.Cover).blur(24).opacity(0.58)
-        }
+      Stack({ alignContent: Alignment.TopStart }) {
         Column() {
-          Column().width('100%').height(this.topAvoidHeight)
-          Row() {
-            SymbolGlyph($r('sys.symbol.chevron_left'))
-              .fontSize(24).fontColor(['#ffffff']).onClick(() => this.pageStack.pop())
-            Text('用户主页').layoutWeight(1).fontSize(17).fontWeight(FontWeight.Bold)
-              .fontColor('#ffffff').textAlign(TextAlign.Center)
-            SymbolGlyph($r('sys.symbol.ellipsis_circle')).fontSize(22).fontColor(['#ffffff'])
-              .visibility(this.isOtherUser() ? Visibility.Visible : Visibility.Hidden)
-              .onClick(() => this.moreMenuVisible = true)
-          }
-          .height(54).width('100%').padding({ left: 16, right: 16 })
-
           if (this.loading) {
             LoadingProgress().layoutWeight(1).width(46).color('#ef233c')
           } else if (!this.detail) {
@@ -820,69 +733,9 @@ export struct UserProfilePage {
                 } else {
                   Column({ space: 12 }) {
                     ForEach(this.events, (item: UserEventItem) => {
-                      Column({ space: 8 }) {
-                        Row({ space: 8 }) {
-                          Image(resizeImageUrl(item.user.avatarUrl, 72, 72)).width(32).height(32)
-                            .sourceSize({ width: 72, height: 72 }).borderRadius(16).objectFit(ImageFit.Cover)
-                          Text(item.user.nickname).fontSize(13).fontWeight(FontWeight.Medium).fontColor('#ffffff')
-                          Text(this.formatEventTime(item.showTime || item.eventTime || 0))
-                            .fontSize(10).fontColor('#66666e')
-                        }
-                        .width('100%').onClick(() => this.openEventDetail(item))
-                        Text(this.eventContent(item)).width('100%').fontSize(13).lineHeight(20).fontColor('#b5b5bc')
-                          .onClick(() => this.openEventDetail(item))
-                        if (this.forwardEvent(item)) {
-                          this.ForwardEventCard(this.forwardEvent(item)!)
-                        }
-                        if ((item.pics || []).length > 0) {
-                          Scroll() {
-                            Row({ space: 8 }) {
-                              ForEach(item.pics || [], (picture: EventPicture) => {
-                                Image(this.pictureUrl(picture))
-                                  .width((item.pics || []).length === 1 ? 260 : 116)
-                                  .height((item.pics || []).length === 1 ? 210 : 116)
-                                  .sourceSize({ width: 520, height: 420 })
-                                  .borderRadius(12).objectFit(ImageFit.Cover)
-                              })
-                            }
-                          }
-                          .width('100%').scrollable(ScrollDirection.Horizontal).scrollBar(BarState.Off)
-                        }
-                        if (this.eventSong(item)) {
-                          Row({ space: 10 }) {
-                            Image(resizeImageUrl(this.eventSong(item)?.img || '', 128, 128))
-                              .width(54).height(54).sourceSize({ width: 128, height: 128 })
-                              .borderRadius(10).objectFit(ImageFit.Cover)
-                            Column({ space: 4 }) {
-                              Text(this.eventSong(item)?.name || '').fontSize(13).fontColor('#ededf0').maxLines(1)
-                              Text(this.eventSong(item)?.author || '').fontSize(10).fontColor('#77777f').maxLines(1)
-                            }
-                            .layoutWeight(1).alignItems(HorizontalAlign.Start)
-                            SymbolGlyph($r('sys.symbol.play_circle_fill')).fontSize(23).fontColor(['#ffffff'])
-                          }
-                          .width('100%').padding(10).backgroundColor('#25252b').borderRadius(12)
-                          .onClick(() => this.playEventSong(item))
-                        }
-                        Row({ space: 24 }) {
-                          Row({ space: 4 }) {
-                            SymbolGlyph($r('sys.symbol.arrow_right_up_and_square')).fontSize(16).fontColor(['#77777f'])
-                            Text(`${item.info.shareCount || 0}`).fontSize(10).fontColor('#77777f')
-                          }
-                          Row({ space: 4 }) {
-                            SymbolGlyph($r('sys.symbol.ellipsis_bubble')).fontSize(16).fontColor(['#77777f'])
-                            Text(`${item.info.commentCount || 0}`).fontSize(10).fontColor('#77777f')
-                          }
-                          Row({ space: 4 }) {
-                            SymbolGlyph(item.info.liked ? $r('sys.symbol.heart_fill') : $r('sys.symbol.heart'))
-                              .fontSize(16).fontColor([item.info.liked ? '#ef233c' : '#77777f'])
-                            Text(`${item.info.likedCount || 0}`).fontSize(10)
-                              .fontColor(item.info.liked ? '#ef233c' : '#77777f')
-                          }
-                        }
-                        .width('100%')
-                      }
-                      .width('100%').padding(16).backgroundColor('#1b1b20').borderRadius(16)
-                    })
+                      EventCard({ item: item,
+                        onChanged: (event: UserEventItem, deleted: boolean) => this.applyEventChange(event, deleted) })
+                    }, (item: UserEventItem) => item.id.toString())
                   }
                   .padding({ left: 16, right: 16, bottom: 28 })
                 }
@@ -891,7 +744,7 @@ export struct UserProfilePage {
             .layoutWeight(1).scrollBar(BarState.Off)
           }
         }
-        .width('100%').height('100%').backgroundColor('#121215')
+        .width('100%').height('100%')
         .bindSheet(this.cancelSheetVisible, this.CancelSheet(), {
           height: '30%',
           backgroundColor: '#19191f',
@@ -899,11 +752,13 @@ export struct UserProfilePage {
           dragBar: false,
           onDisappear: () => this.cancelSheetVisible = false
         })
+        this.ProfileNavigation()
         if (this.moreMenuVisible) {
           this.MoreMenuOverlay()
         }
       }
-      .width('100%').height('100%')
+      .width('100%').height('100%').backgroundColor('#121215')
+      .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP])
     }
     .hideTitleBar(true)
     .onShown(() => this.nearbyShare.activate(() => SystemShareService.linkRecords(this.profileShareLink())))

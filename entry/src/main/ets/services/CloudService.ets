@@ -1,8 +1,14 @@
+import { http } from '@kit.NetworkKit'
+import { media } from '@kit.MediaKit'
+import { AudioMetadata } from './AudioMetadata'
+import { NeteaseCloudUpload, CloudUploadToken } from './NeteaseCloudUpload'
 import { CloudResponse, CloudSong } from '../models/cloud'
 import { ApiParam, OperationResponse, mapApiSong, SongUrlResponse } from '../models/api'
 import { songItemType } from '../models/music'
 import { ApiClient } from './ApiClient'
 import { SongAudioResource } from './SongQualityService'
+
+interface UploadTokenResponse { code: number; msg?: string; message?: string; data?: CloudUploadToken }
 
 export class CloudService {
   private cookie: string
@@ -46,12 +52,69 @@ export class CloudService {
     if (response.code !== 200) { throw new Error(response.message || '纠偏失败') }
   }
 
-  async upload(name: string, data: ArrayBuffer): Promise<void> {
+  async upload(name: string, data: ArrayBuffer, tags?: media.AVMetadata): Promise<void> {
     this.check()
-    const response = await ApiClient.upload<OperationResponse>('/cloud', [{ key: 'cookie', value: this.cookie }],
-      'songFile', name, data, 'audio/mpeg', 300000)
+    const md5 = await AudioMetadata.md5(data)
     this.check()
-    if (response.code !== 200) { throw new Error(response.message || '上传失败') }
+    const tokenBody: Record<string, string> = {
+      'cookie': this.cookie, 'md5': md5, 'fileSize': data.byteLength.toString(), 'filename': name
+    }
+    let direct: NeteaseCloudUpload | undefined = undefined
+    let token: UploadTokenResponse
+    try {
+      token = await ApiClient.postJson<UploadTokenResponse>('/cloud/upload/token', tokenBody)
+      if (token.code === 404) { throw new Error('上传路由不存在 (404)') }
+    } catch (error) {
+      if (!(error instanceof Error) || !/\(404\)$/.test(error.message)) {
+        throw new Error('获取上传凭证：' + (error instanceof Error ? error.message : '请求失败'))
+      }
+      console.info('[CloudUpload] API server upload route unavailable; using official upload flow')
+      direct = new NeteaseCloudUpload(this.cookie)
+      token = { code: 200, data: await direct.token(name, data.byteLength, md5) }
+    }
+    this.check()
+    if (token.code !== 200 || !token.data) { throw new Error(token.msg || token.message || '获取云盘上传凭证失败') }
+    const info = token.data
+    if (typeof info.needUpload !== 'boolean' || !info.songId || !info.resourceId) {
+      throw new Error('云盘上传凭证缺少歌曲或资源标识')
+    }
+    if (info.needUpload) {
+      if (!info.uploadUrl || !/^https?:\/\//.test(info.uploadUrl) || !info.uploadToken) { throw new Error('云盘上传凭证不完整') }
+      const client = http.createHttp()
+      try {
+        const response = await client.request(info.uploadUrl, {
+          method: http.RequestMethod.POST,
+          header: { 'x-nos-token': info.uploadToken, 'Content-MD5': md5, 'Content-Type': 'audio/mpeg' },
+          extraData: data, connectTimeout: 15000, readTimeout: 300000,
+          expectDataType: http.HttpDataType.STRING
+        })
+        if (response.responseCode < 200 || response.responseCode >= 300) { throw new Error('音频直传失败 (' + response.responseCode + ')') }
+      } finally { client.destroy() }
+    }
+    this.check()
+    if (direct) {
+      await direct.complete(info, name, tags)
+      this.check()
+      return
+    }
+    const completeBody: Record<string, string> = {
+      'cookie': this.cookie, 'songId': String(info.songId), 'resourceId': String(info.resourceId),
+      'md5': info.md5 || md5, 'filename': name, 'song': tags?.title || name.replace(/\.[^.]+$/, ''),
+      'artist': tags?.artist || '未知艺术家', 'album': tags?.album || '未知专辑'
+    }
+    let response: OperationResponse
+    try {
+      response = await ApiClient.postJson<OperationResponse>('/cloud/upload/complete', completeBody)
+    } catch (error) {
+      if (error instanceof Error && /\(404\)$/.test(error.message)) {
+        await new NeteaseCloudUpload(this.cookie).complete(info, name, tags)
+        this.check()
+        return
+      }
+      throw new Error('导入云盘：' + (error instanceof Error ? error.message : '请求失败'))
+    }
+    this.check()
+    if (response.code !== 200) { throw new Error(response.message || '云盘导入失败') }
   }
 
   static song(item: CloudSong): songItemType {

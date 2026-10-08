@@ -1,3 +1,4 @@
+import { LyricPreferences } from '../models/lyricPreferences'
 import { common } from '@kit.AbilityKit'
 import { preferences } from '@kit.ArkData'
 import { fileIo } from '@kit.CoreFileKit'
@@ -42,6 +43,25 @@ export class AppSettings {
   private static readonly DEFAULT_DOWNLOAD_QUALITY_KEY: string = 'default_download_quality'
   private static readonly BACKGROUND_PLAYBACK_KEY: string = 'background_playback_enabled'
 
+  static lyricPreferences: LyricPreferences = new LyricPreferences()
+  static desktopLyricsEnabled: boolean = false
+  static desktopLyricsLocked: boolean = false
+  static downloadSaveMode: string = 'download'
+  static askDownloadSaveMode: boolean = true
+  static effectsEnabled: boolean = true
+
+  static async saveFeature(key: string, value: preferences.ValueType): Promise<void> {
+    if (!AppSettings.context) { throw new Error('设置存储尚未初始化') }
+    const store = await preferences.getPreferences(AppSettings.context, AppSettings.STORE_NAME)
+    await store.put(key, value)
+    await store.flush()
+  }
+
+  static async saveLyrics(value: LyricPreferences): Promise<void> {
+    await AppSettings.saveFeature('lyric_preferences', JSON.stringify(value))
+    AppSettings.lyricPreferences = value
+  }
+
   static backgroundPlaybackEnabled: boolean = true
 
   static aiBaseUrl: string = 'https://zm.wwoyun.cn'
@@ -54,6 +74,15 @@ export class AppSettings {
 
   static async load(context: common.Context): Promise<void> {
     const store = await preferences.getPreferences(context, AppSettings.STORE_NAME)
+    const lyricValue = await store.get('lyric_preferences', '')
+    if (typeof lyricValue === 'string' && lyricValue) {
+      try { AppSettings.lyricPreferences = LyricPreferences.normalize(JSON.parse(lyricValue) as LyricPreferences) } catch (_error) {}
+    }
+    AppSettings.desktopLyricsEnabled = await store.get('desktop_lyrics_enabled', false) === true
+    AppSettings.desktopLyricsLocked = await store.get('desktop_lyrics_locked', false) === true
+    AppSettings.effectsEnabled = await store.get('effects_enabled', true) === true
+    AppSettings.downloadSaveMode = await store.get('download_save_mode', 'download') === 'saveAs' ? 'saveAs' : 'download'
+    AppSettings.askDownloadSaveMode = await store.get('ask_download_save_mode', true) === true
     const backgroundValue = await store.get(AppSettings.BACKGROUND_PLAYBACK_KEY, true)
     AppSettings.backgroundPlaybackEnabled = typeof backgroundValue === 'boolean' ? backgroundValue : true
     const urlValue = await store.get(AppSettings.API_BASE_URL_KEY, ApiClient.baseUrl)

@@ -1,3 +1,5 @@
+import { AudioMetadata } from '../services/AudioMetadata'
+import { media } from '@kit.MediaKit'
 import { common } from '@kit.AbilityKit'
 import { fileIo, fileUri, picker } from '@kit.CoreFileKit'
 import { CloudSong } from '../models/cloud'
@@ -13,7 +15,7 @@ import { AuthStore } from '../stores/AuthStore'
 export struct CloudDrivePage {
   @Consume('pageStack') pageStack: NavPathStack
   @Consume('topAvoidHeight') topAvoidHeight: number
-  @Consume('authStore') authStore: AuthStore
+  @Consume('authStore') @Watch('onAuthChanged') authStore: AuthStore
   @State songs: CloudSong[] = []
   @State loading: boolean = false
   @State complete: boolean = false
@@ -48,6 +50,29 @@ export struct CloudDrivePage {
   }
 
   aboutToDisappear(): void { this.disposed = true; this.loadToken++; this.searchToken++ }
+
+  private onAuthChanged(): void {
+    if (this.disposed) { return }
+    if (this.authStore.loggedIn && this.service?.uid === this.authStore.userId) {
+      try { this.service.check(); return } catch (_error) {}
+    }
+    this.loadToken++
+    this.searchToken++
+    this.songs = []
+    this.selected = []
+    this.matches = []
+    this.playlists = []
+    this.target = undefined
+    this.sheet = ''
+    this.quota = ''
+    this.complete = false
+    this.loading = false
+    this.service = undefined
+    if (this.authStore.loggedIn) {
+      this.service = new CloudService(this.authStore.userId)
+      this.reload()
+    }
+  }
 
   private owner(): CloudService {
     if (this.disposed || !this.authStore.loggedIn || !this.service || this.service.uid !== this.authStore.userId) {
@@ -249,7 +274,8 @@ export struct CloudDrivePage {
         items.forEach((item) => seen.push(item.id))
         this.playlists = this.playlists.concat(items.map(mapPlaylist).filter((item: playlistType) => item.creatorId === service.uid))
         offset += items.length
-        if (!items.length || items.length < 200) { break }
+        const more = response.more ?? response.data?.more ?? items.length === 200
+        if (!items.length || !more) { break }
       }
       if (!this.playlists.length) { this.sheetMessage = '暂无可收藏的自建歌单' }
     } catch (error) { this.sheetMessage = error instanceof Error ? error.message : '歌单加载失败' }
@@ -285,7 +311,11 @@ export struct CloudDrivePage {
               !(head[0] === 255 && (head[1] & 224) === 224 && (head[1] & 6) !== 0)) {
               throw new Error('文件内容不是 MP3')
             }
-            await service.upload(name, buffer)
+            let tags: media.AVMetadata | undefined = undefined
+            const tagFile = await fileIo.open(uri, fileIo.OpenMode.READ_ONLY)
+            try { tags = await AudioMetadata.read(tagFile.fd, size) } catch (_error) {}
+            finally { await fileIo.close(tagFile) }
+            await service.upload(name, buffer, tags)
             succeeded++
           } finally { await fileIo.close(file) }
         } catch (error) { failed.push(`${name}：${error instanceof Error ? error.message : '上传失败'}`) }

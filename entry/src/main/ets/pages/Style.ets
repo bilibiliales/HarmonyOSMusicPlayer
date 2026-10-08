@@ -6,7 +6,7 @@ import {
   StyleTagPreference
 } from '../models'
 import { ApiClient } from '../services/ApiClient'
-import { resizeImageUrl } from '../services/ImageUrl'
+import { styleRoots, styleImageUrl } from '../services/StylePresentation'
 
 interface StyleTagRow {
   key: string
@@ -83,7 +83,7 @@ export struct StylePage {
       const listResponse = await ApiClient.get<StyleListResponse>('/style/list')
       if (listResponse.code === 200) {
         this.tags = listResponse.data || []
-        this.allTags = this.flattenTags(this.tags)
+        this.allTags = styleRoots(this.tags)
         this.tagRows.reset(this.allTags)
       }
       if (this.allTags.length === 0) {
@@ -94,19 +94,6 @@ export struct StylePage {
     } finally {
       this.loading = false
     }
-  }
-
-  private flattenTags(tags: StyleTag[] | null | undefined): StyleTag[] {
-    const result: StyleTag[] = []
-    if (!tags) {
-      return result
-    }
-    tags.forEach((tag: StyleTag) => {
-      result.push(tag)
-      const children = this.flattenTags(tag.childrenTags)
-      children.forEach((child: StyleTag) => result.push(child))
-    })
-    return result
   }
 
   private findTag(tagId: number, tags: StyleTag[] | null | undefined = this.tags): StyleTag | undefined {
@@ -235,7 +222,7 @@ export struct StylePage {
   private StyleCard(tag: StyleTag) {
     Column({ space: 8 }) {
       Stack({ alignContent: Alignment.BottomStart }) {
-        Image(tag.picUrl).width('100%').height(112)
+        Image(styleImageUrl(tag.picUrl)).width('100%').height(112)
           .borderRadius(15).objectFit(ImageFit.Cover)
           .backgroundColor('#202026')
         Column().width('100%').height(62).borderRadius({ bottomLeft: 15, bottomRight: 15 })

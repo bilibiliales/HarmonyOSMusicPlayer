@@ -31,7 +31,7 @@ export class ListeningScrobble {
     this.lastWallTime = playing ? now : 0
   }
   async completed(song: songItemType, duration: number): Promise<void> {
-    if (this.submitted || this.trial || song.isVoice || !this.cookie || this.cookie !== ApiClient.cookie ||
+    if (this.submitted || this.trial || (song.isVoice || !!song.localUri) || !this.cookie || this.cookie !== ApiClient.cookie ||
       duration <= 0 || this.listened < duration - 1500 ||
       (song.duration && duration < song.duration - 2000)) { return }
     const sourceId = song.sourceId || song.albumId || ''

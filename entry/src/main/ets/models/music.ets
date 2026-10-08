@@ -15,6 +15,14 @@ export interface songItemType {
   playCount?: number
   sourceId?: string
   isVoice?: boolean
+  programId?: string
+  isDifm?: boolean
+  localLrc?: string
+  localYrc?: string
+  localTranslation?: string
+  localUri?: string
+  localManaged?: boolean
+  localFormat?: string
   isCloud?: boolean
 }
 

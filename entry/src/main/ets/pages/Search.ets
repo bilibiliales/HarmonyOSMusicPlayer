@@ -22,6 +22,7 @@ import {
   UserProfilePageParam
 } from '../models/api'
 import { playlistType, songItemType } from '../models/music'
+import { RadioPageParam } from '../models/radio'
 import { ApiClient } from '../services/ApiClient'
 import { playerController } from '../services/PlayerController'
 
@@ -499,6 +500,9 @@ export struct SearchPage {
       this.playSong(item.songIndex)
     } else if (item.playlist) {
       this.pageStack.pushPathByName('PlaylistDetailPage', item.playlist)
+    } else if (item.kind === '电台' && item.id) {
+      const param: RadioPageParam = { id: item.id, name: item.title, cover: item.image }
+      this.pageStack.pushPathByName('RadioDetailPage', param)
     } else if (item.kind === '专辑' && item.id) {
       const param: AlbumPageParam = { id: item.id, name: item.title, picUrl: item.image, artist: item.subtitle }
       this.pageStack.pushPathByName('AlbumDetailPage', param)

@@ -75,7 +75,7 @@ export interface StyleDetailResponse {
 }
 
 export interface StylePageInfo {
-  cursor: number
+  cursor: number | string
   size: number
   total?: number
   more: boolean

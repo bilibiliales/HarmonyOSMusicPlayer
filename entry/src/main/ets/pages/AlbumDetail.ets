@@ -1,3 +1,5 @@
+import { ResourceComments } from '../components/ResourceComments'
+import { CommentResource } from '../models/CommentResource'
 import {
   AlbumDetailData,
   AlbumDetailResponse,
@@ -5,13 +7,11 @@ import {
   AlbumPageParam,
   ApiArtist,
   ArtistPageParam,
-  CommentResponse,
   mapApiSong,
-  mapComment,
   OperationResponse,
   SharePageParam
 } from '../models/api'
-import { MusicComment, SongArtist, songItemType } from '../models/music'
+import { SongArtist, songItemType } from '../models/music'
 import { ApiClient } from '../services/ApiClient'
 import { playerController } from '../services/PlayerController'
 import { AuthStore } from '../stores/AuthStore'
@@ -42,13 +42,6 @@ export struct AlbumDetail {
   @State isSub: boolean = false
   @State descExpanded: boolean = false
   @State commentSheetVisible: boolean = false
-  @State comments: MusicComment[] = []
-  @State commentsLoading: boolean = false
-  @State commentPage: number = 0
-  @State commentHasMore: boolean = true
-  @State commentLoadingMore: boolean = false
-  @State commentInput: string = ''
-  @State commentSubmitting: boolean = false
   @State shareSheetVisible: boolean = false
   private shareParam: SharePageParam = { type: 'album', id: '', name: '', img: '' }
 
@@ -58,6 +51,23 @@ export struct AlbumDetail {
     this.albumArtist = this.pageParam.artist || ''
     this.shareParam = { type: 'album', id: this.pageParam.id, name: this.albumName, img: this.albumCover }
     this.loadDetail()
+  }
+
+  private openCommentSheet(): void {
+    this.commentSheetVisible = true
+  }
+
+  private commentResource(): CommentResource {
+    return { id: this.pageParam.id, type: 3, title: this.albumName }
+  }
+
+  @Builder
+  private CommentsSheetBuilder() {
+    ResourceComments({
+      resource: this.commentResource(),
+      onClose: () => this.commentSheetVisible = false,
+      onCountChange: (total: number) => this.commentCount = total
+    })
   }
 
   private previewCover(): void {
@@ -207,183 +217,10 @@ export struct AlbumDetail {
     }
   }
 
-  private async openCommentSheet(): Promise<void> {
-    this.commentSheetVisible = true
-    if (this.comments.length === 0) {
-      await this.loadComments(true)
-    }
-  }
 
-  private async loadComments(reset: boolean): Promise<void> {
-    if (reset) {
-      this.commentPage = 0
-      this.commentHasMore = true
-      this.commentsLoading = true
-    } else {
-      if (!this.commentHasMore || this.commentLoadingMore) {
-        return
-      }
-      this.commentLoadingMore = true
-    }
-    try {
-      const limit = 30
-      const offset = this.commentPage * limit
-      const response = await ApiClient.get<CommentResponse>('/comment/album', [
-        { key: 'id', value: this.pageParam.id },
-        { key: 'limit', value: limit.toString() },
-        { key: 'offset', value: offset.toString() }
-      ])
-      const newComments = (response.comments || []).map((item) => mapComment(item))
-      const hotComments = (response.hotComments || []).map((item) => mapComment(item))
-      if (reset) {
-        this.comments = hotComments.length > 0 ? [...hotComments, ...newComments] : newComments
-      } else {
-        this.comments = [...this.comments, ...newComments]
-      }
-      this.commentHasMore = this.comments.length < (response.total || 0)
-      this.commentPage++
-      this.commentCount = response.total || this.comments.length
-    } catch (_error) {
-      if (reset) {
-        this.comments = []
-      }
-    } finally {
-      this.commentsLoading = false
-      this.commentLoadingMore = false
-    }
-  }
 
-  private async toggleCommentLike(comment: MusicComment): Promise<void> {
-    if (!this.authStore.loggedIn) {
-      this.pageStack.pushPathByName('LoginPage', null)
-      return
-    }
-    const nextLiked = !comment.liked
-    try {
-      const response = await ApiClient.get<CommentResponse>('/comment/like', [
-        { key: 'id', value: this.pageParam.id },
-        { key: 'cid', value: comment.commentId },
-        { key: 'type', value: '3' },
-        { key: 't', value: nextLiked ? '1' : '0' }
-      ])
-      if (response.code === 200) {
-        comment.liked = nextLiked
-        comment.likedCount = Math.max(0, comment.likedCount + (nextLiked ? 1 : -1))
-        this.comments = this.comments.map((item: MusicComment) => item)
-      }
-    } catch (_error) {
-    }
-  }
 
-  private async submitAlbumComment(): Promise<void> {
-    const content = this.commentInput.trim()
-    if (!content || this.commentSubmitting) {
-      return
-    }
-    if (!this.authStore.loggedIn) {
-      this.pageStack.pushPathByName('LoginPage', null)
-      return
-    }
-    this.commentSubmitting = true
-    try {
-      const response = await ApiClient.get<CommentResponse>('/comment', [
-        { key: 't', value: '1' },
-        { key: 'type', value: '3' },
-        { key: 'id', value: this.pageParam.id },
-        { key: 'content', value: content }
-      ])
-      if (response.code === 200) {
-        this.commentInput = ''
-        this.commentCount = this.commentCount + 1
-        await this.loadComments(true)
-      }
-    } catch (_error) {
-    } finally {
-      this.commentSubmitting = false
-    }
-  }
 
-  @Builder
-  private CommentsSheetBuilder() {
-    Column() {
-      Row() {
-        Column({ space: 3 }) {
-          Text(`评论 · ${this.commentCount}`).fontSize(17).fontWeight(FontWeight.Bold).fontColor('#ffffff')
-          Text('热门评论与最新评论').fontSize(10).fontColor('#77777f')
-        }
-        .layoutWeight(1).alignItems(HorizontalAlign.Start)
-        SymbolGlyph($r('sys.symbol.xmark_circle_fill')).fontSize(24).fontColor(['#686870'])
-          .onClick(() => this.commentSheetVisible = false)
-      }
-      .width('100%').height(66).padding({ left: 20, right: 20 })
-
-      if (this.commentsLoading) {
-        LoadingProgress().layoutWeight(1).width(42).color('#ef233c')
-      } else if (this.comments.length === 0) {
-        Column({ space: 10 }) {
-          SymbolGlyph($r('sys.symbol.ellipsis_bubble')).fontSize(38).fontColor(['#55555d'])
-          Text('暂无评论').fontSize(12).fontColor('#77777f')
-        }
-        .layoutWeight(1).justifyContent(FlexAlign.Center)
-      } else {
-        List({ space: 14 }) {
-          ForEach(this.comments, (item: MusicComment) => {
-            ListItem() {
-              Row({ space: 10 }) {
-                Image(item.user.avatarUrl).width(36).height(36).borderRadius(18).objectFit(ImageFit.Cover)
-                Column({ space: 6 }) {
-                  Row() {
-                    Column({ space: 2 }) {
-                      Text(item.user.nickname).fontSize(12).fontColor('#b9b9c0')
-                      Text(item.timeStr).fontSize(9).fontColor('#5f5f67')
-                    }
-                    .layoutWeight(1).alignItems(HorizontalAlign.Start)
-                    Row({ space: 4 }) {
-                      SymbolGlyph(item.liked ? $r('sys.symbol.heart_fill') : $r('sys.symbol.heart'))
-                        .fontSize(14).fontColor([item.liked ? '#ef233c' : '#77777f'])
-                      Text(`${item.likedCount}`).fontSize(10).fontColor(item.liked ? '#ef233c' : '#77777f')
-                    }
-                    .padding({ left: 6, right: 4, top: 5, bottom: 5 })
-                    .onClick(() => this.toggleCommentLike(item))
-                  }
-                  Text(item.content).fontSize(13).fontColor('#ededf0').lineHeight(20)
-                }
-                .layoutWeight(1).alignItems(HorizontalAlign.Start)
-              }
-              .padding({ left: 18, right: 18, bottom: 6 })
-            }
-          })
-          if (this.commentHasMore) {
-            ListItem() {
-              Row() {
-                if (this.commentLoadingMore) {
-                  LoadingProgress().width(20).height(20).color('#ef233c')
-                }
-                Text(this.commentLoadingMore ? '加载中…' : '上滑加载更多')
-                  .fontSize(12).fontColor('#77777f').margin({ left: 8 })
-              }
-              .width('100%').justifyContent(FlexAlign.Center).padding({ top: 12, bottom: 12 })
-            }
-          }
-        }
-        .layoutWeight(1)
-        .onReachEnd(() => this.loadComments(false))
-      }
-      Row({ space: 10 }) {
-        TextInput({ text: this.commentInput, placeholder: '写下你对这张专辑的评论…' })
-          .layoutWeight(1).height(42).fontSize(13).fontColor('#ffffff')
-          .placeholderColor('#66666e').backgroundColor('#25252b').borderRadius(18)
-          .onChange((value: string) => this.commentInput = value)
-          .onSubmit(() => this.submitAlbumComment())
-        Button(this.commentSubmitting ? '发送中' : '发送')
-          .height(40).fontSize(12).fontColor('#ffffff').backgroundColor('#ef233c')
-          .borderRadius(18).enabled(!this.commentSubmitting && this.commentInput.trim().length > 0)
-          .onClick(() => this.submitAlbumComment())
-      }
-      .width('100%').padding({ left: 14, right: 14, top: 8, bottom: 12 })
-    }
-    .width('100%').height('100%')
-  }
 
   build() {
     NavDestination() {

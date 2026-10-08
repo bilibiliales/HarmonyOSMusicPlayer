@@ -1,3 +1,8 @@
+import { SongMetadataCache } from './SongMetadataCache'
+import { fileIo } from '@kit.CoreFileKit'
+import { LocalLibrary } from './LocalLibrary'
+import { audio } from '@kit.AudioKit'
+import { ApiClient } from './ApiClient'
 import { UIContext } from '@kit.ArkUI'
 import { common } from '@kit.AbilityKit'
 import { avSession } from '@kit.AVSessionKit'
@@ -10,12 +15,19 @@ import { PlaybackAction, PlaybackControlBridge } from './PlaybackControlBridge'
 import { ListeningScrobble } from './ListeningScrobble'
 import { SongAudioResource, SongQualityService } from './SongQualityService'
 import { MemoryAudioLoad } from './MemoryAudioSource'
+import { RadioService } from './RadioService'
 import { CloudService } from './CloudService'
 
 export class PlayerController {
   private static instance: PlayerController = new PlayerController()
 
   static getInstance(): PlayerController { return PlayerController.instance }
+  private localFiles: Map<media.AVPlayer, fileIo.File> = new Map()
+  private closeLocalFile(player: media.AVPlayer): void {
+    const file = this.localFiles.get(player)
+    if (file) { this.localFiles.delete(player); try { fileIo.closeSync(file) } catch (_error) {} }
+  }
+
   private player?: media.AVPlayer
   private store?: PlayerStore
   private shouldAutoPlay: boolean = false
@@ -27,6 +39,14 @@ export class PlayerController {
   private loadingSongId: string = ''
   private playerGeneration: number = 0
   private playerCreation?: Promise<media.AVPlayer>
+  private metadataRevision: number = 0
+  private desktopSessionEnabled: boolean = false
+  private desktopConfiguring: boolean = false
+  private metadataWrites: Promise<void> = Promise.resolve()
+  private desktopChanging: boolean = false
+  private sourceLocalUri: string = ''
+  private lyricSongId: string = ''
+  private systemLyric: string = ''
   private systemSession?: avSession.AVSession
   private systemSessionCreation?: Promise<avSession.AVSession>
   private lastSystemPositionSync: number = 0
@@ -59,6 +79,9 @@ export class PlayerController {
         }
         const session = this.systemSession
         this.systemSession = undefined
+        ++this.metadataRevision
+        this.desktopSessionEnabled = false
+        if (this.store) { this.store.desktopLyricsVisible = false }
         if (session) { await session.destroy() }
         await LiveViewController.stop()
         if (!this.foreground) { this.onAppBackground() }
@@ -250,6 +273,25 @@ export class PlayerController {
       }
     }
     this.systemSession = session
+    this.desktopSessionEnabled = false
+    try { session.onDesktopLyricVisibilityChanged((visible: boolean) => {
+      if (this.systemSession !== session) { return }
+      if (this.store) { this.store.desktopLyricsVisible = visible }
+      if (!this.desktopChanging && !this.desktopConfiguring) {
+        AppSettings.desktopLyricsEnabled = visible
+        AppSettings.saveFeature('desktop_lyrics_enabled', visible).catch(() => {})
+      }
+    })
+    } catch (_error) {}
+    try { session.onDesktopLyricStateChanged((state: avSession.DesktopLyricState) => {
+      if (this.systemSession !== session) { return }
+      if (this.store) { this.store.desktopLyricsLocked = state.isLocked }
+      if (!this.desktopChanging && !this.desktopConfiguring) {
+        AppSettings.desktopLyricsLocked = state.isLocked
+        AppSettings.saveFeature('desktop_lyrics_locked', state.isLocked).catch(() => {})
+      }
+    })
+    } catch (_error) {}
     if (this.released || !AppSettings.backgroundPlaybackEnabled) {
       this.systemSession = undefined
       await session.destroy()
@@ -265,8 +307,75 @@ export class PlayerController {
       await session.setBackgroundPlayMode(avSession.BackgroundPlayMode.ENABLE_BACKGROUND_PLAY)
     } catch (_error) {
     }
+    if (AppSettings.desktopLyricsEnabled) {
+      try { await this.configureDesktopLyrics(session, true, AppSettings.desktopLyricsLocked) }
+      catch (error) { this.log('DESKTOP_LYRICS_FAILED', String(error)) }
+    }
     this.log('AVSESSION_READY', `sessionId=${session.sessionId}`)
     return session
+  }
+
+  private async configureDesktopLyrics(session: avSession.AVSession, enabled: boolean, locked: boolean): Promise<void> {
+    if (!(await avSession.isDesktopLyricSupported())) { throw new Error('当前设备不支持系统桌面歌词') }
+    this.desktopConfiguring = true
+    try {
+      if (enabled && !this.desktopSessionEnabled) {
+        await session.enableDesktopLyric(true)
+        this.desktopSessionEnabled = true
+      }
+      if (!enabled && this.desktopSessionEnabled) { await session.setDesktopLyricVisible(false) }
+      if (enabled) {
+        await session.setDesktopLyricState({ isLocked: locked })
+        await session.setDesktopLyricVisible(true)
+      }
+    } finally { this.desktopConfiguring = false }
+  }
+
+  async refreshDesktopLyrics(): Promise<void> {
+    const session = this.systemSession
+    if (!session || !this.desktopSessionEnabled || !this.store) {
+      if (this.store) { this.store.desktopLyricsVisible = false }
+      return
+    }
+    const visible = await session.isDesktopLyricVisible()
+    const state = await session.getDesktopLyricState()
+    if (session !== this.systemSession) { return }
+    this.store.desktopLyricsVisible = visible
+    this.store.desktopLyricsLocked = state.isLocked
+  }
+
+  async setDesktopLyrics(enabled: boolean, locked: boolean): Promise<void> {
+    if (this.desktopChanging) { return }
+    if (enabled && !AppSettings.backgroundPlaybackEnabled) { throw new Error('请先开启后台播放以使用系统桌面歌词') }
+    this.desktopChanging = true
+    try {
+      const session = await this.ensureSystemSession()
+      if (session) { await this.configureDesktopLyrics(session, enabled, locked) }
+      else if (enabled) { throw new Error('媒体会话尚未就绪') }
+      await AppSettings.saveFeature('desktop_lyrics_enabled', enabled)
+      await AppSettings.saveFeature('desktop_lyrics_locked', locked)
+      AppSettings.desktopLyricsEnabled = enabled
+      AppSettings.desktopLyricsLocked = locked
+      if (enabled && this.store?.currentSong.id) {
+        this.syncSystemMetadata(this.store.currentSong)
+        await this.syncSystemPlayback(this.store.isPlaying ? avSession.PlaybackState.PLAYBACK_STATE_PLAY :
+          avSession.PlaybackState.PLAYBACK_STATE_PAUSE, this.store.position)
+      }
+    } finally {
+      try { await this.refreshDesktopLyrics() } catch (_error) {}
+      this.desktopChanging = false
+    }
+  }
+
+  async setEffects(enabled: boolean): Promise<void> {
+    const mode = enabled ? audio.AudioEffectMode.EFFECT_DEFAULT : audio.AudioEffectMode.EFFECT_NONE
+    const supported = await audio.getAudioManager().getStreamManager().getAudioEffectInfoArray(audio.StreamUsage.STREAM_USAGE_MUSIC)
+    if (!supported.includes(mode)) { throw new Error('当前输出设备不支持该音效模式') }
+    if (this.player && ['prepared', 'playing', 'paused', 'completed'].includes(this.player.state)) {
+      this.player.audioEffectMode = mode
+    }
+    await AppSettings.saveFeature('effects_enabled', enabled)
+    AppSettings.effectsEnabled = enabled
   }
 
   private handleSystemPlay(): void {
@@ -305,12 +414,40 @@ export class PlayerController {
     return avSession.LoopMode.LOOP_MODE_SHUFFLE
   }
 
+  private metadataCurrent(revision: number, song: songItemType, session: avSession.AVSession): boolean {
+    return revision === this.metadataRevision && !this.released && session === this.systemSession &&
+      this.store?.currentSong.id === song.id && this.store?.currentSong.localUri === song.localUri
+  }
+
+  private async writeMetadata(revision: number, song: songItemType, session: avSession.AVSession,
+    metadata: avSession.AVMetadata): Promise<void> {
+    const job = this.metadataWrites.catch(() => {}).then(async () => {
+      if (this.metadataCurrent(revision, song, session)) { await session.setAVMetadata(metadata) }
+    })
+    this.metadataWrites = job
+    await job
+  }
+
+  refreshLocalMetadata(song: songItemType): void {
+    if (!song.localUri || !this.store) { return }
+    this.store.queue = this.store.queue.map((item: songItemType) => item.localUri === song.localUri ? song : item)
+    if (this.store.currentSong.localUri === song.localUri) {
+      this.store.currentSong = song
+      this.sourceSongId = song.id
+      this.syncSystemMetadata(song)
+      LiveViewController.refresh(song, this.store.isPlaying, this.store.position, this.store.duration).catch(() => {})
+    }
+    this.persistState()
+  }
+
   private async syncSystemMetadata(song: songItemType): Promise<void> {
+    const revision = ++this.metadataRevision
     try {
       const session = await this.ensureSystemSession()
       if (!session) {
         return
       }
+      if (!this.metadataCurrent(revision, song, session)) { return }
       const metadata: avSession.AVMetadata = {
         assetId: song.id,
         title: song.name,
@@ -318,10 +455,27 @@ export class PlayerController {
         album: song.album || '',
         duration: song.duration || this.store?.duration || 0,
         mediaImage: song.img || '',
+        lyric: this.lyricSongId === song.id + (song.localUri || '') ? this.systemLyric : '',
         previousAssetId: this.store && this.store.queue.length > 1 ? 'previous' : undefined,
         nextAssetId: this.store && this.store.queue.length > 1 ? 'next' : undefined
       }
-      await session.setAVMetadata(metadata)
+      await this.writeMetadata(revision, song, session, metadata)
+      if (!song.isDifm && !song.programId) {
+        try {
+          const response = await SongMetadataCache.lyrics(song)
+          if (!this.metadataCurrent(revision, song, session)) { return }
+          this.lyricSongId = song.id + (song.localUri || '')
+          this.systemLyric = SongMetadataCache.lrc(response)
+          metadata.lyric = this.systemLyric
+          await this.writeMetadata(revision, song, session, metadata)
+          if (this.metadataCurrent(revision, song, session) && metadata.lyric) {
+            const controller = await session.getController()
+            const received = await controller.getAVMetadata()
+            this.log('SYSTEM_LRC_READBACK', 'songId=' + received.assetId + ' chars=' +
+              (received.lyric || '').length + ' lines=' + (received.lyric || '').split('\n').length)
+          }
+        } catch (error) { this.log('DESKTOP_LYRIC_LOAD_FAILED', error instanceof Error ? error.message : 'unknown') }
+      }
     } catch (error) {
       this.log('AVSESSION_METADATA_FAILED', error instanceof Error ? error.message : 'unknown error')
     }
@@ -396,6 +550,7 @@ export class PlayerController {
     if (this.player) {
       try {
         await player.release()
+        this.closeLocalFile(player)
       } catch (_error) {
       }
       return this.player
@@ -482,6 +637,8 @@ export class PlayerController {
       }
       const expectedDuration = this.store.currentSong.duration
       player.loop = false
+      try { player.audioEffectMode = AppSettings.effectsEnabled ? audio.AudioEffectMode.EFFECT_DEFAULT : audio.AudioEffectMode.EFFECT_NONE }
+      catch (error) { this.log('AUDIO_EFFECT_FAILED', String(error)) }
       this.store.duration = Math.max(0, player.duration)
       this.store.isLoading = false
       this.loadingSongId = ''
@@ -579,8 +736,10 @@ export class PlayerController {
       this.log('RELEASE_OLD_PLAYER', `requestToken=${requestToken} generation=${oldGeneration} state=${player.state}`)
       try {
         await player.release()
+        this.closeLocalFile(player)
         this.log('OLD_PLAYER_RELEASED', `requestToken=${requestToken} generation=${oldGeneration}`)
       } catch (error) {
+        this.closeLocalFile(player)
         this.log('OLD_PLAYER_RELEASE_FAILED', `requestToken=${requestToken} generation=${oldGeneration} message=${error instanceof Error ? error.message : 'unknown error'}`)
       }
     }
@@ -599,6 +758,12 @@ export class PlayerController {
     let resource: SongAudioResource | undefined
     if (song.isCloud) {
       resource = await CloudService.playback(song.id)
+    } else if (song.isDifm) {
+      if (!/^https?:\/\//i.test(song.url)) { throw new Error('频道音源已失效，请返回音乐电台刷新曲目') }
+      resource = { url: song.url, requestedLevel: '', selectedLevel: '', actualLevel: '',
+        size: 0, type: '', encodeType: '', trial: false }
+    } else if (song.programId) {
+      resource = await RadioService.audio(song.id)
     } else if (song.isVoice) {
       resource = await SongQualityService.playbackAtLevel(song.id, 'standard')
       if (!resource && song.url) {
@@ -626,7 +791,7 @@ export class PlayerController {
     const safeIndex = Math.max(0, Math.min(index, this.store.queue.length - 1))
     const song = this.store.queue[safeIndex]
     this.log('PLAY_AT_START', `targetSongId=${song.id} targetName=${song.name} index=${safeIndex} autoPlay=${autoPlay} forceReload=${forceReload} sourceSongId=${this.sourceSongId} loadingSongId=${this.loadingSongId}`)
-    if (!forceReload && this.hasReusableSource(song.id)) {
+    if (!forceReload && this.hasReusableSource(song.id) && this.sourceLocalUri === (song.localUri || '')) {
       this.log('REUSE_SOURCE', `songId=${song.id} index=${safeIndex} playerState=${this.player ? this.player.state : 'none'}`)
       this.store.selectAt(safeIndex, true)
       this.store.errorMessage = ''
@@ -646,6 +811,7 @@ export class PlayerController {
     }
 
     const requestToken = ++this.playRequestToken
+    this.sourceLocalUri = song.localUri || ''
     this.cancelAudioLoad()
     if (!forceReload) { this.scrobble.reset() }
     this.store.actualQuality = ''
@@ -678,6 +844,20 @@ export class PlayerController {
     this.loadingSongId = song.id
     this.shouldAutoPlay = autoPlay
     try {
+      if (song.localUri) {
+        const file = await LocalLibrary.open(song.localUri, song.localManaged)
+        let attached = false
+        try {
+          const stat = await fileIo.stat(file.fd)
+          if (requestToken !== this.playRequestToken || !this.isCurrentPlayer(player, generation)) { return }
+          if (!stat.size) { throw new Error('本地音频文件为空') }
+          this.sourceSongId = song.id
+          this.localFiles.set(player, file)
+          attached = true
+          player.fdSrc = { fd: file.fd, offset: 0, length: stat.size }
+        } finally { if (!attached) { await fileIo.close(file) } }
+        return
+      }
       const resource = await this.resolveSongResource(song, requestToken)
       if (requestToken !== this.playRequestToken || this.store.currentSong.id !== song.id ||
         !this.isCurrentPlayer(player, generation)) {
@@ -728,7 +908,11 @@ export class PlayerController {
 
   async insertNext(songs: songItemType[]): Promise<void> {
     if (!this.store || songs.length === 0) { return }
-    if (!this.store.hasQueue()) { await this.setQueue(songs, 0, false); return }
+    if (!this.store.hasQueue()) {
+      this.store.setQueue(songs, 0, false)
+      this.persistState()
+      return
+    }
     const queue = this.store.queue.slice()
     queue.splice(this.store.currentIndex + 1, 0, ...songs)
     this.store.setQueue(queue, this.store.currentIndex, true)
@@ -884,6 +1068,10 @@ export class PlayerController {
   private async stopAndClearSource(): Promise<void> {
     const requestToken = ++this.playRequestToken
     this.cancelAudioLoad()
+    ++this.metadataRevision
+    this.lyricSongId = ''
+    this.systemLyric = ''
+    this.sourceLocalUri = ''
     this.sourceSongId = ''
     this.loadingSongId = ''
     this.shouldAutoPlay = false
@@ -902,7 +1090,9 @@ export class PlayerController {
       this.log('RELEASE_PLAYER_FOR_CLEAR', `requestToken=${requestToken} generation=${generation} state=${player.state}`)
       try {
         await player.release()
+        this.closeLocalFile(player)
       } catch (error) {
+        this.closeLocalFile(player)
         this.log('RELEASE_PLAYER_FOR_CLEAR_FAILED', `generation=${generation} message=${error instanceof Error ? error.message : 'unknown error'}`)
       }
     }

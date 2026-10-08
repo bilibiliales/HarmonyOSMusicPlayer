@@ -51,6 +51,40 @@ export struct SettingsPage {
   @State defaultOnlineQuality: string = AppSettings.defaultOnlineQuality
   @State defaultDownloadQuality: string = AppSettings.defaultDownloadQuality
   @State backgroundPlaybackEnabled: boolean = AppSettings.backgroundPlaybackEnabled
+  @State effectsEnabled: boolean = AppSettings.effectsEnabled
+  @State downloadSaveMode: string = AppSettings.downloadSaveMode
+  @State askDownloadSaveMode: boolean = AppSettings.askDownloadSaveMode
+
+  private async saveDownloadOption(mode: string, ask: boolean): Promise<void> {
+    try {
+      await AppSettings.saveFeature('download_save_mode', mode)
+      await AppSettings.saveFeature('ask_download_save_mode', ask)
+      AppSettings.downloadSaveMode = mode
+      AppSettings.askDownloadSaveMode = ask
+      this.downloadSaveMode = mode
+      this.askDownloadSaveMode = ask
+    } catch (error) { BubbleTip.show(this.getUIContext(), error instanceof Error ? error.message : '保存失败') }
+  }
+
+  @State featureBusy: boolean = false
+
+  private async changeDesktop(enabled: boolean, locked: boolean): Promise<void> {
+    if (this.featureBusy) { return }
+    this.featureBusy = true
+    try {
+      await playerController.setDesktopLyrics(enabled, locked)
+    } catch (error) { BubbleTip.show(this.getUIContext(), error instanceof Error ? error.message : '桌面歌词设置失败') }
+    finally { this.featureBusy = false }
+  }
+
+  private async changeEffects(enabled: boolean): Promise<void> {
+    if (this.featureBusy) { return }
+    this.featureBusy = true
+    try { await playerController.setEffects(enabled); this.effectsEnabled = enabled }
+    catch (error) { BubbleTip.show(this.getUIContext(), error instanceof Error ? error.message : '音效设置失败') }
+    finally { this.featureBusy = false }
+  }
+
   @State changingPlayback: boolean = false
 
   aboutToDisappear(): void { this.privacyRequest++; this.privacyVisible = false }
@@ -230,8 +264,42 @@ export struct SettingsPage {
                     .onClick(() => this.defaultPlayMode = mode)
                 })
               }.width('100%')
+              Row() {
+                Text('系统桌面歌词').fontSize(14).fontColor('#ffffff').layoutWeight(1)
+                Toggle({ type: ToggleType.Switch, isOn: this.playerStore.desktopLyricsVisible })
+                  .selectedColor('#ef233c').enabled(!this.featureBusy)
+                  .onChange((enabled: boolean) => this.changeDesktop(enabled, this.playerStore.desktopLyricsLocked))
+              }.width('100%')
+              Row() {
+                Text('锁定桌面歌词').fontSize(14).fontColor('#ffffff').layoutWeight(1)
+                Toggle({ type: ToggleType.Switch, isOn: this.playerStore.desktopLyricsLocked })
+                  .selectedColor('#ef233c').enabled(this.playerStore.desktopLyricsVisible && !this.featureBusy)
+                  .onChange((locked: boolean) => this.changeDesktop(this.playerStore.desktopLyricsVisible, locked))
+              }.width('100%')
+              Text('桌面歌词需要开启后台播放；外观与媒体控制由系统提供。').fontSize(11).fontColor('#9999a4')
+              Row() {
+                Text('系统音效').fontSize(14).fontColor('#ffffff').layoutWeight(1)
+                Toggle({ type: ToggleType.Switch, isOn: this.effectsEnabled })
+                  .selectedColor('#ef233c').enabled(!this.featureBusy)
+                  .onChange((enabled: boolean) => this.changeEffects(enabled))
+              }.width('100%')
+              Text('使用设备默认音效，关闭后使用原始音频。当前系统未开放多频段均衡器调节。').fontSize(11).fontColor('#9999a4')
               Text('在线播放音质').width('100%').fontSize(12).fontColor('#b9b9c0')
               QualitySelector({ selected: $defaultOnlineQuality })
+              Text('下载保存方式').width('100%').fontSize(14).fontColor('#ffffff')
+              Row({ space: 12 }) {
+                Button('下载目录').fontSize(12).backgroundColor(this.downloadSaveMode === 'download' ? '#ef233c' : '#29292f')
+                  .onClick(() => this.saveDownloadOption('download', this.askDownloadSaveMode))
+                Button('另存为').fontSize(12).backgroundColor(this.downloadSaveMode === 'saveAs' ? '#ef233c' : '#29292f')
+                  .onClick(() => this.saveDownloadOption('saveAs', this.askDownloadSaveMode))
+              }
+              Row() {
+                Text('下载前询问保存方式').layoutWeight(1).fontSize(14).fontColor('#ffffff')
+                Toggle({ type: ToggleType.Switch, isOn: this.askDownloadSaveMode })
+                  .onChange((value: boolean) => this.saveDownloadOption(this.downloadSaveMode, value))
+              }.width('100%')
+              Text('下载目录支持自动扫描；另存文件会记住位置，授权失效时请在本地音乐中重新选择文件。')
+                .fontSize(11).fontColor('#9999a4')
               Text('下载音质').width('100%').fontSize(12).fontColor('#b9b9c0')
               QualitySelector({ selected: $defaultDownloadQuality })
               Button('保存默认播放设置').width('100%').height(46).borderRadius(23)
@@ -265,6 +333,7 @@ export struct SettingsPage {
         }.width('100%').layoutWeight(1)
       }.width('100%').height('100%').backgroundColor('#121215')
     }.hideTitleBar(true).onShown(() => {
+      playerController.refreshDesktopLyrics().catch(() => {})
       this.privacyVisible = true
       this.loadPrivacySettings()
     }).onHidden(() => this.privacyVisible = false)

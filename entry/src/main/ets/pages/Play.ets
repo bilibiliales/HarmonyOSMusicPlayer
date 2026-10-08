@@ -1,3 +1,12 @@
+import { ResourceComments } from '../components/ResourceComments'
+import { CommentResource } from '../models/CommentResource'
+import { CommentService } from '../services/CommentService'
+import { connection } from '@kit.NetworkKit'
+import { SongMetadataCache } from '../services/SongMetadataCache'
+import { LocalLibrary } from '../services/LocalLibrary'
+import { LyricPreferences } from '../models/lyricPreferences'
+import { LyricSettingsSheet } from '../components/LyricSettingsSheet'
+import { RadioPageParam } from '../models/radio'
 import { common } from '@kit.AbilityKit'
 import { fileIo, fileUri, picker } from '@kit.CoreFileKit'
 import { photoAccessHelper } from '@kit.MediaLibraryKit'
@@ -11,14 +20,13 @@ import {
   LikeListResponse,
   LyricResponse,
   mapApiSong,
-  mapComment,
   mapPlaylist,
   SharePageParam,
   SongDetailResponse,
   SongRedCountResponse,
   UserPlaylistResponse
 } from '../models/api'
-import { MusicComment, PlayMode, playlistType, QualityOption, SongArtist, songItemType } from '../models/music'
+import { PlayMode, playlistType, QualityOption, SongArtist, songItemType } from '../models/music'
 import { ApiClient } from '../services/ApiClient'
 import { SongQualityService } from '../services/SongQualityService'
 import { AudioFileFormat } from '../services/AudioFileFormat'
@@ -39,11 +47,9 @@ export struct Play {
   @Consume('authStore') authStore: AuthStore
 
   @State activeSheet: string = ''
-  @State comments: MusicComment[] = []
+  @State commentsVisible: boolean = false
+  @State commentTarget: CommentResource = { id: '', type: 0 }
   @State playlists: playlistType[] = []
-  @State commentsLoading: boolean = false
-  @State commentInput: string = ''
-  @State commentSubmitting: boolean = false
   @State liked: boolean = false
   @State vinylDiameter: number = 280
   @State downloadProgress: number = 0
@@ -58,6 +64,7 @@ export struct Play {
   @State pageReloading: boolean = false
   @State lyricUserScrolling: boolean = false
   @State lyricProgressPosition: number = 0
+  @State lyricAppearance: LyricPreferences = AppSettings.lyricPreferences
   @State redCount: number = 0
   @State redCountLoading: boolean = false
   @State vinylOffsetX: number = 0
@@ -78,16 +85,16 @@ export struct Play {
   @State coverPreviewVisible: boolean = false
   @State coverSaving: boolean = false
   @State coverMessage: string = ''
-  @State commentPage: number = 0
-  @State commentHasMore: boolean = true
-  @State commentLoadingMore: boolean = false
   @State progressSeeking: boolean = false
   @State seekPreviewPosition: number = 0
   private shareParam: SharePageParam = { type: 'song', id: '', name: '', img: '' }
   private lyricTimer: number = -1
   private lyricResumeTimer: number = -1
   private lyricAutoScrollTimer: number = -1
+  @State networkAvailable: boolean = true
+  private lastNetworkCheck: number = 0
   private loadedLyricSongId: string = ''
+  private lyricLoadRevision: number = 0
   private loadedRedSongId: string = ''
   private loadedQualitySongId: string = ''
   private likedSongIds: string[] = []
@@ -105,8 +112,9 @@ export struct Play {
       this.pageStack.pop()
       return
     }
+    this.checkNetwork()
     this.liked = this.playerStore.currentSong.liked || false
-    this.loadComments()
+    this.loadCommentSummary()
     this.loadRedCount()
     this.loadMusicQualities()
     this.loadLikedState()
@@ -157,12 +165,13 @@ export struct Play {
     }
     this.lyricTimer = setInterval(() => {
       if (!this.playerStore.hasQueue()) { return }
-      if (this.loadedLyricSongId !== this.playerStore.currentSong.id && !this.lyricsLoading) {
+      if (Date.now() - this.lastNetworkCheck > 1000) { this.checkNetwork() }
+      if (this.loadedLyricSongId !== this.lyricKey()) {
         this.loadLyrics()
         this.loadRedCount()
         this.loadMusicQualities()
         this.loadLikedState()
-        this.loadComments()
+        this.loadCommentSummary()
         return
       }
       if (this.showLyrics && this.preciseLyricsLoaded) {
@@ -305,9 +314,36 @@ export struct Play {
     })
   }
 
+  private checkNetwork(): void {
+    this.lastNetworkCheck = Date.now()
+    try { this.networkAvailable = connection.hasDefaultNetSync() } catch (_error) { this.networkAvailable = false }
+  }
+
+  private lyricKey(): string {
+    const song = this.playerStore.currentSong
+    return song.id + (song.localUri || '') + (song.localLrc || '') + (song.localYrc || '')
+  }
+
+  private isNonCatalogAudio(): boolean {
+    return (!!this.playerStore.currentSong.localUri && (!/^\d+$/.test(this.playerStore.currentSong.id) || !this.networkAvailable)) || !!this.playerStore.currentSong.programId || this.playerStore.currentSong.isDifm === true
+  }
+
+  private openAudioDetails(): void {
+    const song = this.playerStore.currentSong
+    this.activeSheet = ''
+    if (song.localUri) { this.pageStack.pushPathByName('LocalMusicPage', null); return }
+    if (song.programId) {
+      const param: RadioPageParam = { id: song.programId }
+      this.pageStack.pushPathByName('RadioProgramPage', param)
+    } else {
+      this.pageStack.pushPathByName('DifmPage', null)
+    }
+  }
+
   private async loadLyrics(): Promise<void> {
-    const songId = this.playerStore.currentSong.id
-    this.loadedLyricSongId = songId
+    const revision = ++this.lyricLoadRevision
+    const key = this.lyricKey()
+    this.loadedLyricSongId = key
     this.lyricsLoading = true
     this.lyricMessage = ''
     this.lyricCanRetry = false
@@ -315,11 +351,14 @@ export struct Play {
     this.currentLyricIndex = -1
     this.lyricProgressPosition = this.playerStore.position
     this.preciseLyricsLoaded = false
+    if (this.isNonCatalogAudio() && !this.playerStore.currentSong.localUri) {
+      this.lyricMessage = this.playerStore.currentSong.localUri ? '本地音频暂无歌词' : '电台音源暂无歌词'
+      this.lyricsLoading = false
+      return
+    }
     try {
-      const response = await ApiClient.get<LyricResponse>('/lyric/new', [
-        { key: 'id', value: songId }
-      ])
-      if (songId !== this.playerStore.currentSong.id) {
+      const response = await SongMetadataCache.lyrics(this.playerStore.currentSong)
+      if (revision !== this.lyricLoadRevision || key !== this.lyricKey()) {
         return
       }
       if (response.code !== 200 || response.nolyric || response.uncollected ||
@@ -342,18 +381,20 @@ export struct Play {
         }
       }
     } catch (error) {
-      if (songId === this.playerStore.currentSong.id) {
+      if (revision === this.lyricLoadRevision) {
         this.lyricMessage = error instanceof Error ? error.message : '歌词加载失败'
         this.lyricCanRetry = true
       }
     } finally {
-      if (songId === this.playerStore.currentSong.id) {
+      if (revision === this.lyricLoadRevision) {
         this.lyricsLoading = false
       }
     }
   }
 
   private async reloadSongPage(): Promise<void> {
+    if (this.playerStore.currentSong.localUri) { await this.loadLyrics(); return }
+    if (this.isNonCatalogAudio()) { this.openAudioDetails(); return }
     if (this.pageReloading || !this.playerStore.currentSong.id) {
       return
     }
@@ -375,7 +416,7 @@ export struct Play {
       await this.loadLyrics()
       this.loadRedCount()
       this.loadMusicQualities()
-      this.loadComments()
+      this.loadCommentSummary()
       BubbleTip.show(this.getUIContext(), '歌曲页面已重新加载')
     } catch (error) {
       BubbleTip.show(this.getUIContext(), error instanceof Error ? error.message : '重新加载失败')
@@ -388,7 +429,7 @@ export struct Play {
     let low = 0
     let high = this.lyricLines.length - 1
     let result = -1
-    const target = position + 120
+    const target = position + this.lyricAppearance.offset * 1000 + 120
     while (low <= high) {
       const middle = Math.floor((low + high) / 2)
       if (this.lyricLines[middle].time <= target) {
@@ -458,7 +499,7 @@ export struct Play {
     this.showLyrics = true
     this.lyricsImmersive = false
     this.lyricProgressPosition = this.playerStore.position
-    if (this.loadedLyricSongId !== this.playerStore.currentSong.id) {
+    if (this.loadedLyricSongId !== this.lyricKey()) {
       this.loadLyrics()
     }
     setTimeout(() => this.scrollToCurrentLyric(false), 100)
@@ -508,14 +549,14 @@ export struct Play {
     }
     this.lyricUserScrolling = false
     this.currentLyricIndex = index
-    this.lyricProgressPosition = line.time
-    playerController.seek(line.time)
+    this.lyricProgressPosition = Math.max(0, line.time - this.lyricAppearance.offset * 1000)
+    playerController.seek(Math.max(0, line.time - this.lyricAppearance.offset * 1000))
     this.scrollToCurrentLyric(true)
   }
 
   private lyricColor(index: number): string {
     if (index === this.currentLyricIndex) {
-      return '#ffffff'
+      return this.lyricAppearance.highlight
     }
     if (index < this.currentLyricIndex) {
       return 'rgba(255,255,255,0.25)'
@@ -547,9 +588,9 @@ export struct Play {
     }
     const relativeIndex = index - this.currentLyricIndex
     if (relativeIndex < 0) {
-      return -Math.min(Math.abs(relativeIndex), 6) * 18
+      return -Math.min(Math.abs(relativeIndex), 6) * 18 * this.lyricAppearance.amplitude
     }
-    return Math.min(relativeIndex, 6) * 16
+    return Math.min(relativeIndex, 6) * 16 * this.lyricAppearance.amplitude
   }
 
   private lyricLineOpacity(index: number): number {
@@ -561,23 +602,23 @@ export struct Play {
 
   private lyricLineScale(index: number): number {
     if (index === this.currentLyricIndex) {
-      return 1.08
+      return 1 + 0.08 * this.lyricAppearance.amplitude
     }
-    return Math.max(0.92, 0.975 - Math.min(this.lyricLineDistance(index), 3) * 0.018)
+    return 1 - (1 - Math.max(0.92, 0.975 - Math.min(this.lyricLineDistance(index), 3) * 0.018)) * this.lyricAppearance.amplitude
   }
 
   private lyricFontSize(index: number): number {
     if (index === this.currentLyricIndex) {
-      return 28
+      return this.lyricAppearance.fontSize + 9
     }
-    return 19
+    return this.lyricAppearance.fontSize
   }
 
   private lyricLineHeight(index: number): number {
     if (index === this.currentLyricIndex) {
-      return 39
+      return this.lyricAppearance.fontSize + 20
     }
-    return 30
+    return this.lyricAppearance.fontSize + 11
   }
 
   private hasPreciseLyrics(): boolean {
@@ -586,11 +627,11 @@ export struct Play {
 
   private lyricCharacterProgress(word: LyricWord, characterIndex: number, characterCount: number): number {
     if (characterCount <= 0 || word.duration <= 0) {
-      return this.lyricProgressPosition >= word.start ? 1 : 0
+      return this.lyricProgressPosition + this.lyricAppearance.offset * 1000 >= word.start ? 1 : 0
     }
     const characterDuration = word.duration / characterCount
     const characterStart = word.start + characterDuration * characterIndex
-    return Math.max(0, Math.min(1, (this.lyricProgressPosition - characterStart) / characterDuration))
+    return Math.max(0, Math.min(1, (this.lyricProgressPosition + this.lyricAppearance.offset * 1000 - characterStart) / characterDuration))
   }
 
   @Builder
@@ -608,7 +649,7 @@ export struct Play {
               Text(character)
                 .fontSize(this.lyricFontSize(index))
                 .fontWeight(FontWeight.Bold)
-                .fontColor('#ef233c')
+                .fontColor(this.lyricAppearance.highlight)
                 .lineHeight(this.lyricLineHeight(index))
                 .clipShape(new RectShape({
                   width: `${this.lyricCharacterProgress(word, characterIndex, word.text.length) * 100}%`,
@@ -640,6 +681,12 @@ export struct Play {
   }
 
   private async loadRedCount(): Promise<void> {
+    if (this.isNonCatalogAudio()) {
+      this.loadedRedSongId = this.playerStore.currentSong.id
+      this.redCount = 0
+      this.redCountLoading = false
+      return
+    }
     const songId = this.playerStore.currentSong.id
     if (this.redCountLoading && this.loadedRedSongId === songId) {
       return
@@ -675,6 +722,14 @@ export struct Play {
   }
 
   private async loadMusicQualities(): Promise<void> {
+    if (this.playerStore.currentSong.localUri) { return }
+    if (this.isNonCatalogAudio()) {
+      this.qualityRequestToken++
+      this.loadedQualitySongId = this.playerStore.currentSong.id
+      this.availableQualities = []
+      this.qualityLoading = false
+      return
+    }
     const songId = this.playerStore.currentSong.id
     if (!songId || (this.qualityLoading && this.loadedQualitySongId === songId)) { return }
     const token = ++this.qualityRequestToken
@@ -697,11 +752,14 @@ export struct Play {
   }
 
   private openQualitySheet(): void {
+    if (this.playerStore.currentSong.localUri) { BubbleTip.show(this.getUIContext(), '本地文件使用原始音质'); return }
+    if (this.isNonCatalogAudio()) { this.openAudioDetails(); return }
     this.activeSheet = 'quality'
     this.loadMusicQualities()
   }
 
   private async openDownloadQualitySheet(): Promise<void> {
+    if (this.isNonCatalogAudio()) { this.openAudioDetails(); return }
     if (this.downloading) {
       BubbleTip.show(this.getUIContext(), `正在下载 · ${this.downloadProgress}%`)
       return
@@ -731,6 +789,7 @@ export struct Play {
   }
 
   private async loadLikedState(): Promise<void> {
+    if (this.isNonCatalogAudio()) { this.likeListRequestToken++; this.liked = false; return }
     const songId = this.playerStore.currentSong.id
     if (!this.authStore.loggedIn || !this.authStore.userId) {
       this.liked = this.playerStore.currentSong.liked || false
@@ -760,6 +819,7 @@ export struct Play {
   }
 
   private async toggleLike(): Promise<void> {
+    if (this.isNonCatalogAudio()) { this.openAudioDetails(); return }
     if (!this.authStore.loggedIn) {
       this.pageStack.pushPathByName('LoginPage', null)
       return
@@ -788,98 +848,54 @@ export struct Play {
     }
   }
 
-  private async loadComments(reset: boolean = true): Promise<void> {
-    if (reset) {
-      this.commentPage = 0
-      this.commentHasMore = true
-      this.commentsLoading = true
-    } else {
-      if (!this.commentHasMore || this.commentLoadingMore) {
-        return
-      }
-      this.commentLoadingMore = true
-    }
-    try {
-      const limit = 30
-      const offset = this.commentPage * limit
-      const response = await ApiClient.get<CommentResponse>('/comment/music', [
-        { key: 'id', value: this.playerStore.currentSong.id },
-        { key: 'limit', value: limit.toString() },
-        { key: 'offset', value: offset.toString() }
-      ])
-      const newComments = (response.comments || []).map((item) => mapComment(item))
-      const hotComments = (response.hotComments || []).map((item) => mapComment(item))
-      if (reset) {
-        this.comments = hotComments.length > 0 ? [...hotComments, ...newComments] : newComments
-      } else {
-        this.comments = [...this.comments, ...newComments]
-      }
-      this.commentHasMore = this.comments.length < (response.total || 0)
-      this.commentPage++
-      this.playerStore.currentSong.commentCount = response.total || this.comments.length
-    } catch (_error) {
-      if (reset) {
-        this.comments = []
-      }
-    } finally {
-      this.commentsLoading = false
-      this.commentLoadingMore = false
-    }
+
+
+
+  private currentCommentResource(): CommentResource {
+    const song = this.playerStore.currentSong
+    return { id: song.programId || song.id, type: song.programId ? 4 : 0, title: song.name }
   }
 
-  private async toggleCommentLike(comment: MusicComment): Promise<void> {
-    if (!this.authStore.loggedIn) {
-      this.pageStack.pushPathByName('LoginPage', null)
-      return
-    }
-    const nextLiked = !comment.liked
-    try {
-      const response = await ApiClient.get<CommentResponse>('/comment/like', [
-        { key: 'id', value: this.playerStore.currentSong.id },
-        { key: 'cid', value: comment.commentId },
-        { key: 'type', value: '0' },
-        { key: 't', value: nextLiked ? '1' : '0' }
-      ])
-      if (response.code === 200) {
-        comment.liked = nextLiked
-        comment.likedCount = Math.max(0, comment.likedCount + (nextLiked ? 1 : -1))
-        this.comments = this.comments.map((item: MusicComment) => item)
-      }
-    } catch (error) {
-      BubbleTip.show(this.getUIContext(), error instanceof Error ? error.message : '评论点赞失败')
-    }
+  private canComment(): boolean {
+    const song = this.playerStore.currentSong
+    return song.isDifm !== true && /^\d+$/.test(song.programId || song.id) &&
+      (!song.localUri || this.networkAvailable)
   }
 
-  private async submitSongComment(): Promise<void> {
-    const content = this.commentInput.trim()
-    if (!content || this.commentSubmitting) {
-      return
-    }
-    if (!this.authStore.loggedIn) {
-      this.pageStack.pushPathByName('LoginPage', null)
-      return
-    }
-    this.commentSubmitting = true
+  private async loadCommentSummary(): Promise<void> {
+    if (!this.canComment()) { return }
+    const resource = this.currentCommentResource()
     try {
-      const response = await ApiClient.get<CommentResponse>('/comment', [
-        { key: 't', value: '1' },
-        { key: 'type', value: '0' },
-        { key: 'id', value: this.playerStore.currentSong.id },
-        { key: 'content', value: content }
-      ])
-      if (response.code === 200) {
-        this.commentInput = ''
-        this.playerStore.currentSong.commentCount = (this.playerStore.currentSong.commentCount || 0) + 1
-        await this.loadComments()
+      const total = await CommentService.count(resource)
+      const current = this.currentCommentResource()
+      if (resource.id === current.id && resource.type === current.type) {
+        this.playerStore.currentSong.commentCount = total
       }
-    } catch (error) {
-      BubbleTip.show(this.getUIContext(), error instanceof Error ? error.message : '评论发送失败')
-    } finally {
-      this.commentSubmitting = false
-    }
+    } catch (_error) {}
+  }
+
+  private openComments(): void {
+    if (!this.canComment()) { return }
+    this.commentTarget = this.currentCommentResource()
+    this.commentsVisible = true
+  }
+
+  @Builder
+  private CommentsSheet() {
+    ResourceComments({
+      resource: this.commentTarget,
+      onClose: () => this.commentsVisible = false,
+      onCountChange: (total: number) => {
+        const current = this.currentCommentResource()
+        if (current.id === this.commentTarget.id && current.type === this.commentTarget.type) {
+          this.playerStore.currentSong.commentCount = total
+        }
+      }
+    })
   }
 
   private async openCollectSheet(): Promise<void> {
+    if (this.isNonCatalogAudio()) { this.openAudioDetails(); return }
     if (!this.authStore.loggedIn) {
       this.pageStack.pushPathByName('LoginPage', null)
       return
@@ -928,6 +944,14 @@ export struct Play {
     this.downloadProgress = 0
     let tempPath = ''
     try {
+      let saveMode = AppSettings.downloadSaveMode
+      if (AppSettings.askDownloadSaveMode) {
+        const result = await this.getUIContext().getPromptAction().showActionMenu({
+          title: '保存方式',
+          buttons: [{ text: '保存到下载目录', color: '#ef233c' }, { text: '另存为…', color: '#777777' }]
+        })
+        saveMode = result.index === 1 ? 'saveAs' : 'download'
+      }
       BubbleTip.show(this.getUIContext(), '正在获取下载地址…')
       const resource = await SongQualityService.download(song.id, level)
       const qualityTitle = SongQualityService.title(resource.actualLevel)
@@ -958,24 +982,10 @@ export struct Play {
         const extension = AudioFileFormat.extension(resource.url, resource.type, resource.encodeType,
           new Uint8Array(header, 0, bytesRead))
         const safeName = this.safeCoverFileName(`${song.name}-${song.author}`)
-        // Choose the destination after verifying the actual file format, then copy the bytes unchanged.
-        const audioPicker = new picker.AudioViewPicker(context)
-        const saveOptions = new picker.AudioSaveOptions()
-        saveOptions.newFileNames = [`${safeName}.${extension}`]
-        const uris = await audioPicker.save(saveOptions)
-        if (uris.length === 0) {
-          BubbleTip.show(this.getUIContext(), '已取消保存')
-          return
-        }
-        const target = fileIo.openSync(uris[0],
-          fileIo.OpenMode.CREATE | fileIo.OpenMode.READ_WRITE | fileIo.OpenMode.TRUNC)
-        try {
-          await fileIo.copyFile(tempPath, target.fd)
-        } finally {
-          fileIo.closeSync(target)
-        }
+        const saved = await LocalLibrary.saveDownload(context, tempPath, `${safeName}.${extension}`, song, saveMode)
+        if (!saved) { BubbleTip.show(this.getUIContext(), '已取消保存'); return }
         this.downloadProgress = 100
-        BubbleTip.show(this.getUIContext(), `下载完成：${safeName}.${extension} · ${qualityTitle}`)
+        BubbleTip.show(this.getUIContext(), `${saved} · ${qualityTitle}`)
       } finally {
         fileIo.closeSync(source)
       }
@@ -1063,6 +1073,7 @@ export struct Play {
   }
 
   private async openCurrentAlbum(): Promise<void> {
+    if (this.isNonCatalogAudio()) { this.openAudioDetails(); return }
     const song = this.playerStore.currentSong
     if (!song.id || !song.album) {
       return
@@ -1098,6 +1109,7 @@ export struct Play {
   }
 
   private shareSong(): void {
+    if (this.isNonCatalogAudio()) { this.openAudioDetails(); return }
     this.shareParam = {
       type: 'song',
       id: this.playerStore.currentSong.id,
@@ -1109,6 +1121,7 @@ export struct Play {
   }
 
   private openArtist(artist: SongArtist): void {
+    if (this.isNonCatalogAudio()) { this.openAudioDetails(); return }
     if (!artist.id || artist.id === '0') {
       return
     }
@@ -1171,7 +1184,7 @@ export struct Play {
       return
     }
     this.liked = this.playerStore.currentSong.liked || false
-    this.loadComments()
+    this.loadCommentSummary()
     this.loadLyrics()
     this.loadRedCount()
     this.loadMusicQualities()
@@ -1198,7 +1211,7 @@ export struct Play {
     await playerController.playAt(index, true)
     this.liked = this.playerStore.currentSong.liked || false
     this.activeSheet = ''
-    this.loadComments()
+    this.loadCommentSummary()
     this.loadLyrics()
     this.loadRedCount()
     this.loadMusicQualities()
@@ -1240,6 +1253,8 @@ export struct Play {
         .layoutWeight(1)
         .alignItems(HorizontalAlign.Start)
         Row({ space: 8 }) {
+          SymbolGlyph($r('sys.symbol.gearshape')).fontSize(18).fontColor(['#d9d9de'])
+            .onClick(() => this.activeSheet = 'lyricSettings')
           Row({ space: 5 }) {
             SymbolGlyph($r('sys.symbol.arrow_up_left_and_arrow_down_right'))
               .fontSize(14).fontColor([this.lyricsImmersive ? '#ff7b8b' : '#d9d9de'])
@@ -1289,7 +1304,7 @@ export struct Play {
         .justifyContent(FlexAlign.Center)
       } else {
         Stack() {
-          List({ space: this.lyricsImmersive ? 18 : 23, scroller: this.lyricScroller }) {
+          List({ space: this.lyricAppearance.spacing, scroller: this.lyricScroller }) {
             ListItem() {
               Column().height(this.lyricsImmersive ? this.topAvoidHeight + 58 : 175)
             }
@@ -1300,7 +1315,7 @@ export struct Play {
                     .width(index === this.currentLyricIndex ? 3 : 0)
                     .height(index === this.currentLyricIndex ? 28 : 0)
                     .borderRadius(2)
-                    .backgroundColor('#ef233c')
+                    .backgroundColor(this.lyricAppearance.highlight)
                   Column({ space: 5 }) {
                     this.PrimaryLyricText(line, index)
                     if (line.translation) {
@@ -1315,7 +1330,7 @@ export struct Play {
                   .alignItems(HorizontalAlign.Start)
                 }
                 .width('100%')
-                .padding({ left: 22, right: 22, top: 3, bottom: 3 })
+                .padding({ left: 22 + this.lyricAppearance.horizontal, right: 22, top: 3, bottom: 3 })
                 .opacity(this.lyricLineOpacity(index))
                 .scale({
                   x: this.lyricLineScale(index),
@@ -1552,99 +1567,6 @@ export struct Play {
     }
   }
 
-  @Builder
-  private CommentsSheet() {
-    Column() {
-      this.SheetHeader(`评论 · ${this.playerStore.currentSong.commentCount || this.comments.length}`, '热门评论与最新评论')
-      if (this.commentsLoading) {
-        LoadingProgress().layoutWeight(1).width(42).color('#ef233c')
-      } else if (this.comments.length === 0) {
-        Column({ space: 10 }) {
-          SymbolGlyph($r('sys.symbol.ellipsis_bubble'))
-            .fontSize(38)
-            .fontColor(['#55555d'])
-          Text('暂无评论，或后端服务暂不可用')
-            .fontSize(12)
-            .fontColor('#77777f')
-        }
-        .layoutWeight(1)
-        .justifyContent(FlexAlign.Center)
-      } else {
-        List({ space: 14 }) {
-          ForEach(this.comments, (item: MusicComment) => {
-            ListItem() {
-              Row({ space: 10 }) {
-                Image(item.user.avatarUrl)
-                  .width(36)
-                  .height(36)
-                  .borderRadius(18)
-                  .objectFit(ImageFit.Cover)
-                Column({ space: 6 }) {
-                  Row() {
-                    Column({ space: 2 }) {
-                      Text(item.user.nickname).fontSize(12).fontColor('#b9b9c0')
-                      Text(item.timeStr).fontSize(9).fontColor('#5f5f67')
-                    }
-                    .layoutWeight(1)
-                    .alignItems(HorizontalAlign.Start)
-                    Row({ space: 4 }) {
-                      SymbolGlyph(item.liked ? $r('sys.symbol.heart_fill') : $r('sys.symbol.heart'))
-                        .fontSize(14)
-                        .fontColor([item.liked ? '#ef233c' : '#77777f'])
-                      Text(`${item.likedCount}`)
-                        .fontSize(10)
-                        .fontColor(item.liked ? '#ef233c' : '#77777f')
-                    }
-                    .padding({ left: 6, right: 4, top: 5, bottom: 5 })
-                    .onClick(() => this.toggleCommentLike(item))
-                  }
-                  Text(item.content)
-                    .fontSize(13)
-                    .fontColor('#ededf0')
-                    .lineHeight(20)
-                }
-                .layoutWeight(1)
-                .alignItems(HorizontalAlign.Start)
-              }
-              .padding({ left: 18, right: 18, bottom: 6 })
-            }
-          })
-          if (this.commentHasMore) {
-            ListItem() {
-              Row() {
-                if (this.commentLoadingMore) {
-                  LoadingProgress().width(20).height(20).color('#ef233c')
-                }
-                Text(this.commentLoadingMore ? '加载中…' : '下拉加载更多')
-                  .fontSize(12)
-                  .fontColor('#77777f')
-                  .margin({ left: 8 })
-              }
-              .width('100%')
-              .justifyContent(FlexAlign.Center)
-              .padding({ top: 12, bottom: 12 })
-            }
-          }
-        }
-        .layoutWeight(1)
-        .onReachEnd(() => {
-          this.loadComments(false)
-        })
-      }
-      Row({ space: 10 }) {
-        TextInput({ text: this.commentInput, placeholder: '写下你对这首歌的评论…' })
-          .layoutWeight(1).height(42).fontSize(13).fontColor('#ffffff')
-          .placeholderColor('#66666e').backgroundColor('#25252b').borderRadius(18)
-          .onChange((value: string) => this.commentInput = value)
-          .onSubmit(() => this.submitSongComment())
-        Button(this.commentSubmitting ? '发送中' : '发送')
-          .height(40).fontSize(12).fontColor('#ffffff').backgroundColor('#ef233c')
-          .borderRadius(18).enabled(!this.commentSubmitting && this.commentInput.trim().length > 0)
-          .onClick(() => this.submitSongComment())
-      }
-      .width('100%').padding({ left: 14, right: 14, top: 8, bottom: 12 })
-    }
-  }
 
   @Builder
   private CollectSheet() {
@@ -1790,14 +1712,16 @@ export struct Play {
         .backgroundColor('rgba(0,0,0,0.58)')
         .onClick(() => this.closeSheet())
       Column() {
-        if (this.activeSheet === 'quality') {
+        if (this.activeSheet === 'lyricSettings') {
+          LyricSettingsSheet({ value: this.lyricAppearance,
+            onPreview: (value: LyricPreferences) => { this.lyricAppearance = value; this.updateCurrentLyric() },
+            onClose: () => this.closeSheet() })
+        } else if (this.activeSheet === 'quality') {
           this.QualitySheet()
         } else if (this.activeSheet === 'downloadQuality') {
           this.DownloadQualitySheet()
         } else if (this.activeSheet === 'queue') {
           this.QueueSheet()
-        } else if (this.activeSheet === 'comments') {
-          this.CommentsSheet()
         } else if (this.activeSheet === 'collect') {
           this.CollectSheet()
         } else if (this.activeSheet === 'more') {
@@ -1936,6 +1860,7 @@ export struct Play {
             .layoutWeight(1)
             .alignItems(HorizontalAlign.Start)
 
+            if (!this.isNonCatalogAudio()) {
             Column({ space: 3 }) {
               SymbolGlyph(this.liked ? $r('sys.symbol.heart_fill') : $r('sys.symbol.heart'))
                 .fontSize(27)
@@ -1944,19 +1869,19 @@ export struct Play {
                 .fontSize(9).fontColor('#9b9ba3')
             }
             .onClick(() => this.toggleLike())
+            }
 
+            if (this.canComment()) {
             Column({ space: 3 }) {
               SymbolGlyph($r('sys.symbol.ellipsis_bubble'))
                 .fontSize(25)
                 .fontColor(['#ffffff'])
-              Text((this.playerStore.currentSong.commentCount || this.comments.length).toString())
+              Text((this.playerStore.currentSong.commentCount || 0).toString())
                 .fontSize(9)
                 .fontColor('#9b9ba3')
             }
-            .onClick(() => {
-              this.activeSheet = 'comments'
-              this.loadComments()
-            })
+            .onClick(() => this.openComments())
+            }
             }
             .width('100%')
             .constraintSize({ minHeight: 70 })
@@ -1979,12 +1904,14 @@ export struct Play {
               Text(this.formatTime(this.progressPosition())).fontSize(10).fontColor('#92929a')
               Row({ space: 4 }) {
                 Text(this.playerStore.qualityTitle()).fontSize(10).fontColor('#d8d8dd')
-                SymbolGlyph($r('sys.symbol.chevron_up')).fontSize(10).fontColor(['#8d8d95'])
+                if (!this.isNonCatalogAudio()) {
+                  SymbolGlyph($r('sys.symbol.chevron_up')).fontSize(10).fontColor(['#8d8d95'])
+                }
               }
               .padding({ left: 8, right: 8, top: 4, bottom: 4 })
               .backgroundColor('rgba(255,255,255,0.08)')
               .borderRadius(10)
-              .onClick(() => this.openQualitySheet())
+              .onClick(() => { if (!this.isNonCatalogAudio()) { this.openQualitySheet() } })
               Text(this.formatTime(this.playerStore.duration)).fontSize(10).fontColor('#92929a')
             }
             .width('100%')
@@ -2045,12 +1972,16 @@ export struct Play {
             .alignItems(VerticalAlign.Center)
 
             Row() {
+            if (this.isNonCatalogAudio()) {
+              this.SmallAction($r('sys.symbol.info_circle'), this.playerStore.currentSong.localUri ? '本地音乐' : this.playerStore.currentSong.programId ? '节目详情' : '音乐电台', () => this.openAudioDetails())
+            } else {
             this.SmallAction($r('sys.symbol.folder_badge_plus'), '收藏歌单', () => this.openCollectSheet())
             this.SmallAction($r('sys.symbol.arrow_down_circle'), '下载', () => this.openDownloadQualitySheet())
             this.SmallAction($r('sys.symbol.arrow_right_up_and_square'), '分享', () => this.shareSong())
             this.SmallAction($r('sys.symbol.info_circle'), '歌曲百科', () => {
               this.pageStack.pushPathByName('SongWikiPage', this.playerStore.currentSong)
             })
+            }
             }
             .width('100%')
             .constraintSize({ minHeight: 60 })
@@ -2092,6 +2023,10 @@ export struct Play {
         .width('100%')
         .height('100%')
         .backgroundColor('#121215')
+        .bindSheet(this.commentsVisible, this.CommentsSheet(), {
+          height: '72%', backgroundColor: '#19191f', showClose: false, dragBar: true,
+          onDisappear: () => this.commentsVisible = false
+        })
     }
     .hideTitleBar(true)
   }
