@@ -135,8 +135,10 @@ export class LocalLibrary {
     return uris[0]
   }
 
-  static async saveDownload(context: common.UIAbilityContext, source: string, name: string,
-    song: songItemType, mode: string): Promise<string> {
+  // `write` streams the audio straight into the final file descriptor. No temp file
+  // and no whole-file copy: a 100 MB+ FLAC never needs a second on-disk duplicate.
+  static async saveDownload(context: common.UIAbilityContext, name: string,
+    song: songItemType, mode: string, write: (fd: number) => Promise<number>): Promise<string> {
     await LocalLibrary.init(context)
     let uri = ''
     const managed = mode === 'download'
@@ -162,14 +164,18 @@ export class LocalLibrary {
     const targetPath = managed ? new fileUri.FileUri(uri).path : uri
     const target = await fileIo.open(targetPath, fileIo.OpenMode.CREATE | fileIo.OpenMode.READ_WRITE |
       (managed ? 0 : fileIo.OpenMode.TRUNC))
-    let copied = false
-    try { await fileIo.copyFile(source, target.fd); copied = true }
-    finally {
+    let written = 0
+    let completed = false
+    try {
+      written = await write(target.fd)
+      completed = true
+    } finally {
       await fileIo.close(target)
-      if (!copied && managed) { try { await fileIo.unlink(targetPath) } catch (_error) {} }
+      if (!completed) { try { await fileIo.unlink(targetPath) } catch (_error) {} }
     }
-    const persistent = managed || await LocalLibrary.persist(uri)
     const stat = await fileIo.stat(targetPath)
+    if (stat.size <= 0 || stat.size !== written) { throw new Error('音频文件下载不完整，请重试') }
+    const persistent = managed || await LocalLibrary.persist(uri)
     const track: LocalTrack = { uri: uri, name: song.name, artist: song.author,
       size: stat.size, modified: stat.mtime, managed: managed, persistent: persistent, format: LocalLibrary.format(name), songId: /^\d+$/.test(song.id) ? song.id : undefined,
       album: song.album, albumId: song.albumId, artists: song.artists, duration: song.duration }

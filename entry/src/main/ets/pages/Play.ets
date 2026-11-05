@@ -8,10 +8,9 @@ import { LyricPreferences } from '../models/lyricPreferences'
 import { LyricSettingsSheet } from '../components/LyricSettingsSheet'
 import { RadioPageParam } from '../models/radio'
 import { common } from '@kit.AbilityKit'
-import { fileIo, fileUri, picker } from '@kit.CoreFileKit'
+import { fileIo, fileUri } from '@kit.CoreFileKit'
 import { photoAccessHelper } from '@kit.MediaLibraryKit'
 import { http } from '@kit.NetworkKit'
-import { request } from '@kit.BasicServicesKit'
 import curves from '@ohos.curves'
 import {
   AlbumPageParam,
@@ -30,6 +29,7 @@ import { PlayMode, playlistType, QualityOption, SongArtist, songItemType } from 
 import { ApiClient } from '../services/ApiClient'
 import { SongQualityService } from '../services/SongQualityService'
 import { AudioFileFormat } from '../services/AudioFileFormat'
+import { StreamingDownload } from '../services/StreamingAudio'
 import { playerController } from '../services/PlayerController'
 import { AuthStore } from '../stores/AuthStore'
 import { PlayerStore } from '../stores/PlayerStore'
@@ -79,6 +79,7 @@ export struct Play {
   @State downloadSongName: string = ''
   @State preferredDownloadLevel: string = ''
   @State downloading: boolean = false
+  private downloadTask?: StreamingDownload
   private downloadTarget?: songItemType
   private downloadQualityToken: number = 0
   private qualityRequestToken: number = 0
@@ -123,6 +124,8 @@ export struct Play {
   }
 
   aboutToDisappear(): void {
+    this.downloadTask?.cancel()
+    this.downloadTask = undefined
     if (this.lyricTimer !== -1) {
       clearInterval(this.lyricTimer)
       this.lyricTimer = -1
@@ -942,7 +945,8 @@ export struct Play {
     this.downloading = true
     this.activeSheet = ''
     this.downloadProgress = 0
-    let tempPath = ''
+    const task = new StreamingDownload()
+    this.downloadTask = task
     try {
       let saveMode = AppSettings.downloadSaveMode
       if (AppSettings.askDownloadSaveMode) {
@@ -955,47 +959,28 @@ export struct Play {
       BubbleTip.show(this.getUIContext(), '正在获取下载地址…')
       const resource = await SongQualityService.download(song.id, level)
       const qualityTitle = SongQualityService.title(resource.actualLevel)
+      // A 64-byte Range request identifies the real container up front, so the
+      // final filename is known before streaming and no temp file is needed.
+      const header = await StreamingDownload.probe(resource.url, 64)
+      const extension = AudioFileFormat.extension(resource.url, resource.type, resource.encodeType, header)
+      const safeName = this.safeCoverFileName(`${song.name}-${song.author}`)
       BubbleTip.show(this.getUIContext(), `正在下载 · ${qualityTitle}`)
-      tempPath = `${context.cacheDir}/song_${song.id}_${Date.now()}.audio`
-      const task = await request.downloadFile(context, {
-        url: resource.url,
-        filePath: tempPath,
-        header: { 'Referer': 'https://music.163.com/' },
-        enableMetered: true,
-        background: false
-      })
-      task.on('progress', (received: number, total: number) => {
-        if (total > 0) { this.downloadProgress = Math.min(99, Math.floor(received * 100 / total)) }
-      })
-      await new Promise<void>((resolve, reject) => {
-        task.on('complete', () => resolve())
-        task.on('fail', (code: number) => reject(new Error(`下载失败 (${code})`)))
-      })
-      const source = fileIo.openSync(tempPath, fileIo.OpenMode.READ_ONLY)
-      try {
-        const fileSize = fileIo.statSync(source.fd).size
-        if (fileSize <= 0 || (resource.size > 0 && resource.size !== fileSize)) {
-          throw new Error('音频文件下载不完整，请重试')
-        }
-        const header = new ArrayBuffer(64)
-        const bytesRead = fileIo.readSync(source.fd, header, { offset: 0, length: 64 })
-        const extension = AudioFileFormat.extension(resource.url, resource.type, resource.encodeType,
-          new Uint8Array(header, 0, bytesRead))
-        const safeName = this.safeCoverFileName(`${song.name}-${song.author}`)
-        const saved = await LocalLibrary.saveDownload(context, tempPath, `${safeName}.${extension}`, song, saveMode)
-        if (!saved) { BubbleTip.show(this.getUIContext(), '已取消保存'); return }
-        this.downloadProgress = 100
-        BubbleTip.show(this.getUIContext(), `${saved} · ${qualityTitle}`)
-      } finally {
-        fileIo.closeSync(source)
-      }
+      const saved = await LocalLibrary.saveDownload(context, `${safeName}.${extension}`, song, saveMode,
+        async (fd: number): Promise<number> => {
+          return await task.run(resource.url, fd, resource.size, (received: number, total: number): void => {
+            if (total > 0) { this.downloadProgress = Math.min(99, Math.floor(received * 100 / total)) }
+          })
+        })
+      if (!saved) { BubbleTip.show(this.getUIContext(), '已取消保存'); return }
+      this.downloadProgress = 100
+      BubbleTip.show(this.getUIContext(), `${saved} · ${qualityTitle}`)
     } catch (error) {
-      BubbleTip.show(this.getUIContext(), error instanceof Error ? error.message : '下载失败')
+      const message = error instanceof Error ? error.message : '下载失败'
+      // Leaving the page cancels the stream; no need to toast into a destroyed page.
+      if (message !== '下载已取消') { BubbleTip.show(this.getUIContext(), message) }
     } finally {
+      if (this.downloadTask === task) { this.downloadTask = undefined }
       this.downloading = false
-      if (tempPath) {
-        try { if (fileIo.accessSync(tempPath)) { fileIo.unlinkSync(tempPath) } } catch (_error) {}
-      }
     }
   }
 

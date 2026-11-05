@@ -5,8 +5,11 @@ import { audio } from '@kit.AudioKit'
 import { ApiClient } from './ApiClient'
 import { UIContext } from '@kit.ArkUI'
 import { common } from '@kit.AbilityKit'
-import { avSession } from '@kit.AVSessionKit'
 import { media } from '@kit.MediaKit'
+import {
+  DesktopLyricConfig, MediaSessionApi, MediaSessionRegistry, SessionHandlers,
+  SessionLoopMode, SessionMetadata, SessionPlaybackState, shouldLoadMediaSession
+} from './MediaSessionContract'
 import { PlayMode, songItemType } from '../models/music'
 import { PlayerStore } from '../stores/PlayerStore'
 import { AppSettings } from './AppSettings'
@@ -14,7 +17,7 @@ import { LiveViewController } from './LiveViewController'
 import { PlaybackAction, PlaybackControlBridge } from './PlaybackControlBridge'
 import { ListeningScrobble } from './ListeningScrobble'
 import { SongAudioResource, SongQualityService } from './SongQualityService'
-import { MemoryAudioLoad } from './MemoryAudioSource'
+import { secureAudioUrl, StreamingAudioSource } from './StreamingAudio'
 import { RadioService } from './RadioService'
 import { CloudService } from './CloudService'
 
@@ -47,19 +50,22 @@ export class PlayerController {
   private sourceLocalUri: string = ''
   private lyricSongId: string = ''
   private systemLyric: string = ''
-  private systemSession?: avSession.AVSession
-  private systemSessionCreation?: Promise<avSession.AVSession>
+  private systemSession?: MediaSessionApi
+  private systemSessionCreation?: Promise<MediaSessionApi | undefined>
+  private systemSessionGeneration: number = 0
   private lastSystemPositionSync: number = 0
   private lastLiveViewPositionSync: number = 0
   private externalControlInProgress: boolean = false
   private released: boolean = false
   private scrobble: ListeningScrobble = new ListeningScrobble()
 
-  private audioLoad?: MemoryAudioLoad
+  // The streaming source must outlive the load call: AVPlayer keeps calling its
+  // descriptor callback while the song is playing. Cancelled on song switch / teardown.
+  private audioStream?: StreamingAudioSource
 
-  private cancelAudioLoad(): void {
-    this.audioLoad?.cancel()
-    this.audioLoad = undefined
+  private closeAudioStream(): void {
+    this.audioStream?.cancel()
+    this.audioStream = undefined
   }
 
   private foreground: boolean = true
@@ -67,8 +73,20 @@ export class PlayerController {
 
   onAppForeground(): void { this.foreground = true }
 
+  /**
+   * The only gate for touching the AVSession-backed runtime. Nothing below may
+   * load MediaSessionBridge or call a media session API without going through
+   * this check. With the switch off (or before preferences are read, or after
+   * release) it is false, so the media session Kit is never resolved.
+   */
+  private mediaSessionAllowed(): boolean {
+    return shouldLoadMediaSession(AppSettings.settingsLoaded, AppSettings.backgroundPlaybackEnabled,
+      this.released)
+  }
+
   async setBackgroundPlayback(context: common.Context, enabled: boolean): Promise<void> {
-    if (this.switchingBackground || enabled === AppSettings.backgroundPlaybackEnabled) { return }
+    if (this.switchingBackground ||
+      (AppSettings.settingsLoaded && enabled === AppSettings.backgroundPlaybackEnabled)) { return }
     this.switchingBackground = true
     try {
       await AppSettings.saveBackgroundPlayback(context, enabled)
@@ -80,8 +98,11 @@ export class PlayerController {
         const session = this.systemSession
         this.systemSession = undefined
         ++this.metadataRevision
+        ++this.systemSessionGeneration
         this.desktopSessionEnabled = false
+        this.desktopConfiguring = false
         if (this.store) { this.store.desktopLyricsVisible = false }
+        // Only an already-created session is destroyed here; no new Kit access.
         if (session) { await session.destroy() }
         await LiveViewController.stop()
         if (!this.foreground) { this.onAppBackground() }
@@ -90,8 +111,8 @@ export class PlayerController {
         await this.ensureSystemSession()
         if (this.store?.currentSong.id) {
           await this.syncSystemMetadata(this.store.currentSong)
-          await this.syncSystemPlayback(this.store.isPlaying ? avSession.PlaybackState.PLAYBACK_STATE_PLAY :
-            avSession.PlaybackState.PLAYBACK_STATE_PAUSE)
+          await this.syncSystemPlayback(this.store.isPlaying ? SessionPlaybackState.PLAY :
+            SessionPlaybackState.PAUSE)
         }
       }
       this.persistState()
@@ -99,6 +120,8 @@ export class PlayerController {
   }
 
   private subscribeSystemControls(): void {
+    // WantAgent control bridge is Kit-free; it only needs the switch itself,
+    // not the media-session readiness gate.
     if (!AppSettings.backgroundPlaybackEnabled || this.released) { return }
     PlaybackControlBridge.subscribe((action: PlaybackAction) => this.handleExternalControl(action)).catch((error: Error) => {
       this.log('CONTROL_BRIDGE_FAILED', error.message)
@@ -131,10 +154,11 @@ export class PlayerController {
 
   onAppBackground(): void {
     this.foreground = false
-    if (!AppSettings.backgroundPlaybackEnabled) {
+    if (!this.mediaSessionAllowed()) {
       this.shouldAutoPlay = false
       ++this.playRequestToken
-      this.cancelAudioLoad()
+      // Keep the streaming source alive: a paused AVPlayer still reads from its
+      // dataSrc callback when the user resumes in the foreground.
       this.loadingSongId = ''
       if (this.store) { this.store.isLoading = false }
       this.pause().catch((error: Error) => this.log('FOREGROUND_PAUSE_FAILED', error.message))
@@ -147,7 +171,7 @@ export class PlayerController {
     const isPlaying = this.store.isPlaying
     const position = this.store.position
     const duration = this.store.duration || song.duration || 0
-    this.ensureSystemSession().then((session: avSession.AVSession | undefined) => {
+    this.ensureSystemSession().then((session: MediaSessionApi | undefined) => {
       if (session) {
         session.activate().catch(() => {
         })
@@ -155,8 +179,8 @@ export class PlayerController {
     }).catch(() => {
     })
     this.syncSystemMetadata(song)
-    this.syncSystemPlayback(isPlaying ? avSession.PlaybackState.PLAYBACK_STATE_PLAY :
-      avSession.PlaybackState.PLAYBACK_STATE_PAUSE, position)
+    this.syncSystemPlayback(isPlaying ? SessionPlaybackState.PLAY :
+      SessionPlaybackState.PAUSE, position)
     LiveViewController.refresh(song, isPlaying, position, duration).catch((error: Error) => {
       this.log('LIVE_VIEW_BACKGROUND_REFRESH_FAILED', error.message)
     })
@@ -221,7 +245,7 @@ export class PlayerController {
         this.log('EXTERNAL_SESSION_ACTIVATE_FAILED', error instanceof Error ? error.message : 'unknown error')
       }
     }
-    await this.syncSystemPlayback(avSession.PlaybackState.PLAYBACK_STATE_PAUSE, storedPosition)
+    await this.syncSystemPlayback(SessionPlaybackState.PAUSE, storedPosition)
     const player = this.player
     if (player && this.sourceSongId === targetSongId) {
       try {
@@ -248,118 +272,144 @@ export class PlayerController {
     await this.playAt(targetIndex, true, true)
   }
 
-  private async ensureSystemSession(): Promise<avSession.AVSession | undefined> {
-    if (this.released || !AppSettings.backgroundPlaybackEnabled) { return undefined }
-    if (this.systemSession) {
-      return this.systemSession
-    }
-    if (this.systemSessionCreation) {
-      const session = await this.systemSessionCreation
-      return !this.released && AppSettings.backgroundPlaybackEnabled ? session : undefined
-    }
-    const hostContext = this.uiContext?.getHostContext()
-    if (!hostContext) {
-      return undefined
-    }
-    const context = hostContext as common.Context
-    const creation = avSession.createAVSession(context, 'HarmonyCloudMusic', 'audio')
-    this.systemSessionCreation = creation
-    let session: avSession.AVSession
-    try {
-      session = await creation
-    } finally {
-      if (this.systemSessionCreation === creation) {
-        this.systemSessionCreation = undefined
+  /** Kit-free callbacks wired into the optionally loaded media session. */
+  private sessionHandlers(): SessionHandlers {
+    // A stale (already destroyed) session must not be able to drive the player
+    // or overwrite preferences after the switch is turned off / a new session
+    // is created.
+    const generation = ++this.systemSessionGeneration
+    const active = (): boolean => generation === this.systemSessionGeneration && this.mediaSessionAllowed()
+    return {
+      onPlay: () => { if (active()) { this.handleSystemPlay() } },
+      onPause: () => { if (active()) { this.handleSystemPause() } },
+      onNext: () => { if (active()) { this.next() } },
+      onPrevious: () => { if (active()) { this.previous() } },
+      onSeek: (time: number) => { if (active()) { this.seek(time) } },
+      onDesktopLyricVisibilityChanged: (visible: boolean) => {
+        if (!active()) { return }
+        if (this.store) { this.store.desktopLyricsVisible = visible }
+        if (!this.desktopChanging && !this.desktopConfiguring) {
+          AppSettings.desktopLyricsEnabled = visible
+          AppSettings.saveFeature('desktop_lyrics_enabled', visible).catch(() => {})
+        }
+      },
+      onDesktopLyricStateChanged: (locked: boolean) => {
+        if (!active()) { return }
+        if (this.store) { this.store.desktopLyricsLocked = locked }
+        if (!this.desktopChanging && !this.desktopConfiguring) {
+          AppSettings.desktopLyricsLocked = locked
+          AppSettings.saveFeature('desktop_lyrics_locked', locked).catch(() => {})
+        }
       }
     }
-    this.systemSession = session
-    this.desktopSessionEnabled = false
-    try { session.onDesktopLyricVisibilityChanged((visible: boolean) => {
-      if (this.systemSession !== session) { return }
-      if (this.store) { this.store.desktopLyricsVisible = visible }
-      if (!this.desktopChanging && !this.desktopConfiguring) {
-        AppSettings.desktopLyricsEnabled = visible
-        AppSettings.saveFeature('desktop_lyrics_enabled', visible).catch(() => {})
-      }
-    })
-    } catch (_error) {}
-    try { session.onDesktopLyricStateChanged((state: avSession.DesktopLyricState) => {
-      if (this.systemSession !== session) { return }
-      if (this.store) { this.store.desktopLyricsLocked = state.isLocked }
-      if (!this.desktopChanging && !this.desktopConfiguring) {
-        AppSettings.desktopLyricsLocked = state.isLocked
-        AppSettings.saveFeature('desktop_lyrics_locked', state.isLocked).catch(() => {})
-      }
-    })
-    } catch (_error) {}
-    if (this.released || !AppSettings.backgroundPlaybackEnabled) {
-      this.systemSession = undefined
-      await session.destroy()
-      return undefined
-    }
-    session.on('play', () => this.handleSystemPlay())
-    session.on('pause', () => this.handleSystemPause())
-    session.on('playNext', () => this.next())
-    session.on('playPrevious', () => this.previous())
-    session.on('seek', (time: number) => this.seek(time))
-    await session.activate()
-    try {
-      await session.setBackgroundPlayMode(avSession.BackgroundPlayMode.ENABLE_BACKGROUND_PLAY)
-    } catch (_error) {
-    }
-    if (AppSettings.desktopLyricsEnabled) {
-      try { await this.configureDesktopLyrics(session, true, AppSettings.desktopLyricsLocked) }
-      catch (error) { this.log('DESKTOP_LYRICS_FAILED', String(error)) }
-    }
-    this.log('AVSESSION_READY', `sessionId=${session.sessionId}`)
-    return session
   }
 
-  private async configureDesktopLyrics(session: avSession.AVSession, enabled: boolean, locked: boolean): Promise<void> {
-    if (!(await avSession.isDesktopLyricSupported())) { throw new Error('当前设备不支持系统桌面歌词') }
+  /**
+   * The ONLY place in the application that resolves AVSession Kit.
+   * Reachable exclusively from ensureSystemSession() after mediaSessionAllowed()
+   * has returned true. When the background playback switch is off this method is
+   * never entered, so the Kit is never loaded, resolved or called.
+   */
+  private async createSystemSession(context: common.Context): Promise<MediaSessionApi> {
+    const bridge: ESObject = await import('./MediaSessionBridge')
+    const factory = MediaSessionRegistry.factory
+    if (!bridge || !factory) {
+      throw new Error('媒体会话模块加载失败')
+    }
+    this.log('MEDIA_SESSION_MODULE_LOADED', 'background playback enabled')
     this.desktopConfiguring = true
     try {
-      if (enabled && !this.desktopSessionEnabled) {
-        await session.enableDesktopLyric(true)
-        this.desktopSessionEnabled = true
+      const initial: DesktopLyricConfig = {
+        enabled: AppSettings.desktopLyricsEnabled,
+        locked: AppSettings.desktopLyricsLocked
       }
-      if (!enabled && this.desktopSessionEnabled) { await session.setDesktopLyricVisible(false) }
-      if (enabled) {
-        await session.setDesktopLyricState({ isLocked: locked })
-        await session.setDesktopLyricVisible(true)
+      const session = await factory(context, this.sessionHandlers(), initial)
+      this.log('MEDIA_SESSION_READY', `sessionId=${session.sessionId()}`)
+      return session
+    } finally {
+      this.desktopConfiguring = false
+    }
+  }
+
+  private async ensureSystemSession(): Promise<MediaSessionApi | undefined> {
+    // Hard gate: with the switch off (or before preferences are read) nothing
+    // below runs, so no dynamic import and no session API can be reached.
+    if (!this.mediaSessionAllowed()) { return undefined }
+    if (this.systemSession) { return this.systemSession }
+    if (this.systemSessionCreation) {
+      const pending = await this.systemSessionCreation
+      return this.mediaSessionAllowed() ? pending : undefined
+    }
+    const hostContext = this.uiContext?.getHostContext()
+    if (!hostContext) { return undefined }
+    const context = hostContext as common.Context
+    const creation = (async (): Promise<MediaSessionApi | undefined> => {
+      const session = await this.createSystemSession(context)
+      if (!this.mediaSessionAllowed()) {
+        // Switch was turned off while the module was loading. Tear the session
+        // down and never hand it out.
+        await session.destroy()
+        return undefined
       }
-    } finally { this.desktopConfiguring = false }
+      this.systemSession = session
+      this.desktopSessionEnabled = AppSettings.desktopLyricsEnabled
+      return session
+    })().catch((error: Error): MediaSessionApi | undefined => {
+      this.log('MEDIA_SESSION_CREATE_FAILED', error.message)
+      return undefined
+    })
+    this.systemSessionCreation = creation
+    try {
+      return await creation
+    } finally {
+      if (this.systemSessionCreation === creation) { this.systemSessionCreation = undefined }
+    }
   }
 
   async refreshDesktopLyrics(): Promise<void> {
     const session = this.systemSession
-    if (!session || !this.desktopSessionEnabled || !this.store) {
+    if (!this.mediaSessionAllowed() || !session || !this.desktopSessionEnabled || !this.store) {
       if (this.store) { this.store.desktopLyricsVisible = false }
       return
     }
-    const visible = await session.isDesktopLyricVisible()
-    const state = await session.getDesktopLyricState()
+    const status = await session.refreshDesktopLyrics()
     if (session !== this.systemSession) { return }
-    this.store.desktopLyricsVisible = visible
-    this.store.desktopLyricsLocked = state.isLocked
+    this.store.desktopLyricsVisible = status.visible
+    this.store.desktopLyricsLocked = status.locked
   }
 
   async setDesktopLyrics(enabled: boolean, locked: boolean): Promise<void> {
     if (this.desktopChanging) { return }
-    if (enabled && !AppSettings.backgroundPlaybackEnabled) { throw new Error('请先开启后台播放以使用系统桌面歌词') }
+    if (enabled && !this.mediaSessionAllowed()) { throw new Error('请先开启后台播放以使用系统桌面歌词') }
+    // Switch off: persist the preference only, without touching the media session
+    // (not even reading it). This guarantees zero Kit access in this state.
+    if (!this.mediaSessionAllowed()) {
+      await AppSettings.saveFeature('desktop_lyrics_enabled', enabled)
+      await AppSettings.saveFeature('desktop_lyrics_locked', locked)
+      AppSettings.desktopLyricsEnabled = enabled
+      AppSettings.desktopLyricsLocked = locked
+      if (this.store) { this.store.desktopLyricsVisible = false }
+      return
+    }
     this.desktopChanging = true
     try {
       const session = await this.ensureSystemSession()
-      if (session) { await this.configureDesktopLyrics(session, enabled, locked) }
-      else if (enabled) { throw new Error('媒体会话尚未就绪') }
+      if (!session) {
+        if (enabled) { throw new Error('媒体会话尚未就绪') }
+      } else {
+        this.desktopConfiguring = true
+        try { await session.configureDesktopLyrics(enabled, locked) }
+        finally { this.desktopConfiguring = false }
+        this.desktopSessionEnabled = enabled
+      }
       await AppSettings.saveFeature('desktop_lyrics_enabled', enabled)
       await AppSettings.saveFeature('desktop_lyrics_locked', locked)
       AppSettings.desktopLyricsEnabled = enabled
       AppSettings.desktopLyricsLocked = locked
       if (enabled && this.store?.currentSong.id) {
         this.syncSystemMetadata(this.store.currentSong)
-        await this.syncSystemPlayback(this.store.isPlaying ? avSession.PlaybackState.PLAYBACK_STATE_PLAY :
-          avSession.PlaybackState.PLAYBACK_STATE_PAUSE, this.store.position)
+        await this.syncSystemPlayback(this.store.isPlaying ? SessionPlaybackState.PLAY :
+          SessionPlaybackState.PAUSE, this.store.position)
       }
     } finally {
       try { await this.refreshDesktopLyrics() } catch (_error) {}
@@ -379,7 +429,7 @@ export class PlayerController {
   }
 
   private handleSystemPlay(): void {
-    if (!AppSettings.backgroundPlaybackEnabled) { return }
+    if (!this.mediaSessionAllowed()) { return }
     if (this.released || (!AppSettings.backgroundPlaybackEnabled && !this.foreground)) { return }
     if (this.externalControlInProgress || !this.store || this.store.queue.length === 0) {
       return
@@ -389,7 +439,7 @@ export class PlayerController {
       this.log('SYSTEM_RESUME_FAILED', error.message)
       if (this.store) {
         this.store.isPlaying = false
-        this.syncSystemPlayback(avSession.PlaybackState.PLAYBACK_STATE_PAUSE, this.store.position)
+        this.syncSystemPlayback(SessionPlaybackState.PAUSE, this.store.position)
       }
     }).finally(() => {
       this.externalControlInProgress = false
@@ -397,32 +447,32 @@ export class PlayerController {
   }
 
   private handleSystemPause(): void {
-    if (!AppSettings.backgroundPlaybackEnabled) { return }
+    if (!this.mediaSessionAllowed()) { return }
     if (this.player && this.player.state === 'playing') {
       this.player.pause().catch(() => {
       })
     }
   }
 
-  private avLoopMode(): avSession.LoopMode {
+  private sessionLoopMode(): number {
     if (!this.store || this.store.playMode === PlayMode.LOOP) {
-      return avSession.LoopMode.LOOP_MODE_LIST
+      return SessionLoopMode.LIST
     }
     if (this.store.playMode === PlayMode.SINGLE) {
-      return avSession.LoopMode.LOOP_MODE_SINGLE
+      return SessionLoopMode.SINGLE
     }
-    return avSession.LoopMode.LOOP_MODE_SHUFFLE
+    return SessionLoopMode.SHUFFLE
   }
 
-  private metadataCurrent(revision: number, song: songItemType, session: avSession.AVSession): boolean {
+  private metadataCurrent(revision: number, song: songItemType, session: MediaSessionApi): boolean {
     return revision === this.metadataRevision && !this.released && session === this.systemSession &&
       this.store?.currentSong.id === song.id && this.store?.currentSong.localUri === song.localUri
   }
 
-  private async writeMetadata(revision: number, song: songItemType, session: avSession.AVSession,
-    metadata: avSession.AVMetadata): Promise<void> {
+  private async writeMetadata(revision: number, song: songItemType, session: MediaSessionApi,
+    metadata: SessionMetadata): Promise<void> {
     const job = this.metadataWrites.catch(() => {}).then(async () => {
-      if (this.metadataCurrent(revision, song, session)) { await session.setAVMetadata(metadata) }
+      if (this.metadataCurrent(revision, song, session)) { await session.setMetadata(metadata) }
     })
     this.metadataWrites = job
     await job
@@ -441,6 +491,7 @@ export class PlayerController {
   }
 
   private async syncSystemMetadata(song: songItemType): Promise<void> {
+    if (!this.mediaSessionAllowed()) { return }
     const revision = ++this.metadataRevision
     try {
       const session = await this.ensureSystemSession()
@@ -448,7 +499,7 @@ export class PlayerController {
         return
       }
       if (!this.metadataCurrent(revision, song, session)) { return }
-      const metadata: avSession.AVMetadata = {
+      const metadata: SessionMetadata = {
         assetId: song.id,
         title: song.name,
         artist: song.author,
@@ -469,36 +520,30 @@ export class PlayerController {
           metadata.lyric = this.systemLyric
           await this.writeMetadata(revision, song, session, metadata)
           if (this.metadataCurrent(revision, song, session) && metadata.lyric) {
-            const controller = await session.getController()
-            const received = await controller.getAVMetadata()
-            this.log('SYSTEM_LRC_READBACK', 'songId=' + received.assetId + ' chars=' +
-              (received.lyric || '').length + ' lines=' + (received.lyric || '').split('\n').length)
+            const readback = await session.readLyricMetadata()
+            this.log('SYSTEM_LRC_READBACK', 'songId=' + readback.assetId + ' chars=' +
+              readback.lyric.length + ' lines=' + readback.lyric.split('\n').length)
           }
         } catch (error) { this.log('DESKTOP_LYRIC_LOAD_FAILED', error instanceof Error ? error.message : 'unknown') }
       }
     } catch (error) {
-      this.log('AVSESSION_METADATA_FAILED', error instanceof Error ? error.message : 'unknown error')
+      this.log('MEDIA_SESSION_METADATA_FAILED', error instanceof Error ? error.message : 'unknown error')
     }
   }
 
-  private async syncSystemPlayback(state: avSession.PlaybackState, position?: number): Promise<void> {
+  private async syncSystemPlayback(state: number, position?: number): Promise<void> {
+    // Guard before any work: callers pass neutral numbers, but the session (and
+    // therefore AVSession Kit) must only be touched when the switch is on.
+    if (!this.mediaSessionAllowed()) { return }
     try {
       const session = await this.ensureSystemSession()
       if (!session) {
         return
       }
-      const playbackState: avSession.AVPlaybackState = {
-        state: state,
-        speed: 1,
-        position: {
-          elapsedTime: Math.max(0, position !== undefined ? position : (this.store?.position || 0)),
-          updateTime: Date.now()
-        },
-        loopMode: this.avLoopMode()
-      }
-      await session.setAVPlaybackState(playbackState)
+      const elapsedTime = Math.max(0, position !== undefined ? position : (this.store?.position || 0))
+      await session.setPlaybackState(state, elapsedTime, this.sessionLoopMode())
     } catch (error) {
-      this.log('AVSESSION_STATE_FAILED', error instanceof Error ? error.message : 'unknown error')
+      this.log('MEDIA_SESSION_STATE_FAILED', error instanceof Error ? error.message : 'unknown error')
     }
   }
 
@@ -569,8 +614,8 @@ export class PlayerController {
         const now = Date.now()
         if (now - this.lastSystemPositionSync >= 2000) {
           this.lastSystemPositionSync = now
-          this.syncSystemPlayback(this.store.isPlaying ? avSession.PlaybackState.PLAYBACK_STATE_PLAY :
-            avSession.PlaybackState.PLAYBACK_STATE_PAUSE, time)
+          this.syncSystemPlayback(this.store.isPlaying ? SessionPlaybackState.PLAY :
+            SessionPlaybackState.PAUSE, time)
         }
         if (now - this.lastLiveViewPositionSync >= 2000) {
           this.lastLiveViewPositionSync = now
@@ -598,7 +643,7 @@ export class PlayerController {
         this.sourceSongId = ''
         this.loadingSongId = ''
         this.shouldAutoPlay = false
-        this.syncSystemPlayback(avSession.PlaybackState.PLAYBACK_STATE_ERROR)
+        this.syncSystemPlayback(SessionPlaybackState.ERROR)
         LiveViewController.stop()
         this.notifyPlaybackFailure(`AVPlayer error: ${error.message}`)
       }
@@ -620,7 +665,7 @@ export class PlayerController {
         return
       }
       const preparingSongId = this.sourceSongId
-      this.syncSystemPlayback(avSession.PlaybackState.PLAYBACK_STATE_PREPARE)
+      this.syncSystemPlayback(SessionPlaybackState.PREPARE)
       player.prepare().catch(() => {
         if (this.isCurrentPlayer(player, generation) && this.store && preparingSongId === this.store.currentSong.id) {
           this.store.isLoading = false
@@ -643,7 +688,7 @@ export class PlayerController {
       this.store.isLoading = false
       this.loadingSongId = ''
       this.syncSystemMetadata(this.store.currentSong)
-      this.syncSystemPlayback(avSession.PlaybackState.PLAYBACK_STATE_PAUSE)
+      this.syncSystemPlayback(SessionPlaybackState.PAUSE)
       LiveViewController.sync(this.store.currentSong, false, this.store.position, this.store.duration)
       this.log('PREPARED', `generation=${generation} songId=${this.sourceSongId} expectedDuration=${expectedDuration} actualDuration=${player.duration} autoPlay=${this.shouldAutoPlay}`)
       if (this.resumePosition > 0) {
@@ -671,7 +716,7 @@ export class PlayerController {
       this.store.isPlaying = true
       this.scrobble.update(Math.max(0, player.currentTime), true)
       this.store.isLoading = false
-      this.syncSystemPlayback(avSession.PlaybackState.PLAYBACK_STATE_PLAY)
+      this.syncSystemPlayback(SessionPlaybackState.PLAY)
       LiveViewController.sync(this.store.currentSong, true, this.store.position, this.store.duration)
       this.persistState()
       this.log('PLAYING_CONFIRMED', `generation=${generation} songId=${this.sourceSongId} duration=${player.duration}`)
@@ -680,7 +725,7 @@ export class PlayerController {
       this.scrobble.discontinuity()
       if (this.sourceSongId === this.store.currentSong.id) {
         this.store.isPlaying = false
-        this.syncSystemPlayback(avSession.PlaybackState.PLAYBACK_STATE_PAUSE)
+        this.syncSystemPlayback(SessionPlaybackState.PAUSE)
         this.store.position = Math.max(0, player.currentTime)
         LiveViewController.sync(this.store.currentSong, false, this.store.position, this.store.duration)
         this.persistState()
@@ -690,7 +735,7 @@ export class PlayerController {
         return
       }
       this.store.isPlaying = false
-      this.syncSystemPlayback(avSession.PlaybackState.PLAYBACK_STATE_COMPLETED)
+      this.syncSystemPlayback(SessionPlaybackState.COMPLETED)
       this.store.position = this.store.duration
       this.scrobble.update(this.store.duration, true)
       this.scrobble.completed(this.store.currentSong, this.store.duration).catch((error: Error) => {
@@ -707,7 +752,7 @@ export class PlayerController {
         this.loadingSongId = ''
         this.shouldAutoPlay = false
         this.resumePosition = 0
-        this.syncSystemPlayback(avSession.PlaybackState.PLAYBACK_STATE_ERROR)
+        this.syncSystemPlayback(SessionPlaybackState.ERROR)
         LiveViewController.stop()
       }
     }
@@ -812,7 +857,6 @@ export class PlayerController {
 
     const requestToken = ++this.playRequestToken
     this.sourceLocalUri = song.localUri || ''
-    this.cancelAudioLoad()
     if (!forceReload) { this.scrobble.reset() }
     this.store.actualQuality = ''
     if (!forceReload) {
@@ -824,7 +868,7 @@ export class PlayerController {
     this.store.errorMessage = ''
     this.persistState()
     this.syncSystemMetadata(song)
-    this.syncSystemPlayback(avSession.PlaybackState.PLAYBACK_STATE_PREPARE, 0)
+    this.syncSystemPlayback(SessionPlaybackState.PREPARE, 0)
     let player: media.AVPlayer | undefined
     try {
       player = await this.replacePlayerForSongSwitch(requestToken)
@@ -840,6 +884,8 @@ export class PlayerController {
       this.log('STALE_REQUEST', `stage=playerReady requestToken=${requestToken} activeToken=${this.playRequestToken}`)
       return
     }
+    // The previous AVPlayer is released by now, so its descriptor is no longer read.
+    this.closeAudioStream()
     const generation = this.playerGeneration
     this.loadingSongId = song.id
     this.shouldAutoPlay = autoPlay
@@ -864,16 +910,28 @@ export class PlayerController {
         this.log('STALE_REQUEST', `stage=urlResolved requestToken=${requestToken} activeToken=${this.playRequestToken} targetSongId=${song.id} storeSongId=${this.store?.currentSong.id} generation=${generation} activeGeneration=${this.playerGeneration}`)
         return
       }
-      const load = new MemoryAudioLoad()
-      this.audioLoad = load
-      const source = await load.load(resource.url, resource.size)
-      if (this.audioLoad === load) { this.audioLoad = undefined }
-      if (requestToken !== this.playRequestToken || this.store.currentSong.id !== song.id ||
-        !this.isCurrentPlayer(player, generation)) { return }
-      this.sourceSongId = song.id
-      this.log('SET_MEMORY_SOURCE', `requestToken=${requestToken} generation=${generation} songId=${song.id} bytes=${source.size}`)
-      // The descriptor callback retains the complete file until this AVPlayer is released.
-      player.dataSrc = source.descriptor()
+      if (resource.size > 0) {
+        // Range-backed streaming: only a bounded window is resident, so a 100 MB+
+        // FLAC starts playing after ~1 MB instead of being materialised in RAM first.
+        const stream = new StreamingAudioSource(resource.url, resource.size)
+        this.audioStream = stream
+        await stream.preload()
+        if (requestToken !== this.playRequestToken || this.store.currentSong.id !== song.id ||
+          !this.isCurrentPlayer(player, generation)) {
+          if (this.audioStream === stream) { this.audioStream = undefined }
+          stream.cancel()
+          return
+        }
+        this.sourceSongId = song.id
+        this.log('SET_STREAMING_SOURCE', `requestToken=${requestToken} generation=${generation} songId=${song.id} ${stream.stats()}`)
+        player.dataSrc = stream.descriptor()
+      } else {
+        // Radio / programme / voice streams have no declared size; let AVPlayer
+        // handle the network stream natively instead of buffering anything in-app.
+        this.sourceSongId = song.id
+        this.log('SET_NETWORK_SOURCE', `requestToken=${requestToken} generation=${generation} songId=${song.id}`)
+        player.url = secureAudioUrl(resource.url)
+      }
     } catch (error) {
       if (requestToken !== this.playRequestToken) {
         return
@@ -884,7 +942,7 @@ export class PlayerController {
       this.loadingSongId = ''
       this.shouldAutoPlay = false
       this.resumePosition = 0
-      this.cancelAudioLoad()
+      this.closeAudioStream()
       this.store.actualQuality = ''
       this.notifyPlaybackFailure(error instanceof Error ? error.message : 'unable to load audio')
     }
@@ -1013,8 +1071,8 @@ export class PlayerController {
     const safePosition = Math.max(0, Math.min(position, this.store.duration))
     this.player.seek(safePosition)
     this.store.position = safePosition
-    this.syncSystemPlayback(this.store.isPlaying ? avSession.PlaybackState.PLAYBACK_STATE_PLAY :
-      avSession.PlaybackState.PLAYBACK_STATE_PAUSE, safePosition)
+    this.syncSystemPlayback(this.store.isPlaying ? SessionPlaybackState.PLAY :
+      SessionPlaybackState.PAUSE, safePosition)
     LiveViewController.sync(this.store.currentSong, this.store.isPlaying, safePosition, this.store.duration)
   }
 
@@ -1030,8 +1088,8 @@ export class PlayerController {
       this.store.playMode = PlayMode.LOOP
     }
     this.persistState()
-    this.syncSystemPlayback(this.store.isPlaying ? avSession.PlaybackState.PLAYBACK_STATE_PLAY :
-      avSession.PlaybackState.PLAYBACK_STATE_PAUSE)
+    this.syncSystemPlayback(this.store.isPlaying ? SessionPlaybackState.PLAY :
+      SessionPlaybackState.PAUSE)
     if (this.player) {
       const validStates: media.AVPlayerState[] = ['prepared', 'playing', 'paused', 'completed']
       if (validStates.indexOf(this.player.state) >= 0) {
@@ -1067,7 +1125,6 @@ export class PlayerController {
 
   private async stopAndClearSource(): Promise<void> {
     const requestToken = ++this.playRequestToken
-    this.cancelAudioLoad()
     ++this.metadataRevision
     this.lyricSongId = ''
     this.systemLyric = ''
@@ -1096,7 +1153,8 @@ export class PlayerController {
         this.log('RELEASE_PLAYER_FOR_CLEAR_FAILED', `generation=${generation} message=${error instanceof Error ? error.message : 'unknown error'}`)
       }
     }
-    this.syncSystemPlayback(avSession.PlaybackState.PLAYBACK_STATE_STOP, 0)
+    this.closeAudioStream()
+    this.syncSystemPlayback(SessionPlaybackState.STOP, 0)
     LiveViewController.stop()
   }
 

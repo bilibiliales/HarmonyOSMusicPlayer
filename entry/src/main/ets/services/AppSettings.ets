@@ -64,6 +64,13 @@ export class AppSettings {
 
   static backgroundPlaybackEnabled: boolean = true
 
+  /**
+   * Guards the media session gate against the `true` default above: until the
+   * persisted preference has actually been read, background playback is treated
+   * as undecided (and therefore the media session Kit must stay unloaded).
+   */
+  static settingsLoaded: boolean = false
+
   static aiBaseUrl: string = 'https://zm.wwoyun.cn'
   static aiApiKey: string = ''
   static aiModel: string = 'gpt-3.5-turbo'
@@ -85,6 +92,7 @@ export class AppSettings {
     AppSettings.askDownloadSaveMode = await store.get('ask_download_save_mode', true) === true
     const backgroundValue = await store.get(AppSettings.BACKGROUND_PLAYBACK_KEY, true)
     AppSettings.backgroundPlaybackEnabled = typeof backgroundValue === 'boolean' ? backgroundValue : true
+    AppSettings.settingsLoaded = true
     const urlValue = await store.get(AppSettings.API_BASE_URL_KEY, ApiClient.baseUrl)
     if (typeof urlValue === 'string') {
       ApiClient.setBaseUrl(urlValue)
@@ -165,6 +173,8 @@ export class AppSettings {
     await store.put(AppSettings.BACKGROUND_PLAYBACK_KEY, enabled)
     await store.flush()
     AppSettings.backgroundPlaybackEnabled = enabled
+    // An explicit user choice is authoritative even if the initial load failed.
+    AppSettings.settingsLoaded = true
   }
 
   static async saveAiSettings(context: common.Context, baseUrl: string, apiKey: string,

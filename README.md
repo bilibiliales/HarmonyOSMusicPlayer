@@ -56,6 +56,7 @@
 
 ### 播放器
 - 基于 AVPlayer 的真实音频播放
+- **流式播放**：按 HTTP Range 分段按需取数，只保留有界窗口，100MB+ FLAC 不再整曲载入内存
 - 全局共享播放队列 (PlayerStore)
 - 播放模式：顺序播放、列表循环、单曲循环、随机播放
 - 音质切换：标准 / 较高 / 极高 / 无损 / Hi-Res
@@ -63,7 +64,8 @@
 - 悬浮迷你播放器 (FloatingMusicCard)
 
 ### 后台播放与系统集成
-- AVSession 系统媒体会话：锁屏控制、通知栏播放器
+- **开关关闭时绝不加载 AVSession Kit**：系统媒体会话相关代码全部隔离在按需动态加载的 `MediaSessionBridge.ets` 中；播放控制器只依赖无 Kit 的中立契约，开关关闭时连 `avSession.*` 枚举都不会被求值
+- AVSession 系统媒体会话：锁屏控制、通知栏播放器（仅后台播放开关打开时创建）
 - Live View 实况窗状态同步
 - 桌面音乐卡片 (MusicCardAbility)：显示当前歌曲，支持播放/暂停/切歌
 - PlaybackControlBridge：接收桌面卡片与外部 Want 控制指令
@@ -162,7 +164,9 @@ HarmonyOS 系统能力层 (AVPlayer / AVSession / NetworkKit / FormKit / ShareKi
 
 - **导航**：全部页面使用 `Navigation` + `NavPathStack` + `navDestination`，统一由 Index 页面的 PageMap 注册，不使用 router
 - **网络**：`ApiClient` 统一封装 GET / JSON POST / 表单 POST / 文件上传，Cookie 自动附加，每次请求后销毁 HttpRequest
-- **播放**：`PlayerController` 单例管理 AVPlayer，通过 playRequestToken 防止快速切歌串歌，多级备用地址策略 (song/url/v1 → song/url → song/download/url/v1)
+- **播放**：`PlayerController` 单例管理 AVPlayer，通过 playRequestToken 防止快速切歌串歌，音质解析走 `SongQualityService`
+- **流式音源**：`StreamingAudio` 的 `StreamingAudioSource` 用 4MB Range 窗口 + 16MB LRU 块缓存为 `AVPlayer.dataSrc` 供数；起播仅预取 2MB 头部与 256KB 尾部，跳转时按需拉取对应区间。`StreamingDownload` 把下载分块直接写入最终文件，不再产生临时文件与整文件复制
+- **媒体会话按需加载**：`MediaSessionContract.ets` 是不含任何媒体 Kit 的中立契约（数值常量 + 接口 + 唯一准入判断 `shouldLoadMediaSession`）；`PlayerController` 静态只依赖它。唯一静态导入 `@kit.AVSessionKit` 的 `MediaSessionBridge.ets` 通过 `await import('./MediaSessionBridge')` 加载，且该调用只存在于 `createSystemSession()`，后者只在 `mediaSessionAllowed()` 为真时由 `ensureSystemSession()` 调用。常量路径为编译期可解析的动态导入，无需 `runtimeOnly` 配置
 - **状态**：`@Provide` / `@Consume` 跨组件共享 AuthStore 和 PlayerStore
 - **持久化**：Preferences 保存 API 地址、Cookie、用户资料、播放队列、进度、模式和音质；AppSettings 负责读写与同步桌面卡片
 
@@ -204,6 +208,37 @@ node app.js
 # 命令行构建
 hvigorw assembleHap
 ```
+
+### 流式加载验证
+
+播放/下载地址接口返回的 CDN 已实测支持流式读取：`Accept-Ranges: bytes`、`Content-Length`，
+以及对首部/中部/尾部区间的 `206 Partial Content`（HTTP 与 HTTPS、带 `Referer` 均通过）。
+因此播放改为按需分段，下载改为分块直写磁盘。
+
+```bash
+# 联网实测接口 + 本地 120MB+ 虚拟 FLAC 回归（Node 22，需要 curl 才能跑联网部分）
+node entry/src/test/StreamingAudio.regression.cjs
+
+# 离线环境可跳过联网部分
+SKIP_LIVE=1 node entry/src/test/StreamingAudio.regression.cjs
+```
+
+回归覆盖：起播预取量、顺序读取与任意跳转的字节正确性、常驻内存上界、取消语义、
+以及下载探测头只取 64 字节与直写文件的完整性。
+
+### 后台播放开关隔离性验证
+
+```bash
+node entry/src/test/AvSessionIsolation.regression.cjs
+```
+
+三层验证：① 扫描全部源码，证明全工程只有 `MediaSessionBridge.ets` 静态导入 AVSession Kit，
+且从所有冷启动入口做静态依赖 BFS 均不可达该模块；② 执行真实中立契约的
+`shouldLoadMediaSession` 真值表；③ 抽取 `PlayerController.ets` 里真实的
+`mediaSessionAllowed` / `createSystemSession` / `ensureSystemSession` 三个方法，
+用探针模块替换桥接模块后实际运行，观测「模块是否被加载」：
+开关关闭、偏好未读完、已释放三种状态下加载次数均为 0，开关打开为 1，
+加载途中关开关会销毁已创建的会话且不再对外提供。
 
 ## 权限声明
 
