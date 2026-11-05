@@ -917,8 +917,8 @@ export class PlayerController {
         this.log('STALE_REQUEST', `stage=urlResolved requestToken=${requestToken} activeToken=${this.playRequestToken} targetSongId=${song.id} storeSongId=${this.store?.currentSong.id} generation=${generation} activeGeneration=${this.playerGeneration}`)
         return
       }
-      if (resource.size > 0) {
-        if (AppSettings.streamingPlaybackEnabled) {
+      if (AppSettings.streamingPlaybackEnabled) {
+        if (resource.size > 0) {
           // Range-backed streaming: only a bounded window is resident, so a 100 MB+
           // FLAC starts playing after ~1 MB instead of being materialised in RAM first.
           const stream = new StreamingAudioSource(resource.url, resource.size)
@@ -934,28 +934,34 @@ export class PlayerController {
           this.log('SET_STREAMING_SOURCE', `requestToken=${requestToken} generation=${generation} songId=${song.id} ${stream.stats()}`)
           player.dataSrc = stream.descriptor()
         } else {
-          // Fallback: materialise the whole file in memory, then play (the original
-          // strategy). Kept for devices / VMs whose AVPlayer cannot consume the
-          // Range-backed dataSrc. A large FLAC therefore occupies RAM in full.
-          const load = new MemoryAudioLoad()
-          this.audioLoad = load
-          const source = await load.load(resource.url, resource.size)
-          if (requestToken !== this.playRequestToken || this.store.currentSong.id !== song.id ||
-            !this.isCurrentPlayer(player, generation)) {
-            if (this.audioLoad === load) { this.audioLoad = undefined }
-            return
-          }
-          this.audioLoad = undefined
+          // Live radio / programme / voice streams have no declared size and cannot
+          // be range-requested; let AVPlayer stream the network source directly.
           this.sourceSongId = song.id
-          this.log('SET_MEMORY_SOURCE', `requestToken=${requestToken} generation=${generation} songId=${song.id} bytes=${source.size}`)
-          player.dataSrc = source.descriptor()
+          this.log('SET_NETWORK_SOURCE', `requestToken=${requestToken} generation=${generation} songId=${song.id}`)
+          player.url = secureAudioUrl(resource.url)
         }
       } else {
-        // Radio / programme / voice streams have no declared size; let AVPlayer
-        // handle the network stream natively instead of buffering anything in-app.
+        // Non-streaming (original) strategy: materialise the COMPLETE file in memory
+        // before handing it to AVPlayer, exactly as the pre-streaming code did. The
+        // whole song is resident in RAM before playback begins, so the loading state
+        // persists until the download finishes — there is never a "load while playing"
+        // window. This is the required fallback for devices / VMs whose AVPlayer
+        // cannot consume the Range-backed dataSrc. size is forwarded only for the
+        // completeness check, not to branch into a streaming path.
+        const load = new MemoryAudioLoad()
+        this.audioLoad = load
+        const source = await load.load(resource.url, resource.size)
+        if (requestToken !== this.playRequestToken || this.store.currentSong.id !== song.id ||
+          !this.isCurrentPlayer(player, generation)) {
+          if (this.audioLoad === load) { this.audioLoad = undefined }
+          return
+        }
+        this.audioLoad = undefined
         this.sourceSongId = song.id
-        this.log('SET_NETWORK_SOURCE', `requestToken=${requestToken} generation=${generation} songId=${song.id}`)
-        player.url = secureAudioUrl(resource.url)
+        this.log('SET_MEMORY_SOURCE', `requestToken=${requestToken} generation=${generation} songId=${song.id} bytes=${source.size}`)
+        // The descriptor reads from the in-memory chunks; AVPlayer never touches the
+        // network again until this player is released.
+        player.dataSrc = source.descriptor()
       }
     } catch (error) {
       if (requestToken !== this.playRequestToken) {

@@ -128,19 +128,31 @@ function scan() {
   assert(/store\.get\(AppSettings\.STREAMING_PLAYBACK_KEY/.test(as), 'load() 读取该偏好，默认 true')
   pass('AppSettings: streamingPlaybackEnabled(默认true) + 键 + 持久化方法 齐备')
 
-  // PlayerController: imports MemoryAudioLoad, branches on the flag inside size>0
+  // PlayerController: the streaming toggle is the OUTER branch.
+  //   ON  -> StreamingAudioSource (size>0) OR player.url direct stream (live radio, size 0)
+  //   OFF -> ALWAYS MemoryAudioLoad + dataSrc (the original whole-file-in-memory
+  //          strategy), regardless of resource.size — there is never a
+  //          "load while playing" window, which is what the code review required.
   assert(/import \{ MemoryAudioLoad \} from '\.\/MemoryAudioSource'/.test(pc), 'PlayerController 导入 MemoryAudioLoad')
   assert(/import \{ secureAudioUrl, StreamingAudioSource \} from '\.\/StreamingAudio'/.test(pc), 'PlayerController 仍导入 StreamingAudioSource')
-  // branch text inside the (resource.size > 0) block
-  const sizeBlock = pc.split('resource.size > 0')[1] || ''
-  assert(/if \(AppSettings\.streamingPlaybackEnabled\)/.test(sizeBlock) ||
-    /AppSettings\.streamingPlaybackEnabled/.test(pc), '按 streamingPlaybackEnabled 分支')
-  assert(/new StreamingAudioSource\(resource\.url, resource\.size\)/.test(pc), 'ON 分支使用 StreamingAudioSource')
-  assert(/new MemoryAudioLoad\(\)/.test(pc), 'OFF 分支使用 MemoryAudioLoad')
+  const gateIdx = pc.indexOf('if (AppSettings.streamingPlaybackEnabled)')
+  assert(gateIdx >= 0, 'PlayerController 按 streamingPlaybackEnabled 外层分支')
+  // The OFF branch is the `} else {` immediately before `new MemoryAudioLoad()`.
+  const memIdx = pc.indexOf('new MemoryAudioLoad()')
+  assert(memIdx >= 0, 'OFF 分支使用 MemoryAudioLoad')
+  const elseIdx = pc.lastIndexOf('} else {', memIdx)
+  const offBranch = pc.slice(elseIdx)
+  assert(/new MemoryAudioLoad\(\)/.test(offBranch), 'OFF 分支使用 MemoryAudioLoad 整曲加载')
+  assert(/player\.dataSrc = source\.descriptor\(\)/.test(offBranch), 'OFF 分支经 dataSrc 从内存读取(非 player.url)')
+  assert(!/player\.url/.test(offBranch), 'OFF 分支绝不走 player.url 直接流(回归项: 关闭流式后不得一边加载一边播)')
+  // The direct-stream path must be confined to the ON branch (after the gate).
+  const onBranch = pc.slice(gateIdx)
+  assert(/new StreamingAudioSource\(resource\.url, resource\.size\)/.test(onBranch), 'ON 分支使用 StreamingAudioSource')
+  assert(/player\.url = secureAudioUrl/.test(onBranch), 'ON 分支的直播流走 player.url 直连')
   assert(/SET_STREAMING_SOURCE/.test(pc) && /SET_MEMORY_SOURCE/.test(pc), '两条分支各有日志标记')
   // lifecycle: closeAudioStream cancels both
   assert(/this\.audioLoad\?\.cancel\(\)/.test(pc), 'closeAudioStream 取消 MemoryAudioLoad')
-  pass('PlayerController: 按开关在 StreamingAudioSource / MemoryAudioLoad 间分支，并正确释放')
+  pass('PlayerController: 流式开关为外层分支, OFF 回退整曲内存加载且绝不走 player.url')
 
   // Settings UI: toggle wired to changeStreamingPlayback -> saveStreamingPlayback
   assert(/@State streamingPlaybackEnabled: boolean = AppSettings\.streamingPlaybackEnabled/.test(se),

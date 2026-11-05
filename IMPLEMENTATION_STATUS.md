@@ -8,7 +8,7 @@
 - 推荐歌单、新歌、Banner、搜索、用户资料、用户歌单、歌单详情与歌曲列表。
 - 基于 `AVPlayer` 的真实音频播放、进度跳转、上一首/下一首。
 - 在线播放与下载均为流式：CDN 支持 Range/206，播放按需分段取数（有界内存），下载分块直接写盘，不再把 100MB+ FLAC 整曲载入内存。
-- 流式播放可在设置中关闭（默认开启）；关闭后回退为整曲载入内存再播放的旧策略（`MemoryAudioSource`/`MemoryAudioLoad`），用于兼容无法消费流式 `dataSrc` 的旧设备 / 虚拟机。
+- 流式播放可在设置中关闭（默认开启）；关闭后回退为整曲载入内存再播放的旧策略（`MemoryAudioSource`/`MemoryAudioLoad`），用于兼容无法消费流式 `dataSrc` 的旧设备 / 虚拟机。流式开关是 `playAt` 的**外层分支**：开关 ON 时按 `resource.size` 选择 `StreamingAudioSource`（有界流式）或 `player.url` 直连（直播/电台等无 size 的流）；开关 OFF 时**始终**走 `MemoryAudioLoad` 整曲加载（不受 `resource.size` 影响，绝不走 `player.url`），即“完整加载到内存之前一直是加载状态”。
 - 流式能力可复现验证与回归脚本：`entry/src/test/StreamingAudio.regression.cjs`；开关与回退：`entry/src/test/StreamingToggle.regression.cjs`。
 - 后台播放开关关闭时，播放模块不加载 AVSession Kit：`MediaSessionContract.ets`（无 Kit 的中立契约）由 `PlayerController` 静态依赖；唯一静态导入 `@kit.AVSessionKit` 的 `MediaSessionBridge.ets` 仅在 `shouldLoadMediaSession()` 放行后通过常量路径动态导入加载。播放状态改用中立数值常量，避免开关关闭时求值 `avSession.*` 枚举触发 Kit 加载。
 - AVSession 隔离性静态依赖扫描 + 门控真值表 + 真实门控代码运行时模拟：`entry/src/test/AvSessionIsolation.regression.cjs`。
