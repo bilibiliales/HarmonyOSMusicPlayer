@@ -42,6 +42,7 @@ export class AppSettings {
   private static readonly DEFAULT_ONLINE_QUALITY_KEY: string = 'default_online_quality'
   private static readonly DEFAULT_DOWNLOAD_QUALITY_KEY: string = 'default_download_quality'
   private static readonly BACKGROUND_PLAYBACK_KEY: string = 'background_playback_enabled'
+  private static readonly STREAMING_PLAYBACK_KEY: string = 'streaming_playback_enabled'
 
   static lyricPreferences: LyricPreferences = new LyricPreferences()
   static desktopLyricsEnabled: boolean = false
@@ -63,6 +64,15 @@ export class AppSettings {
   }
 
   static backgroundPlaybackEnabled: boolean = true
+
+  /**
+   * Streaming playback (default ON). When ON, `PlayerController` feeds AVPlayer
+   * a Range-backed data source whose memory footprint is bounded (~16 MB) regardless
+   * of file size. When OFF, the whole file is downloaded into memory first (the
+   * original strategy) — kept as a fallback for devices / VMs whose AVPlayer cannot
+   * consume the streaming dataSrc.
+   */
+  static streamingPlaybackEnabled: boolean = true
 
   /**
    * Guards the media session gate against the `true` default above: until the
@@ -92,6 +102,7 @@ export class AppSettings {
     AppSettings.askDownloadSaveMode = await store.get('ask_download_save_mode', true) === true
     const backgroundValue = await store.get(AppSettings.BACKGROUND_PLAYBACK_KEY, true)
     AppSettings.backgroundPlaybackEnabled = typeof backgroundValue === 'boolean' ? backgroundValue : true
+    AppSettings.streamingPlaybackEnabled = await store.get(AppSettings.STREAMING_PLAYBACK_KEY, true) === true
     AppSettings.settingsLoaded = true
     const urlValue = await store.get(AppSettings.API_BASE_URL_KEY, ApiClient.baseUrl)
     if (typeof urlValue === 'string') {
@@ -175,6 +186,13 @@ export class AppSettings {
     AppSettings.backgroundPlaybackEnabled = enabled
     // An explicit user choice is authoritative even if the initial load failed.
     AppSettings.settingsLoaded = true
+  }
+
+  static async saveStreamingPlayback(context: common.Context, enabled: boolean): Promise<void> {
+    const store = await preferences.getPreferences(context, AppSettings.STORE_NAME)
+    await store.put(AppSettings.STREAMING_PLAYBACK_KEY, enabled)
+    await store.flush()
+    AppSettings.streamingPlaybackEnabled = enabled
   }
 
   static async saveAiSettings(context: common.Context, baseUrl: string, apiKey: string,

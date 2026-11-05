@@ -18,6 +18,7 @@ import { PlaybackAction, PlaybackControlBridge } from './PlaybackControlBridge'
 import { ListeningScrobble } from './ListeningScrobble'
 import { SongAudioResource, SongQualityService } from './SongQualityService'
 import { secureAudioUrl, StreamingAudioSource } from './StreamingAudio'
+import { MemoryAudioLoad } from './MemoryAudioSource'
 import { RadioService } from './RadioService'
 import { CloudService } from './CloudService'
 
@@ -63,9 +64,15 @@ export class PlayerController {
   // descriptor callback while the song is playing. Cancelled on song switch / teardown.
   private audioStream?: StreamingAudioSource
 
+  // Whole-file (non-streaming) loader, used when the streaming toggle is off. Also
+  // outlives the load and is cancelled on song switch / teardown.
+  private audioLoad?: MemoryAudioLoad
+
   private closeAudioStream(): void {
     this.audioStream?.cancel()
     this.audioStream = undefined
+    this.audioLoad?.cancel()
+    this.audioLoad = undefined
   }
 
   private foreground: boolean = true
@@ -911,20 +918,38 @@ export class PlayerController {
         return
       }
       if (resource.size > 0) {
-        // Range-backed streaming: only a bounded window is resident, so a 100 MB+
-        // FLAC starts playing after ~1 MB instead of being materialised in RAM first.
-        const stream = new StreamingAudioSource(resource.url, resource.size)
-        this.audioStream = stream
-        await stream.preload()
-        if (requestToken !== this.playRequestToken || this.store.currentSong.id !== song.id ||
-          !this.isCurrentPlayer(player, generation)) {
-          if (this.audioStream === stream) { this.audioStream = undefined }
-          stream.cancel()
-          return
+        if (AppSettings.streamingPlaybackEnabled) {
+          // Range-backed streaming: only a bounded window is resident, so a 100 MB+
+          // FLAC starts playing after ~1 MB instead of being materialised in RAM first.
+          const stream = new StreamingAudioSource(resource.url, resource.size)
+          this.audioStream = stream
+          await stream.preload()
+          if (requestToken !== this.playRequestToken || this.store.currentSong.id !== song.id ||
+            !this.isCurrentPlayer(player, generation)) {
+            if (this.audioStream === stream) { this.audioStream = undefined }
+            stream.cancel()
+            return
+          }
+          this.sourceSongId = song.id
+          this.log('SET_STREAMING_SOURCE', `requestToken=${requestToken} generation=${generation} songId=${song.id} ${stream.stats()}`)
+          player.dataSrc = stream.descriptor()
+        } else {
+          // Fallback: materialise the whole file in memory, then play (the original
+          // strategy). Kept for devices / VMs whose AVPlayer cannot consume the
+          // Range-backed dataSrc. A large FLAC therefore occupies RAM in full.
+          const load = new MemoryAudioLoad()
+          this.audioLoad = load
+          const source = await load.load(resource.url, resource.size)
+          if (requestToken !== this.playRequestToken || this.store.currentSong.id !== song.id ||
+            !this.isCurrentPlayer(player, generation)) {
+            if (this.audioLoad === load) { this.audioLoad = undefined }
+            return
+          }
+          this.audioLoad = undefined
+          this.sourceSongId = song.id
+          this.log('SET_MEMORY_SOURCE', `requestToken=${requestToken} generation=${generation} songId=${song.id} bytes=${source.size}`)
+          player.dataSrc = source.descriptor()
         }
-        this.sourceSongId = song.id
-        this.log('SET_STREAMING_SOURCE', `requestToken=${requestToken} generation=${generation} songId=${song.id} ${stream.stats()}`)
-        player.dataSrc = stream.descriptor()
       } else {
         // Radio / programme / voice streams have no declared size; let AVPlayer
         // handle the network stream natively instead of buffering anything in-app.

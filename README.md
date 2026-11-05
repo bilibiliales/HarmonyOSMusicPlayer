@@ -56,7 +56,7 @@
 
 ### 播放器
 - 基于 AVPlayer 的真实音频播放
-- **流式播放**：按 HTTP Range 分段按需取数，只保留有界窗口，100MB+ FLAC 不再整曲载入内存
+- **流式播放（默认开启，可在设置中关闭）**：按 HTTP Range 分段按需取数，只保留有界窗口，100MB+ FLAC 不再整曲载入内存；关闭后回退为「整曲下载到内存再播放」的旧策略（兼容无法消费流式 `dataSrc` 的旧设备 / 虚拟机）
 - 全局共享播放队列 (PlayerStore)
 - 播放模式：顺序播放、列表循环、单曲循环、随机播放
 - 音质切换：标准 / 较高 / 极高 / 无损 / Hi-Res
@@ -165,7 +165,7 @@ HarmonyOS 系统能力层 (AVPlayer / AVSession / NetworkKit / FormKit / ShareKi
 - **导航**：全部页面使用 `Navigation` + `NavPathStack` + `navDestination`，统一由 Index 页面的 PageMap 注册，不使用 router
 - **网络**：`ApiClient` 统一封装 GET / JSON POST / 表单 POST / 文件上传，Cookie 自动附加，每次请求后销毁 HttpRequest
 - **播放**：`PlayerController` 单例管理 AVPlayer，通过 playRequestToken 防止快速切歌串歌，音质解析走 `SongQualityService`
-- **流式音源**：`StreamingAudio` 的 `StreamingAudioSource` 用 4MB Range 窗口 + 16MB LRU 块缓存为 `AVPlayer.dataSrc` 供数；起播仅预取 2MB 头部与 256KB 尾部，跳转时按需拉取对应区间。`StreamingDownload` 把下载分块直接写入最终文件，不再产生临时文件与整文件复制
+- **流式音源**：`StreamingAudio` 的 `StreamingAudioSource` 用 4MB Range 窗口 + 16MB LRU 块缓存为 `AVPlayer.dataSrc` 供数；起播仅预取 2MB 头部与 256KB 尾部，跳转时按需拉取对应区间。`StreamingDownload` 把下载分块直接写入最终文件，不再产生临时文件与整文件复制。设置里 **流式加载播放** 开关关闭时，`PlayerController` 改用 `MemoryAudioSource`/`MemoryAudioLoad` 把整曲载入内存后再交给 `AVPlayer`，作为兼容性回退。
 - **媒体会话按需加载**：`MediaSessionContract.ets` 是不含任何媒体 Kit 的中立契约（数值常量 + 接口 + 唯一准入判断 `shouldLoadMediaSession`）；`PlayerController` 静态只依赖它。唯一静态导入 `@kit.AVSessionKit` 的 `MediaSessionBridge.ets` 通过 `await import('./MediaSessionBridge')` 加载，且该调用只存在于 `createSystemSession()`，后者只在 `mediaSessionAllowed()` 为真时由 `ensureSystemSession()` 调用。常量路径为编译期可解析的动态导入，无需 `runtimeOnly` 配置
 - **状态**：`@Provide` / `@Consume` 跨组件共享 AuthStore 和 PlayerStore
 - **持久化**：Preferences 保存 API 地址、Cookie、用户资料、播放队列、进度、模式和音质；AppSettings 负责读写与同步桌面卡片
@@ -225,6 +225,17 @@ SKIP_LIVE=1 node entry/src/test/StreamingAudio.regression.cjs
 
 回归覆盖：起播预取量、顺序读取与任意跳转的字节正确性、常驻内存上界、取消语义、
 以及下载探测头只取 64 字节与直写文件的完整性。
+
+### 流式开关与回退验证
+
+```bash
+# 内存回退源字节级往返 + 静态接线扫描（设置开关→AppSettings→PlayerController 分支）
+node entry/src/test/StreamingToggle.regression.cjs
+```
+
+覆盖：恢复后的 `MemoryAudioSource` 顺序/跳转/EOF/非法参数/相对读字节全对；
+以及 `streamingPlaybackEnabled`（默认 true）从设置 UI 经 `AppSettings.saveStreamingPlayback`
+一路到 `PlayerController` 在 `StreamingAudioSource` / `MemoryAudioLoad` 之间分支的完整闭环。
 
 ### 后台播放开关隔离性验证
 

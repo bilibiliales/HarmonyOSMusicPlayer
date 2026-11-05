@@ -51,6 +51,7 @@ export struct SettingsPage {
   @State defaultOnlineQuality: string = AppSettings.defaultOnlineQuality
   @State defaultDownloadQuality: string = AppSettings.defaultDownloadQuality
   @State backgroundPlaybackEnabled: boolean = AppSettings.backgroundPlaybackEnabled
+  @State streamingPlaybackEnabled: boolean = AppSettings.streamingPlaybackEnabled
   @State effectsEnabled: boolean = AppSettings.effectsEnabled
   @State downloadSaveMode: string = AppSettings.downloadSaveMode
   @State askDownloadSaveMode: boolean = AppSettings.askDownloadSaveMode
@@ -192,6 +193,19 @@ export struct SettingsPage {
     }
   }
 
+  private async changeStreamingPlayback(enabled: boolean): Promise<void> {
+    if (enabled === AppSettings.streamingPlaybackEnabled) { return }
+    try {
+      const context = this.getUIContext().getHostContext() as common.UIAbilityContext
+      await AppSettings.saveStreamingPlayback(context, enabled)
+      BubbleTip.show(this.getUIContext(), enabled ? '已开启流式播放' : '已关闭流式播放，将整曲载入内存')
+    } catch (error) {
+      BubbleTip.show(this.getUIContext(), error instanceof Error ? error.message : '流式播放设置失败')
+    } finally {
+      this.streamingPlaybackEnabled = AppSettings.streamingPlaybackEnabled
+    }
+  }
+
   private async savePlaybackDefaults(): Promise<void> {
     try {
       const context = this.getUIContext().getHostContext() as common.UIAbilityContext
@@ -254,6 +268,16 @@ export struct SettingsPage {
               }.width('100%')
               Text('关闭后仅在前台播放，切到后台自动暂停；开启后支持后台播放和系统媒体控制。')
                 .width('100%').fontSize(12).fontColor('#b9b9c0')
+              Row({ space: 12 }) {
+                Column({ space: 6 }) {
+                  Text('流式加载播放').fontSize(14).fontColor('#ffffff')
+                  Text('开启后按需分段拉取，内存占用与文件大小无关；关闭则整曲下载到内存后再播放（兼容旧设备）。')
+                    .fontSize(11).fontColor('#92929a').width('100%')
+                }.layoutWeight(1).alignItems(HorizontalAlign.Start)
+                Toggle({ type: ToggleType.Switch, isOn: this.streamingPlaybackEnabled })
+                  .selectedColor('#ef233c').enabled(!this.changingPlayback)
+                  .onChange((enabled: boolean) => this.changeStreamingPlayback(enabled))
+              }.width('100%').margin({ top: 6 })
               Text('播放顺序').width('100%').fontSize(12).fontColor('#b9b9c0')
               Row({ space: 8 }) {
                 ForEach([PlayMode.LOOP, PlayMode.SINGLE, PlayMode.SHUFFLE], (mode: PlayMode) => {
