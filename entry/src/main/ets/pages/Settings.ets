@@ -320,6 +320,7 @@ export struct SettingsPage {
               Row() {
                 Text('下载前询问保存方式').layoutWeight(1).fontSize(14).fontColor('#ffffff')
                 Toggle({ type: ToggleType.Switch, isOn: this.askDownloadSaveMode })
+                  .selectedColor('#ef233c')
                   .onChange((value: boolean) => this.saveDownloadOption(this.downloadSaveMode, value))
               }.width('100%')
               Text('下载目录支持自动扫描；另存文件会记住位置，授权失效时请在本地音乐中重新选择文件。')
