@@ -81,7 +81,7 @@ export class AppSettings {
    */
   static settingsLoaded: boolean = false
 
-  static aiBaseUrl: string = 'https://zm.wwoyun.cn'
+  static aiBaseUrl: string = 'https://neteaseapi.gksm.store'
   static aiApiKey: string = ''
   static aiModel: string = 'gpt-3.5-turbo'
   static defaultPlayMode: PlayMode = PlayMode.LOOP

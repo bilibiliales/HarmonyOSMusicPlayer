@@ -10,15 +10,15 @@
     },
     {
       "name": "module_desc",
-      "value": "module description"
+      "value": "模块描述"
     },
     {
       "name": "EntryAbility_desc",
-      "value": "description"
+      "value": "描述"
     },
     {
       "name": "EntryAbility_label",
-      "value": "label"
+      "value": "网易云音乐"
     }
   ]
 }

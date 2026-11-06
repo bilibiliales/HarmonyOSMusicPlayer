@@ -1,6 +1,6 @@
 # HarmonyOS Music Player
 
-基于 HarmonyOS Stage 模型的在线音乐播放器客户端，使用 ArkTS + ArkUI 构建，数据源为网易云音乐 NodeJS API。
+基于 HarmonyOS Stage 模型的在线音乐播放器客户端，使用 ArkTS + ArkUI 构建，数据源为网易云音乐 NodeJS API Enhanced。
 
 ## 项目信息
 
@@ -157,7 +157,7 @@ HarmonyOS 系统能力层 (AVPlayer / AVSession / NetworkKit / FormKit / ShareKi
         ↓
 状态与服务层 (AuthStore / PlayerStore / PlayerController / ApiClient / AppSettings)
         ↓
-网易云音乐 NodeJS API (第三方数据源)
+网易云音乐 NodeJS API Enhanced (第三方数据源)
 ```
 
 ### 关键设计
@@ -177,7 +177,7 @@ HarmonyOS 系统能力层 (AVPlayer / AVSession / NetworkKit / FormKit / ShareKi
 - ArkTS + ArkUI
 
 ### 后端 API
-本项目使用 [网易云音乐 NodeJS API](https://www.npmjs.com/package/NeteaseCloudMusicApi) 作为数据源，需自行部署：
+本项目使用 [网易云音乐 NodeJS API Enhanced](https://github.com/neteasecloudmusicapienhanced/api-enhanced) 作为数据源，需自行部署：
 
 ```bash
 git clone https://github.com/Binaryify/NeteaseCloudMusicApi.git

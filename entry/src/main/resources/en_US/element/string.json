@@ -1,12 +1,20 @@
 {
   "string": [
     {
+      "name": "music_card_name",
+      "value": "Music Player"
+    },
+    {
+      "name": "music_card_description",
+      "value": "Music card"
+    },
+    {
       "name": "module_desc",
       "value": "module description"
     },
     {
       "name": "EntryAbility_desc",
-      "value": "Netease Cloud Music"
+      "value": "description"
     },
     {
       "name": "EntryAbility_label",

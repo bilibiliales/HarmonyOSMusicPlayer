@@ -2,7 +2,6 @@ import { EventUpdates } from '../services/EventUpdates'
 import { EventPresentation } from '../services/EventPresentation'
 import { EventCard } from '../components/EventCard'
 import { ListeningPlaylistService } from '../services/ListeningPlaylistService'
-import { userPlaylists } from '../constants'
 import { playlistType, songItemType } from '../models'
 import {
   AlbumPageParam,
@@ -89,8 +88,8 @@ export struct Mine {
 
   @State currentTab: string = 'music'
   @State viewMode: string = 'list'
-  @State playlists: playlistType[] = userPlaylists
-  @State createdPlaylists: playlistType[] = userPlaylists
+  @State playlists: playlistType[] = []
+  @State createdPlaylists: playlistType[] = []
   @State subscribedPlaylists: playlistType[] = []
   @State collectedPlaylists: playlistType[] = []
   @State subscribedAlbums: SubscribedAlbum[] = []
@@ -236,8 +235,8 @@ export struct Mine {
       province: 0,
       rawSignature: ''
     }
-    this.playlists = userPlaylists
-    this.createdPlaylists = userPlaylists
+    this.playlists = []
+    this.createdPlaylists = []
     this.subscribedPlaylists = []
     this.collectedPlaylists = []
     this.subscribedAlbums = []
@@ -742,32 +741,32 @@ export struct Mine {
   build() {
     Stack({ alignContent: Alignment.BottomEnd }) {
       Column() {
-      this.HeaderSection()
-      this.StatsSection()
-      this.SubTabBar()
-      Refresh({ refreshing: $$this.isRefreshing }) {
-        Scroll() {
-          Column() {
-            if (this.currentTab === 'music') {
-              this.MusicContent()
-            } else if (this.currentTab === 'podcast') {
-              this.PodcastContent()
-            } else {
-              this.MomentContent()
+        this.HeaderSection()
+        this.StatsSection()
+        this.SubTabBar()
+        Refresh({ refreshing: $$this.isRefreshing }) {
+          Scroll() {
+            Column() {
+              if (this.currentTab === 'music') {
+                this.MusicContent()
+              } else if (this.currentTab === 'podcast') {
+                this.PodcastContent()
+              } else {
+                this.MomentContent()
+              }
             }
           }
+          .layoutWeight(1)
+          .scrollBar(BarState.Off)
         }
         .layoutWeight(1)
-        .scrollBar(BarState.Off)
-      }
-      .layoutWeight(1)
-      .onRefreshing(() => {
-        this.pullRefresh().then(() => {
-          this.isRefreshing = false
-        }).catch(() => {
-          this.isRefreshing = false
+        .onRefreshing(() => {
+          this.pullRefresh().then(() => {
+            this.isRefreshing = false
+          }).catch(() => {
+            this.isRefreshing = false
+          })
         })
-      })
       }
       .width('100%').height('100%')
 
@@ -1277,9 +1276,6 @@ export struct Mine {
               .fontSize(14)
               .fontWeight(FontWeight.Medium)
               .fontColor('#ffffff')
-            Text('当前列表为离线演示内容')
-              .fontSize(11)
-              .fontColor('#77777f')
           }
           .layoutWeight(1)
           .alignItems(HorizontalAlign.Start)

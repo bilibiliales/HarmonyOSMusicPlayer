@@ -422,44 +422,4 @@ export const momentList: momentListType[] = [
   }
 ]
 
-// 我的页面 - 用户歌单数据（预留API：/user/playlist）
-export const userPlaylists: playlistType[] = [
-  {
-    id: 'liked',
-    name: '我喜欢的音乐',
-    cover: 'http://yjy-teach-oss.oss-cn-beijing.aliyuncs.com/HeimaCloudMusic/list1.jpg',
-    count: 168,
-    creator: '网易云音乐',
-    isLiked: true
-  },
-  {
-    id: 'pl001',
-    name: '华语流行经典',
-    cover: 'http://yjy-teach-oss.oss-cn-beijing.aliyuncs.com/HeimaCloudMusic/list2.jpg',
-    count: 56,
-    creator: '网易云音乐'
-  },
-  {
-    id: 'pl002',
-    name: '深夜emo专用',
-    cover: 'http://yjy-teach-oss.oss-cn-beijing.aliyuncs.com/HeimaCloudMusic/list3.jpg',
-    count: 42,
-    creator: '网易云音乐'
-  },
-  {
-    id: 'pl003',
-    name: '运动健身必备',
-    cover: 'http://yjy-teach-oss.oss-cn-beijing.aliyuncs.com/HeimaCloudMusic/list4.jpg',
-    count: 38,
-    creator: '网易云音乐'
-  },
-  {
-    id: 'pl004',
-    name: '日系摇滚精选',
-    cover: 'http://yjy-teach-oss.oss-cn-beijing.aliyuncs.com/HeimaCloudMusic/list5.jpg',
-    count: 27,
-    creator: '网易云音乐'
-  }
-]
-
 
