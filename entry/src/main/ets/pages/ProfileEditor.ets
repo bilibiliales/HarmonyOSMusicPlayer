@@ -213,7 +213,7 @@ export struct ProfileEditorPage {
         Row({ space: 12 }) {
           SymbolGlyph($r('sys.symbol.chevron_left')).fontSize(24).fontColor(['#ffffff'])
             .onClick(() => this.pageStack.pop())
-          Text('编辑个人资料').layoutWeight(1).fontSize(18).fontWeight(FontWeight.Bold)
+          Text('我的资料').layoutWeight(1).fontSize(18).fontWeight(FontWeight.Bold)
             .fontColor('#ffffff').textAlign(TextAlign.Center)
           Button(this.saving ? '保存中' : '保存').height(36).fontSize(12).fontColor('#ffffff')
             .backgroundColor(this.nickname.trim() && !this.saving ? '#ef233c' : '#38383f').borderRadius(18)
@@ -294,6 +294,17 @@ export struct ProfileEditorPage {
                 })
               }.layoutWeight(1)
             }.width('100%')
+
+            Column({ space: 4 }) {
+              Row({ space: 12 }) {
+                Column({ space: 4 }) {
+                  Text('乐迷团').fontSize(14).fontColor('#ffffff')
+                  Text('查看我加入的乐迷团与动态').fontSize(11).fontColor('#92929a')
+                }.layoutWeight(1).alignItems(HorizontalAlign.Start)
+                SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(18).fontColor(['#66666e'])
+              }.width('100%')
+            }.width('100%').padding(16).backgroundColor('#1b1b20').borderRadius(16)
+              .onClick(() => this.pageStack.pushPathByName('FanClubListPage', null))
 
             // 省份选择弹窗
             if (this.showProvinceSelector) {

@@ -4,6 +4,7 @@ import { preferences } from '@kit.ArkData'
 import { fileIo } from '@kit.CoreFileKit'
 import { formBindingData, formProvider } from '@kit.FormKit'
 import { ApiClient } from './ApiClient'
+import { DeviceService } from './DeviceService'
 import { AuthStore } from '../stores/AuthStore'
 import { PlayerStore } from '../stores/PlayerStore'
 import { PlayMode, songItemType } from '../models/music'
@@ -43,6 +44,7 @@ export class AppSettings {
   private static readonly DEFAULT_DOWNLOAD_QUALITY_KEY: string = 'default_download_quality'
   private static readonly BACKGROUND_PLAYBACK_KEY: string = 'background_playback_enabled'
   private static readonly STREAMING_PLAYBACK_KEY: string = 'streaming_playback_enabled'
+  private static readonly DEVICE_ALIAS_KEY: string = 'device_alias'
 
   static lyricPreferences: LyricPreferences = new LyricPreferences()
   static desktopLyricsEnabled: boolean = false
@@ -74,6 +76,9 @@ export class AppSettings {
    */
   static streamingPlaybackEnabled: boolean = true
 
+  // 本机上报到设备中心的别名
+  static deviceAlias: string = 'HarmonyOS 音乐播放器'
+
   /**
    * Guards the media session gate against the `true` default above: until the
    * persisted preference has actually been read, background playback is treated
@@ -104,6 +109,9 @@ export class AppSettings {
     AppSettings.backgroundPlaybackEnabled = typeof backgroundValue === 'boolean' ? backgroundValue : true
     AppSettings.streamingPlaybackEnabled = await store.get(AppSettings.STREAMING_PLAYBACK_KEY, true) === true
     AppSettings.settingsLoaded = true
+    AppSettings.deviceAlias = (await store.get(AppSettings.DEVICE_ALIAS_KEY, AppSettings.deviceAlias)) as string || AppSettings.deviceAlias
+    // 上报本机设备别名到设备中心（该接口无需登录）
+    AppSettings.reportDeviceName().catch(() => {})
     const urlValue = await store.get(AppSettings.API_BASE_URL_KEY, ApiClient.baseUrl)
     if (typeof urlValue === 'string') {
       ApiClient.setBaseUrl(urlValue)
@@ -122,6 +130,20 @@ export class AppSettings {
     }
     AppSettings.defaultOnlineQuality = AppSettings.normalizeQuality(onlineQualityValue)
     AppSettings.defaultDownloadQuality = AppSettings.normalizeQuality(downloadQualityValue)
+  }
+
+  static async saveDeviceAlias(context: common.Context, name: string): Promise<void> {
+    const alias = (name || '').trim() || AppSettings.deviceAlias
+    const store = await preferences.getPreferences(context, AppSettings.STORE_NAME)
+    await store.put(AppSettings.DEVICE_ALIAS_KEY, alias)
+    await store.flush()
+    AppSettings.deviceAlias = alias
+    await AppSettings.reportDeviceName()
+  }
+
+  // 把本机别名上报到设备中心：/deviceinfo/center/upload?deviceName=XXXXX
+  static async reportDeviceName(): Promise<void> {
+    await DeviceService.uploadDeviceName(AppSettings.deviceAlias)
   }
 
   static async loadAuth(authStore: AuthStore): Promise<void> {

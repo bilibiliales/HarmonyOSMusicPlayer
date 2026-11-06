@@ -996,6 +996,20 @@ export interface SongDetailResponse {
   songs: ApiSong[]
 }
 
+export interface SongSimiItem {
+  summary: string
+  resourceId: string
+  extraMap: Record<string, string>
+  trp_id: string
+}
+
+export interface SongSimiResponse {
+  code: number
+  data: {
+    commonResourceList: SongSimiItem[]
+  }
+}
+
 export interface CommentApiUser {
   nickname: string
   avatarUrl: string

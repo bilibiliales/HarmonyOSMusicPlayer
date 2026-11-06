@@ -14,6 +14,10 @@ import { Login } from './Login'
 import { SongWiki } from './SongWiki'
 import { SearchPage } from './Search'
 import { SettingsPage } from './Settings'
+import { DeviceManagementPage } from './DeviceManagement'
+import { FanClubListPage } from './FanClubList'
+import { FanClubDetailPage } from './FanClubDetail'
+import { FanClubDetailParam } from '../services/FanClubService'
 import { RelationshipListPage, RelationshipPageParam } from './RelationshipList'
 import { UserLevelPage } from './UserLevel'
 import { ListeningStatsPage } from './ListeningStats'
@@ -143,6 +147,12 @@ struct HomeIndex {
       SearchPage()
     } else if (name === 'SettingsPage') {
       SettingsPage()
+    } else if (name === 'DeviceManagementPage') {
+      DeviceManagementPage()
+    } else if (name === 'FanClubListPage') {
+      FanClubListPage()
+    } else if (name === 'FanClubDetailPage') {
+      FanClubDetailPage({ pageParam: param as FanClubDetailParam })
     } else if (name === 'FollowingPage' || name === 'FollowersPage') {
       RelationshipListPage({ pageParam: param as RelationshipPageParam })
     } else if (name === 'UserLevelPage') {

@@ -1,6 +1,7 @@
 import { common, OpenLinkOptions } from '@kit.AbilityKit'
 import { VipGrowthClaimResponse, VipGrowthResponse, VipInfoResponse } from '../models/api'
 import { ApiClient } from '../services/ApiClient'
+import { SleepTimerService } from '../services/SleepTimerService'
 import { parseVipInfo, VipDisplayInfo } from '../services/VipService'
 import { AuthStore } from '../stores/AuthStore'
 
@@ -10,6 +11,7 @@ interface SidebarMenuItem {
   subtitle: string
   available: boolean
   route?: string
+  action?: string
 }
 
 @Component
@@ -31,6 +33,12 @@ export struct Sidebar {
   @State vipCardBg: string = ''
   private loadedVip: boolean = false
 
+  @State sleepSheetVisible: boolean = false
+  @State selectedMinutes: number = 30
+  @State customMinutes: number = 0
+  @State sleepRefresh: number = 0
+  private sleepTicker: number = -1
+
   private menuItems: SidebarMenuItem[] = [
     { icon: $r('sys.symbol.envelope_fill'), title: '消息中心', subtitle: '私信、评论与系统通知', available: true, route: 'MessageCenterPage' },
     { icon: $r('sys.symbol.clock'), title: '最近播放', subtitle: '歌曲、声音及更多播放记录', available: true, route: 'RecentPlaybackPage' },
@@ -38,7 +46,8 @@ export struct Sidebar {
     { icon: $r('sys.symbol.arrow_down_circle'), title: '本地与下载', subtitle: '下载管理、导入音乐与离线播放', available: true, route: 'LocalMusicPage' },
     { icon: $r('sys.symbol.wand_and_stars'), title: 'AI 写歌', subtitle: '风格改编、AI 作词与灵感创作', available: true, route: 'AiSongStudioPage' },
     { icon: $r('sys.symbol.cart'), title: '云贝中心', subtitle: '签到、任务与收支记录', available: true, route: 'YunbeiPage' },
-    { icon: $r('sys.symbol.gearshape'), title: '设置', subtitle: '播放与网络设置', available: true, route: 'SettingsPage' }
+    { icon: $r('sys.symbol.gearshape'), title: '设置', subtitle: '播放与网络设置', available: true, route: 'SettingsPage' },
+    { icon: $r('sys.symbol.clock'), title: '定时关闭', subtitle: '倒计时结束自动暂停播放', available: true, action: 'sleep' }
   ]
 
   private openLogin(): void {
@@ -315,6 +324,207 @@ export struct Sidebar {
     .width('100%')
   }
 
+  private startSleepTicker(): void {
+    this.stopSleepTicker()
+    this.sleepRefresh++
+    this.sleepTicker = setInterval(() => {
+      this.sleepRefresh++
+    }, 1000)
+  }
+
+  private stopSleepTicker(): void {
+    if (this.sleepTicker !== -1) {
+      clearInterval(this.sleepTicker)
+      this.sleepTicker = -1
+    }
+  }
+
+  private sleepStatusText(): string {
+    if (!SleepTimerService.enabled) {
+      return '选择时长后开始倒计时，仅在播放时递减'
+    }
+    if (SleepTimerService.stopAfterSong) {
+      return '倒计时结束后将播完当前歌曲再暂停'
+    }
+    return '倒计时归零将立即暂停播放'
+  }
+
+  private customLabel(): string {
+    return this.customMinutes > 0 ? `${this.customMinutes} 分钟` : '点击设置'
+  }
+
+  private selectSleepMinutes(minutes: number): void {
+    this.selectedMinutes = minutes
+    this.customMinutes = 0
+    SleepTimerService.start(minutes, SleepTimerService.stopAfterSong)
+    this.sleepRefresh++
+  }
+
+  private onSleepToggle(on: boolean): void {
+    if (on) {
+      const mins = this.customMinutes > 0
+        ? this.customMinutes
+        : (this.selectedMinutes > 0 ? this.selectedMinutes : 30)
+      SleepTimerService.startMs(mins * 60 * 1000, SleepTimerService.stopAfterSong)
+      if (this.customMinutes > 0) {
+        this.selectedMinutes = -1
+      } else {
+        this.selectedMinutes = mins
+      }
+    } else {
+      SleepTimerService.cancel()
+    }
+    this.sleepRefresh++
+  }
+
+  private openCustomTime(): void {
+    const defaultMin = this.customMinutes > 0
+      ? this.customMinutes
+      : (this.selectedMinutes > 0 ? this.selectedMinutes : 30)
+    const selected = new Date(2024, 0, 1, Math.floor(defaultMin / 60), defaultMin % 60)
+    TimePickerDialog.show({
+      selected: selected,
+      onAccept: (value) => {
+        const mins = value.hour * 60 + value.minute
+        if (mins > 0) {
+          this.selectedMinutes = -1
+          this.customMinutes = mins
+          SleepTimerService.startMs(mins * 60 * 1000, SleepTimerService.stopAfterSong)
+          this.sleepRefresh++
+        }
+        this.sleepSheetVisible = false
+      },
+      onCancel: () => {},
+      onChange: () => {}
+    })
+  }
+
+  @Builder
+  private SleepSheetBuilder() {
+    Column({ space: 16 }) {
+      Column({ space: 6 }) {
+        Text('定时关闭播放')
+          .fontSize(17)
+          .fontWeight(FontWeight.Bold)
+          .fontColor('#ffffff')
+        Text(this.sleepStatusText())
+          .fontSize(12)
+          .fontColor('#9a9aa2')
+      }
+      .width('100%')
+      .alignItems(HorizontalAlign.Center)
+
+      if (SleepTimerService.enabled) {
+        Text(SleepTimerService.format(SleepTimerService.remainingMs))
+          .fontSize(46)
+          .fontWeight(FontWeight.Bold)
+          .fontColor('#ffffff')
+          .margin({ top: 2, bottom: 2 })
+      }
+
+      Flex({ wrap: FlexWrap.Wrap, justifyContent: FlexAlign.SpaceBetween, alignContent: FlexAlign.SpaceBetween }) {
+        ForEach([10, 20, 30, 45, 60, 90], (minutes: number) => {
+          Column({ space: 2 }) {
+            Text(`${minutes}`)
+              .fontSize(20)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(this.selectedMinutes === minutes && SleepTimerService.enabled ? '#ffffff' : '#e7e7eb')
+            Text('分钟')
+              .fontSize(10)
+              .fontColor('#8a8a92')
+          }
+          .width(96)
+          .height(96)
+          .borderRadius(48)
+          .backgroundColor(this.selectedMinutes === minutes && SleepTimerService.enabled ? '#ef233c' : '#232329')
+          .justifyContent(FlexAlign.Center)
+          .alignItems(HorizontalAlign.Center)
+          .onClick(() => this.selectSleepMinutes(minutes))
+        }, (minutes: number) => `${minutes}`)
+      }
+      .width('100%')
+
+      Row({ space: 10 }) {
+        SymbolGlyph($r('sys.symbol.clock'))
+          .fontSize(18)
+          .fontColor(['#e7e7eb'])
+        Text('自定义时长')
+          .fontSize(14)
+          .fontColor('#ededf0')
+        Blank()
+        Text(this.customLabel())
+          .fontSize(12)
+          .fontColor('#8a8a92')
+        SymbolGlyph($r('sys.symbol.chevron_right'))
+          .fontSize(15)
+          .fontColor(['#5e5e66'])
+      }
+      .width('100%')
+      .padding({ left: 14, right: 14, top: 12, bottom: 12 })
+      .backgroundColor('#232329')
+      .borderRadius(14)
+      .onClick(() => this.openCustomTime())
+
+      Row({ space: 12 }) {
+        Column({ space: 3 }) {
+          Text('开启定时关闭')
+            .fontSize(14)
+            .fontColor('#ededf0')
+          Text('倒计时仅在播放时递减')
+            .fontSize(10)
+            .fontColor('#66666e')
+        }
+        .layoutWeight(1)
+        .alignItems(HorizontalAlign.Start)
+        Toggle({ type: ToggleType.Switch, isOn: SleepTimerService.enabled })
+          .onChange((on: boolean) => this.onSleepToggle(on))
+      }
+      .width('100%')
+      .padding({ left: 14, right: 14, top: 10, bottom: 10 })
+      .backgroundColor('#232329')
+      .borderRadius(14)
+
+      Row({ space: 12 }) {
+        Column({ space: 3 }) {
+          Text('播完整首歌后停止')
+            .fontSize(14)
+            .fontColor('#ededf0')
+          Text('等待当前歌曲自然结束后暂停')
+            .fontSize(10)
+            .fontColor('#66666e')
+        }
+        .layoutWeight(1)
+        .alignItems(HorizontalAlign.Start)
+        Toggle({ type: ToggleType.Switch, isOn: SleepTimerService.stopAfterSong })
+          .onChange((on: boolean) => {
+            SleepTimerService.stopAfterSong = on
+            this.sleepRefresh++
+          })
+      }
+      .width('100%')
+      .padding({ left: 14, right: 14, top: 10, bottom: 10 })
+      .backgroundColor('#232329')
+      .borderRadius(14)
+
+      if (SleepTimerService.enabled) {
+        Button('取消定时关闭')
+          .width('100%')
+          .height(44)
+          .backgroundColor('#2b2024')
+          .fontColor('#ff7785')
+          .borderRadius(14)
+          .onClick(() => {
+            SleepTimerService.cancel()
+            this.sleepRefresh++
+          })
+      }
+    }
+    .width('100%')
+    .padding({ left: 20, right: 20, top: 20, bottom: 28 })
+    .onAppear(() => this.startSleepTicker())
+    .onDisappear(() => this.stopSleepTicker())
+  }
+
   build() {
     Stack({ alignContent: Alignment.Start }) {
       Column()
@@ -431,7 +641,13 @@ export struct Sidebar {
               .onClick(() => {
                 if (!item.available) {
                   this.hint = `${item.title}：${item.subtitle}`
-                } else if (item.route) {
+                  return
+                }
+                if (item.action === 'sleep') {
+                  this.sleepSheetVisible = true
+                  return
+                }
+                if (item.route) {
                   this.onClose()
                   this.pageStack.pushPathByName(item.route, null)
                 } else {
@@ -482,5 +698,15 @@ export struct Sidebar {
     }
     .width('100%')
     .height('100%')
+    .bindSheet(this.sleepSheetVisible, this.SleepSheetBuilder(), {
+      height: '64%',
+      backgroundColor: '#19191f',
+      showClose: false,
+      dragBar: true,
+      onDisappear: () => {
+        this.sleepSheetVisible = false
+        this.stopSleepTicker()
+      }
+    })
   }
 }

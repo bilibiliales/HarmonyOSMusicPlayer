@@ -259,6 +259,16 @@ export struct SettingsPage {
           Column({ space: 16 }) {
             this.PrivacySection()
             Column({ space: 12 }) {
+              Text('账号').width('100%').fontSize(16).fontWeight(FontWeight.Bold).fontColor('#ffffff')
+              Row({ space: 12 }) {
+                Column({ space: 4 }) {
+                  Text('设备管理').fontSize(14).fontColor('#ffffff')
+                  Text('查看在线设备、强制下线或上报设备别名').fontSize(11).fontColor('#92929a')
+                }.layoutWeight(1).alignItems(HorizontalAlign.Start)
+                SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(18).fontColor(['#66666e'])
+              }.width('100%').onClick(() => this.pageStack.pushPathByName('DeviceManagementPage', null))
+            }.width('100%').padding(18).backgroundColor('#1b1b20').borderRadius(20)
+            Column({ space: 12 }) {
               Text('默认播放设置').width('100%').fontSize(16).fontWeight(FontWeight.Bold).fontColor('#ffffff')
               Row({ space: 12 }) {
                 Text('开启后台播放').layoutWeight(1).fontSize(14).fontColor('#ffffff')

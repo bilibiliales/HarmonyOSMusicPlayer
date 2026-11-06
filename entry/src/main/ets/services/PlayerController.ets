@@ -16,6 +16,7 @@ import { AppSettings } from './AppSettings'
 import { LiveViewController } from './LiveViewController'
 import { PlaybackAction, PlaybackControlBridge } from './PlaybackControlBridge'
 import { ListeningScrobble } from './ListeningScrobble'
+import { SleepTimerService } from './SleepTimerService'
 import { SongAudioResource, SongQualityService } from './SongQualityService'
 import { secureAudioUrl, StreamingAudioSource } from './StreamingAudio'
 import { MemoryAudioLoad } from './MemoryAudioSource'
@@ -56,6 +57,7 @@ export class PlayerController {
   private systemSessionGeneration: number = 0
   private lastSystemPositionSync: number = 0
   private lastLiveViewPositionSync: number = 0
+  private lastSleepTick: number = 0
   private externalControlInProgress: boolean = false
   private released: boolean = false
   private scrobble: ListeningScrobble = new ListeningScrobble()
@@ -619,6 +621,15 @@ export class PlayerController {
         this.store.position = Math.max(0, time)
         this.scrobble.update(time, this.store.isPlaying)
         const now = Date.now()
+        const sleepDelta = now - this.lastSleepTick
+        this.lastSleepTick = now
+        if (this.store.isPlaying && sleepDelta > 0 && sleepDelta < 5000) {
+          SleepTimerService.tick(sleepDelta)
+          if (SleepTimerService.enabled && SleepTimerService.remainingMs <= 0 && !SleepTimerService.stopAfterSong) {
+            SleepTimerService.cancel()
+            this.pause().catch((error: Error) => this.log('SLEEP_TIMER_PAUSE_FAILED', error.message))
+          }
+        }
         if (now - this.lastSystemPositionSync >= 2000) {
           this.lastSystemPositionSync = now
           this.syncSystemPlayback(this.store.isPlaying ? SessionPlaybackState.PLAY :
@@ -739,6 +750,11 @@ export class PlayerController {
       }
     } else if (state === 'completed') {
       if (this.sourceSongId !== this.store.currentSong.id) {
+        return
+      }
+      // 定时关闭：播完整首歌后停止
+      if (SleepTimerService.consumePendingStop()) {
+        this.pause().catch((error: Error) => this.log('SLEEP_TIMER_PENDING_STOP_FAILED', error.message))
         return
       }
       this.store.isPlaying = false
@@ -864,7 +880,12 @@ export class PlayerController {
 
     const requestToken = ++this.playRequestToken
     this.sourceLocalUri = song.localUri || ''
-    if (!forceReload) { this.scrobble.reset() }
+    if (!forceReload) {
+      // 切歌前：若上一首实际听歌时长 > 60s，补打卡（submit 已同步置位，与随后的 reset 不冲突）
+      this.scrobble.switchOut(this.store.currentSong, this.store.duration)
+        .catch((error: Error) => this.log('SCROBBLE_SWITCH_FAILED', error.message))
+      this.scrobble.reset()
+    }
     this.store.actualQuality = ''
     if (!forceReload) {
       this.resumePosition = 0

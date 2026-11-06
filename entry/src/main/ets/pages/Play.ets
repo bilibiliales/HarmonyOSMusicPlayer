@@ -23,6 +23,7 @@ import {
   SharePageParam,
   SongDetailResponse,
   SongRedCountResponse,
+  SongSimiResponse,
   UserPlaylistResponse
 } from '../models/api'
 import { PlayMode, playlistType, QualityOption, SongArtist, songItemType } from '../models/music'
@@ -73,6 +74,7 @@ export struct Play {
   @State availableQualities: QualityOption[] = []
   @State qualityLoading: boolean = false
   @State qualityError: string = ''
+  @State simiInserting: boolean = false
   @State downloadQualities: QualityOption[] = []
   @State downloadQualityLoading: boolean = false
   @State downloadQualityError: string = ''
@@ -1057,6 +1059,49 @@ export struct Play {
     }
   }
 
+  // 插播相似歌曲：取当前歌曲的相似推荐，插入到播放队列当前歌曲的下一首。
+  private async insertSimilarSong(): Promise<void> {
+    const song = this.playerStore.currentSong
+    if (!song || !song.id || this.simiInserting) {
+      return
+    }
+    this.simiInserting = true
+    try {
+      const simi = await ApiClient.get<SongSimiResponse>('/song/simi/get', [
+        { key: 'id', value: song.id }
+      ])
+      const list = simi?.data?.commonResourceList || []
+      let songId = ''
+      for (let i = 0; i < list.length; i++) {
+        const candidate = list[i]?.extraMap?.songId
+        if (candidate && /^\d+$/.test(candidate)) {
+          songId = candidate
+          break
+        }
+      }
+      if (!songId) {
+        BubbleTip.show(this.getUIContext(), '没有找到可插播的相似歌曲')
+        return
+      }
+      const detail = await ApiClient.get<SongDetailResponse>('/song/detail', [
+        { key: 'ids', value: songId }
+      ])
+      const apiSong = detail?.songs && detail.songs.length > 0 ? detail.songs[0] : undefined
+      if (!apiSong) {
+        BubbleTip.show(this.getUIContext(), '相似歌曲信息获取失败')
+        return
+      }
+      const item = mapApiSong(apiSong)
+      await playerController.insertNext([item])
+      BubbleTip.show(this.getUIContext(), `已插播：${item.name}`)
+      this.closeSheet()
+    } catch (error) {
+      BubbleTip.show(this.getUIContext(), error instanceof Error ? error.message : '插播相似歌曲失败')
+    } finally {
+      this.simiInserting = false
+    }
+  }
+
   private async openCurrentAlbum(): Promise<void> {
     if (this.isNonCatalogAudio()) { this.openAudioDetails(); return }
     const song = this.playerStore.currentSong
@@ -1549,6 +1594,21 @@ export struct Play {
       .width('100%').height(68).padding({ left: 20, right: 20 })
       .enabled(!this.coverSaving && this.playerStore.currentSong.img.length > 0)
       .onClick(() => this.saveCoverFromMenu())
+      Row({ space: 14 }) {
+        if (this.simiInserting) {
+          LoadingProgress().width(24).height(24).color('#ffffff')
+        } else {
+          SymbolGlyph($r('sys.symbol.plus_circle')).fontSize(24).fontColor(['#ffffff'])
+        }
+        Column({ space: 4 }) {
+          Text(this.simiInserting ? '正在插播…' : '插播相似歌曲').fontSize(15).fontColor('#ffffff')
+          Text('获取相似歌曲并插入到当前歌曲之后').fontSize(11).fontColor('#77777f')
+        }
+        .layoutWeight(1).alignItems(HorizontalAlign.Start)
+      }
+      .width('100%').height(68).padding({ left: 20, right: 20 })
+      .enabled(!this.simiInserting && this.playerStore.currentSong.id.length > 0)
+      .onClick(() => this.insertSimilarSong())
     }
   }
 
