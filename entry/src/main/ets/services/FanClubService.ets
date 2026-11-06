@@ -1,5 +1,5 @@
 import { ApiClient } from './ApiClient'
-import { EventInfo, EventPicture, UserEventItem } from '../models/api'
+import { ApiParam, EventInfo, EventPicture, UserEventItem } from '../models/api'
 
 export interface FanClubGroup {
   fansGroupId: string
@@ -41,22 +41,34 @@ export interface FanClubFeedResult {
   cursor: string
 }
 
+interface GroupListData {
+  groups?: FanClubGroup[]
+}
 interface GroupListResponse {
   code: number
-  data: { groups?: FanClubGroup[] }
+  data: GroupListData
 }
 
+interface GroupDetailData {
+  fansGroupInfo?: FanClubDetail | null
+}
 interface GroupDetailResponse {
   code: number
-  data: { fansGroupInfo?: FanClubDetail | null }
+  data: GroupDetailData
 }
 
+interface FeedPage {
+  size?: number
+  cursor?: string
+  more?: boolean
+}
+interface FeedData {
+  records?: object[]
+  page?: FeedPage
+}
 interface FeedResponse {
   code: number
-  data: {
-    records?: object[]
-    page?: { size?: number; cursor?: string; more?: boolean }
-  }
+  data: FeedData
 }
 
 export class FanClubService {
@@ -79,18 +91,19 @@ export class FanClubService {
 
   // 乐迷团动态 / 笔记（复用通用动态组件渲染，故映射为 UserEventItem）
   static async getGroupFeed(groupId: string, cursor: string = '0', size: number = 20): Promise<FanClubFeedResult> {
-    const params = [
+    const params: ApiParam[] = [
       { key: 'fansGroupId', value: groupId },
       { key: 'size', value: size.toString() },
       { key: 'cursor', value: cursor }
     ]
     const resp = await ApiClient.get<FeedResponse>('/fans/group/feed/recommend', params)
-    const rawRecords = resp?.data?.records || []
-    const page = resp?.data?.page || {}
+    const data = resp?.data
+    const rawRecords: object[] = (data && data.records) ? data.records : []
+    const page = (data && data.page) ? data.page : undefined
     return {
       records: rawRecords.map((item: object) => FanClubService.toUserEvent(item)),
-      more: !!page.more,
-      cursor: page.cursor || ''
+      more: !!(page && page.more),
+      cursor: (page && page.cursor) || ''
     }
   }
 

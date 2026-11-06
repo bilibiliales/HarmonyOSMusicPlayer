@@ -1,4 +1,5 @@
 import { ApiClient } from './ApiClient'
+import { ApiParam } from '../models/api'
 import { songItemType } from '../models/music'
 
 // Track media time actually traversed; seeks and resumed progress do not count as listening.
@@ -45,7 +46,7 @@ export class ListeningScrobble {
   private async submit(song: songItemType, seconds: number): Promise<void> {
     const sourceId = song.sourceId || song.albumId || ''
     if (!sourceId || !/^\d+$/.test(sourceId)) { return }
-    const id = song.id
+    const id = song.id.toString()
     const time = Math.max(1, Math.floor(seconds)).toString()
     const name = song.name || ''
     const artist = song.author || ''
@@ -53,7 +54,7 @@ export class ListeningScrobble {
     const timestamp = Date.now().toString()
     // 同步置位，避免与随后到来的 reset() 竞争导致重复提交
     this.submitted = true
-    const params = [
+    const params: ApiParam[] = [
       { key: 'id', value: id },
       { key: 'time', value: time },
       { key: 'sourceid', value: sourceId },

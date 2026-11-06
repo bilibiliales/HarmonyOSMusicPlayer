@@ -1,4 +1,5 @@
-import { FanClubGroup, FanClubService } from '../services/FanClubService'
+import { FanClubGroup, FanClubDetailParam, FanClubService } from '../services/FanClubService'
+import { ArtistPageParam } from '../models/api'
 import { BubbleTip } from '../services/BubbleTip'
 import { AuthStore } from '../stores/AuthStore'
 
@@ -27,13 +28,14 @@ export struct FanClubListPage {
   }
 
   private openDetail(group: FanClubGroup): void {
-    this.pageStack.pushPathByName('FanClubDetailPage', { groupId: group.fansGroupId } as never)
+    const param: FanClubDetailParam = { groupId: group.fansGroupId }
+    this.pageStack.pushPathByName('FanClubDetailPage', param)
   }
 
   private openArtist(group: FanClubGroup): void {
     if (!group.headId) { return }
-    const param = { id: String(group.headId), name: group.artistName, picUrl: group.headAvatarUrl }
-    this.pageStack.pushPathByName('ArtistPage', param as never)
+    const param: ArtistPageParam = { id: String(group.headId), name: group.artistName, picUrl: group.headAvatarUrl }
+    this.pageStack.pushPathByName('ArtistPage', param)
   }
 
   build() {
@@ -56,7 +58,7 @@ export struct FanClubListPage {
                 .textAlign(TextAlign.Center).padding({ top: 40 })
             } else if (this.loading) {
               LoadingProgress().width(32).height(32).color('#ef233c')
-                .alignSelf(HorizontalAlign.Center).padding({ top: 40 })
+                .alignSelf(ItemAlign.Center).padding({ top: 40 })
             } else if (this.groups.length === 0) {
               Text('还没有加入任何乐迷团').width('100%').fontSize(13).fontColor('#92929a')
                 .textAlign(TextAlign.Center).padding({ top: 40 })
@@ -79,7 +81,7 @@ export struct FanClubListPage {
                   }.layoutWeight(1).alignItems(HorizontalAlign.Start)
                   SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(18).fontColor(['#66666e'])
                 }.width('100%').padding(16).backgroundColor('#1b1b20').borderRadius(18)
-                  .onClick(() => this.openDetail(group))
+                .onClick(() => this.openDetail(group))
               }, (group: FanClubGroup) => group.fansGroupId)
             }
           }.width('100%').padding({ left: 16, right: 16, top: 12, bottom: 32 })
