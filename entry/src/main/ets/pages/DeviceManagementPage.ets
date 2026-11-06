@@ -1,3 +1,4 @@
+import { common } from '@kit.AbilityKit'
 import { AppSettings } from '../services/AppSettings'
 import { DeviceItem, DeviceService } from '../services/DeviceService'
 import { BubbleTip } from '../services/BubbleTip'

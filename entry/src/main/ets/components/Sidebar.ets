@@ -522,7 +522,7 @@ export struct Sidebar {
     .width('100%')
     .padding({ left: 20, right: 20, top: 20, bottom: 28 })
     .onAppear(() => this.startSleepTicker())
-    .onDisappear(() => this.stopSleepTicker())
+    .onDisAppear(() => this.stopSleepTicker())
   }
 
   build() {

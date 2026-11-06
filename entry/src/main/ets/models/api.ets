@@ -1003,11 +1003,13 @@ export interface SongSimiItem {
   trp_id: string
 }
 
+export interface SongSimiData {
+  commonResourceList: SongSimiItem[]
+}
+
 export interface SongSimiResponse {
   code: number
-  data: {
-    commonResourceList: SongSimiItem[]
-  }
+  data: SongSimiData
 }
 
 export interface CommentApiUser {
