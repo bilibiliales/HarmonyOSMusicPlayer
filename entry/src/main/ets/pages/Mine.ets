@@ -776,7 +776,7 @@ export struct Mine {
         }
         .width(58).height(58).borderRadius(29).backgroundColor('#ef233c')
         .shadow({ radius: 18, color: 'rgba(239,35,60,0.38)', offsetY: 7 })
-        .margin({ right: 20, bottom: 24 }).onClick(() => this.openPublishEvent())
+        .margin({ right: 20, bottom: 84 }).onClick(() => this.openPublishEvent())
       }
     }
     .width('100%')

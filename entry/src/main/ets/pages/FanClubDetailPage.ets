@@ -1,5 +1,5 @@
 import { FanClubDetail, FanClubDetailParam, FanClubService } from '../services/FanClubService'
-import { UserEventItem } from '../models/api'
+import { ArtistPageParam, UserEventItem } from '../models/api'
 import { EventCard } from '../components/EventCard'
 import { EventPresentation } from '../services/EventPresentation'
 import { BubbleTip } from '../services/BubbleTip'
@@ -63,8 +63,8 @@ export struct FanClubDetailPage {
 
   private openArtist(): void {
     if (!this.detail || !this.detail.headId) { return }
-    const param = { id: String(this.detail.headId), name: this.detail.artistName, picUrl: this.detail.headAvatarUrl }
-    this.pageStack.pushPathByName('ArtistPage', param as never)
+    const param: ArtistPageParam = { id: String(this.detail.headId), name: this.detail.artistName, picUrl: this.detail.headAvatarUrl }
+    this.pageStack.pushPathByName('ArtistPage', param)
   }
 
   private applyEventChange(changed: UserEventItem, deleted: boolean): void {
@@ -114,16 +114,16 @@ export struct FanClubDetailPage {
                 }
               }.width('100%').padding(18).backgroundColor('#16161b').borderRadius(20)
             } else if (this.loading) {
-              LoadingProgress().width(32).height(32).color('#ef233c').alignSelf(HorizontalAlign.Center).padding({ top: 20 })
+              LoadingProgress().width(32).height(32).color('#ef233c').alignSelf(ItemAlign.Center).padding({ top: 20 })
             }
 
             Column({ space: 10 }) {
               Text('动态').width('100%').fontSize(16).fontWeight(FontWeight.Bold).fontColor('#ffffff')
               if (this.feedLoading && this.events.length === 0) {
-                LoadingProgress().width(28).height(28).color('#ef233c').alignSelf(HorizontalAlign.Center)
+                LoadingProgress().width(28).height(28).color('#ef233c').alignSelf(ItemAlign.Center)
               } else if (this.events.length === 0) {
                 Text(this.message || '还没有动态').fontSize(12).fontColor('#92929a')
-                  .alignSelf(HorizontalAlign.Center).padding({ top: 16, bottom: 16 })
+                  .alignSelf(ItemAlign.Center).padding({ top: 16, bottom: 16 })
               } else {
                 ForEach(this.events.filter((event: UserEventItem) => event.id > 0), (item: UserEventItem) => {
                   EventCard({ item: item, onChanged: (event: UserEventItem, deleted: boolean) => this.applyEventChange(event, deleted) })

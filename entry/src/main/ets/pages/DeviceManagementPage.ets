@@ -1,4 +1,5 @@
 import { common } from '@kit.AbilityKit'
+import { deviceInfo } from '@kit.BasicServicesKit'
 import { AppSettings } from '../services/AppSettings'
 import { DeviceItem, DeviceService } from '../services/DeviceService'
 import { BubbleTip } from '../services/BubbleTip'
@@ -12,7 +13,7 @@ export struct DeviceManagementPage {
 
   @State devices: DeviceItem[] = []
   @State loading: boolean = false
-  @State alias: string = AppSettings.deviceAlias
+  @State alias: string = AppSettings.deviceAlias || deviceInfo.marketName
   @State aliasSaving: boolean = false
   @State kickingKey: string = ''
 

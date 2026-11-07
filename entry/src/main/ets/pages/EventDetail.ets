@@ -2,7 +2,7 @@ import { ShareSheet } from '../components/ShareSheet'
 import { EventImages } from '../components/EventImages'
 import { ResourceComments } from '../components/ResourceComments'
 import { CommentResource } from '../models/CommentResource'
-import { EventPresentation } from '../services/EventPresentation'
+import { EventPresentation, EventResourceView } from '../services/EventPresentation'
 import {
   EventDetailPageParam,
   EventForwardData,
@@ -40,9 +40,9 @@ export struct EventDetailPage {
   @State commentSheetVisible: boolean = false
   @State commentType: number = 6
   @State shareVisible: boolean = false
-  @State shareDelete: boolean = false
   @State songLiked: boolean = false
   @State eventLikeBusy: boolean = false
+  @State deletingEvent: boolean = false
 
   aboutToAppear(): void {
     this.event = this.pageParam.event
@@ -147,6 +147,24 @@ export struct EventDetailPage {
   private song(): songItemType | null {
     const data = this.data()
     return data.song ? mapApiSong(data.song) : null
+  }
+
+  private attachedResource(): EventResourceView {
+    return EventPresentation.resource(this.event)
+  }
+
+  private hasAttachedResource(): boolean {
+    const resource = EventPresentation.resource(this.event)
+    return !!(resource.title && (resource.playlist || resource.album))
+  }
+
+  private openAttachedResource(): void {
+    const resource = EventPresentation.resource(this.event)
+    if (resource.playlist) {
+      this.pageStack.pushPathByName('PlaylistDetailPage', resource.playlist)
+    } else if (resource.album) {
+      this.pageStack.pushPathByName('AlbumDetailPage', resource.album)
+    }
   }
 
   private threadId(): string {
@@ -296,27 +314,49 @@ export struct EventDetailPage {
     }
   }
 
-  private openShare(deleting: boolean = false): void {
-    this.shareDelete = deleting
+  private openShare(): void {
     this.shareVisible = true
+  }
+
+  private confirmDeleteEvent(): void {
+    this.getUIContext().showAlertDialog({
+      title: '删除动态',
+      message: '确定删除这条动态？删除后无法恢复。',
+      primaryButton: { value: '取消', action: () => {} },
+      secondaryButton: { value: '删除', fontColor: '#ef233c', action: () => { this.deleteEvent() } }
+    })
+  }
+
+  private async deleteEvent(): Promise<void> {
+    if (this.deletingEvent) { return }
+    this.deletingEvent = true
+    try {
+      const response = await ApiClient.get<OperationResponse>('/event/del', [
+        { key: 'evId', value: this.event.id.toString() }
+      ])
+      if (response.code !== 200) { throw new Error(response.message || '动态删除失败') }
+      BubbleTip.show(this.getUIContext(), '动态已删除')
+      this.pageParam.onChanged?.(this.event, true)
+      this.pageStack.pop()
+    } catch (error) {
+      BubbleTip.show(this.getUIContext(), error instanceof Error ? error.message : '动态删除失败')
+    } finally {
+      this.deletingEvent = false
+    }
   }
 
   private moreOptions(): MenuElement[] {
     const options: MenuElement[] = [{ value: '分享', action: () => this.openShare() }]
     if (this.authStore.loggedIn && this.event.user.userId.toString() === this.authStore.userId) {
-      options.push({ value: '删除', action: () => this.openShare(true) })
+      options.push({ value: '删除', action: () => this.confirmDeleteEvent() })
     }
     return options
   }
 
   @Builder
   private ShareOptions() {
-    ShareSheet({ shareParam: EventPresentation.share(this.event), visible: true, confirmDelete: this.shareDelete,
+    ShareSheet({ shareParam: EventPresentation.share(this.event), visible: true,
       onClose: () => this.shareVisible = false,
-      onDeleted: () => {
-        this.pageParam.onChanged?.(this.event, true)
-        this.pageStack.pop()
-      },
       onShared: () => {
         const updated = EventPresentation.copy(this.event)
         updated.info.shareCount = (this.event.info.shareCount || 0) + 1
@@ -407,6 +447,28 @@ export struct EventDetailPage {
                 SymbolGlyph($r('sys.symbol.play_circle_fill')).fontSize(25).fontColor(['#ffffff'])
                   .onClick(() => this.playSong())
               }.width('100%').padding(12).backgroundColor('#24242a').borderRadius(14)
+            }
+            if (this.hasAttachedResource()) {
+              Row({ space: 11 }) {
+                if (this.attachedResource().image) {
+                  Image(this.attachedResource().image).width(58).height(58)
+                    .borderRadius(11).objectFit(ImageFit.Cover)
+                } else {
+                  Stack() {
+                    SymbolGlyph($r('sys.symbol.music')).fontSize(25).fontColor(['#a0a0a8'])
+                  }.width(58).height(58).borderRadius(11).backgroundColor('#303037')
+                }
+                Column({ space: 5 }) {
+                  Text(this.attachedResource().kind).fontSize(9).fontColor('#ff7587')
+                  Text(this.attachedResource().title).fontSize(13).fontWeight(FontWeight.Medium)
+                    .fontColor('#ededf0').maxLines(1)
+                  if (this.attachedResource().subtitle) {
+                    Text(this.attachedResource().subtitle).fontSize(10).fontColor('#77777f').maxLines(1)
+                  }
+                }.layoutWeight(1).alignItems(HorizontalAlign.Start)
+                SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(16).fontColor(['#66666e'])
+              }.width('100%').padding(11).backgroundColor('#24242a').borderRadius(13)
+                .onClick(() => this.openAttachedResource())
             }
             if (this.data().mv) {
               Row({ space: 11 }) {

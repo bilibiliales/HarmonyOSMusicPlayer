@@ -37,6 +37,7 @@ export struct Sidebar {
   @State selectedMinutes: number = 30
   @State customMinutes: number = 0
   @State sleepRefresh: number = 0
+  @State sleepRemainingMs: number = 0
   private sleepTicker: number = -1
 
   private menuItems: SidebarMenuItem[] = [
@@ -46,8 +47,8 @@ export struct Sidebar {
     { icon: $r('sys.symbol.arrow_down_circle'), title: '本地与下载', subtitle: '下载管理、导入音乐与离线播放', available: true, route: 'LocalMusicPage' },
     { icon: $r('sys.symbol.wand_and_stars'), title: 'AI 写歌', subtitle: '风格改编、AI 作词与灵感创作', available: true, route: 'AiSongStudioPage' },
     { icon: $r('sys.symbol.cart'), title: '云贝中心', subtitle: '签到、任务与收支记录', available: true, route: 'YunbeiPage' },
-    { icon: $r('sys.symbol.gearshape'), title: '设置', subtitle: '播放与网络设置', available: true, route: 'SettingsPage' },
-    { icon: $r('sys.symbol.clock'), title: '定时关闭', subtitle: '倒计时结束自动暂停播放', available: true, action: 'sleep' }
+    { icon: $r('sys.symbol.clock'), title: '定时关闭', subtitle: '倒计时结束自动暂停播放', available: true, action: 'sleep' },
+    { icon: $r('sys.symbol.gearshape'), title: '设置', subtitle: '播放与网络设置', available: true, route: 'SettingsPage' }
   ]
 
   private openLogin(): void {
@@ -326,9 +327,9 @@ export struct Sidebar {
 
   private startSleepTicker(): void {
     this.stopSleepTicker()
-    this.sleepRefresh++
+    this.refreshSleepDisplay()
     this.sleepTicker = setInterval(() => {
-      this.sleepRefresh++
+      this.refreshSleepDisplay()
     }, 1000)
   }
 
@@ -337,6 +338,12 @@ export struct Sidebar {
       clearInterval(this.sleepTicker)
       this.sleepTicker = -1
     }
+  }
+
+  // 将服务中的剩余毫秒同步到组件 @State，确保倒计时显示随数据变化实时刷新
+  private refreshSleepDisplay(): void {
+    this.sleepRemainingMs = SleepTimerService.remainingMs
+    this.sleepRefresh++
   }
 
   private sleepStatusText(): string {
@@ -357,7 +364,7 @@ export struct Sidebar {
     this.selectedMinutes = minutes
     this.customMinutes = 0
     SleepTimerService.start(minutes, SleepTimerService.stopAfterSong)
-    this.sleepRefresh++
+    this.refreshSleepDisplay()
   }
 
   private onSleepToggle(on: boolean): void {
@@ -374,24 +381,36 @@ export struct Sidebar {
     } else {
       SleepTimerService.cancel()
     }
-    this.sleepRefresh++
+    this.refreshSleepDisplay()
+  }
+
+  // TimePickerDialog 选中的是"时刻"（类似闹钟），需转换为"距此刻还有多少分钟"
+  private clockToDurationMinutes(hour: number, minute: number): number {
+    const now = new Date()
+    const target = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hour, minute, 0, 0)
+    let diffMs = target.getTime() - now.getTime()
+    if (diffMs <= 0) {
+      // 选中的时刻今天已过，顺延到明天同一时刻
+      diffMs += 24 * 60 * 60 * 1000
+    }
+    return Math.max(1, Math.round(diffMs / 60000))
   }
 
   private openCustomTime(): void {
-    const defaultMin = this.customMinutes > 0
+    const baseMin = this.customMinutes > 0
       ? this.customMinutes
       : (this.selectedMinutes > 0 ? this.selectedMinutes : 30)
-    const selected = new Date(2024, 0, 1, Math.floor(defaultMin / 60), defaultMin % 60)
+    const now = new Date()
+    const target = new Date(now.getTime() + baseMin * 60000)
+    const selected = new Date(2024, 0, 1, target.getHours(), target.getMinutes())
     TimePickerDialog.show({
       selected: selected,
       onAccept: (value) => {
-        const mins = value.hour * 60 + value.minute
-        if (mins > 0) {
-          this.selectedMinutes = -1
-          this.customMinutes = mins
-          SleepTimerService.startMs(mins * 60 * 1000, SleepTimerService.stopAfterSong)
-          this.sleepRefresh++
-        }
+        const mins = this.clockToDurationMinutes(value.hour, value.minute)
+        this.selectedMinutes = -1
+        this.customMinutes = mins
+        SleepTimerService.startMs(mins * 60 * 1000, SleepTimerService.stopAfterSong)
+        this.refreshSleepDisplay()
         this.sleepSheetVisible = false
       },
       onCancel: () => {},
@@ -415,7 +434,7 @@ export struct Sidebar {
       .alignItems(HorizontalAlign.Center)
 
       if (SleepTimerService.enabled) {
-        Text(SleepTimerService.format(SleepTimerService.remainingMs))
+        Text(SleepTimerService.format(this.sleepRemainingMs))
           .fontSize(46)
           .fontWeight(FontWeight.Bold)
           .fontColor('#ffffff')
@@ -498,7 +517,7 @@ export struct Sidebar {
         Toggle({ type: ToggleType.Switch, isOn: SleepTimerService.stopAfterSong })
           .onChange((on: boolean) => {
             SleepTimerService.stopAfterSong = on
-            this.sleepRefresh++
+            this.refreshSleepDisplay()
           })
       }
       .width('100%')
@@ -515,7 +534,7 @@ export struct Sidebar {
           .borderRadius(14)
           .onClick(() => {
             SleepTimerService.cancel()
-            this.sleepRefresh++
+            this.refreshSleepDisplay()
           })
       }
     }

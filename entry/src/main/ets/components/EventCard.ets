@@ -116,7 +116,6 @@ export struct EventCard {
   private ShareOptions() {
     ShareSheet({ shareParam: EventPresentation.share(this.item), visible: true,
       onClose: () => this.sharing = false,
-      onDeleted: () => this.onChanged(this.item, true),
       onShared: () => {
         const updated = EventPresentation.copy(this.item)
         updated.info.shareCount = (updated.info.shareCount || 0) + 1

@@ -36,6 +36,27 @@ export struct LyricSettingsSheet {
     finally { this.saving = false }
   }
 
+  private confirmRestore(): void {
+    this.getUIContext().showAlertDialog({
+      title: '恢复默认设置',
+      message: '确定将歌词显示设置恢复为默认值？',
+      primaryButton: { value: '取消', action: () => {} },
+      secondaryButton: { value: '恢复', fontColor: '#ef233c', action: () => { this.restoreDefaults() } }
+    })
+  }
+
+  private restoreDefaults(): void {
+    const defaults = new LyricPreferences()
+    this.lyricSize = defaults.fontSize
+    this.horizontal = defaults.horizontal
+    this.spacing = defaults.spacing
+    this.amplitude = defaults.amplitude
+    this.timeOffset = defaults.offset
+    this.color = defaults.highlight
+    this.onPreview(this.current())
+    this.save()
+  }
+
   @Builder
   private Control(title: string, value: number, min: number, max: number, step: number,
     change: (value: number) => void) {
@@ -48,7 +69,15 @@ export struct LyricSettingsSheet {
 
   build() {
     Column({ space: 12 }) {
-      Text('歌词显示设置').fontSize(20).fontWeight(FontWeight.Bold).fontColor('#ffffff')
+      Row() {
+        Text('歌词显示设置').fontSize(20).fontWeight(FontWeight.Bold).fontColor('#ffffff')
+        Blank()
+        SymbolGlyph($r('sys.symbol.arrow_counterclockwise'))
+          .fontSize(22)
+          .fontColor(['#9a9aa2'])
+          .padding({ left: 14, right: 2, top: 6, bottom: 6 })
+          .onClick(() => this.confirmRestore())
+      }.width('100%')
       Scroll() {
         Column({ space: 8 }) {
           this.Control('字号 · ' + this.lyricSize, this.lyricSize, 14, 32, 1, (v: number) => this.lyricSize = v)

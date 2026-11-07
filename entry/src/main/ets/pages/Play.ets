@@ -1774,7 +1774,7 @@ export struct Play {
         }
       }
       .width('100%')
-      .height(this.activeSheet === 'quality' || this.activeSheet === 'downloadQuality' ? '62%' : this.activeSheet === 'more' ? '28%' : '68%')
+      .height(this.activeSheet === 'quality' || this.activeSheet === 'downloadQuality' ? '62%' : this.activeSheet === 'more' ? '38%' : '68%')
       .backgroundColor('#19191f')
       .borderRadius({ topLeft: 28, topRight: 28 })
       .shadow({ radius: 28, color: 'rgba(0,0,0,0.45)', offsetY: -5 })

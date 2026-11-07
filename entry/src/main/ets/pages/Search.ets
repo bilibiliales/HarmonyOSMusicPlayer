@@ -2,6 +2,7 @@ import {
   AlbumPageParam,
   ApiAlbum,
   ApiArtist,
+  ApiParam,
   ApiPlaylist,
   ApiSong,
   ApiUser,
@@ -45,6 +46,7 @@ export struct SearchPage {
   @State discoveryLoading: boolean = true
   private suggestTimer: number = -1
   private suggestRequestToken: number = 0
+  private searchRequestToken: number = 0
 
   private searchTabs: SearchTabItem[] = [
     { type: 1018, title: '综合' },
@@ -97,6 +99,7 @@ export struct SearchPage {
   }
 
   private onKeywordChange(value: string): void {
+    ++this.searchRequestToken
     this.keyword = value
     this.sections = []
     this.songQueue = []
@@ -168,6 +171,8 @@ export struct SearchPage {
         items.push(item)
       })
       this.suggestionItems = items
+      this.suggestionLoading = false
+      await this.enrichSuggestionCovers(requestToken)
     } catch (_error) {
       if (requestToken === this.suggestRequestToken) {
         this.suggestionItems = []
@@ -178,6 +183,78 @@ export struct SearchPage {
         this.suggestionLoading = false
       }
     }
+  }
+
+  // 搜索结果与搜索建议返回的歌曲只带专辑 picId（数字），没有可用的封面 URL，
+  // 真实封面在 /song/detail 的 al.picUrl 中。此处批量补齐，使列表显示封面，
+  // 并让播放队列自带封面，进入播放页无需再加载。
+  private async fetchCoverMap(queue: songItemType[]): Promise<Map<string, string>> {
+    const covers = new Map<string, string>()
+    const ids: string[] = []
+    queue.forEach((song: songItemType) => {
+      if (song.id && !song.img) { ids.push(song.id) }
+    })
+    if (ids.length === 0) { return covers }
+    for (let start = 0; start < ids.length; start += 50) {
+      const batch = ids.slice(start, start + 50)
+      try {
+        const params: ApiParam[] = [{ key: 'ids', value: batch.join(',') }]
+        const response = await ApiClient.get<SongDetailResponse>('/song/detail', params)
+        const songs: ApiSong[] = response.songs || []
+        songs.forEach((song: ApiSong) => {
+          const mapped = mapApiSong(song)
+          if (mapped.img) { covers.set(mapped.id, mapped.img) }
+        })
+      } catch (_error) {
+      }
+    }
+    return covers
+  }
+
+  private async enrichSearchCovers(requestToken: number): Promise<void> {
+    const covers = await this.fetchCoverMap(this.songQueue)
+    if (requestToken !== this.searchRequestToken || covers.size === 0) { return }
+    this.songQueue.forEach((song: songItemType) => {
+      const cover = covers.get(song.id)
+      if (cover && !song.img) { song.img = cover }
+    })
+    this.songQueue = this.songQueue.slice()
+    const sections: SearchSection[] = this.sections.map((section: SearchSection) => {
+      const items: SearchDisplayItem[] = section.items.map((item: SearchDisplayItem) => {
+        const cover = covers.get(item.id)
+        if (!cover || item.image) { return item }
+        const updated: SearchDisplayItem = {
+          id: item.id, title: item.title, subtitle: item.subtitle, image: cover,
+          kind: item.kind, extra: item.extra, songIndex: item.songIndex,
+          uid: item.uid, playlist: item.playlist
+        }
+        return updated
+      })
+      const next: SearchSection = { title: section.title, items: items }
+      return next
+    })
+    this.sections = sections
+  }
+
+  private async enrichSuggestionCovers(requestToken: number): Promise<void> {
+    const covers = await this.fetchCoverMap(this.suggestionSongQueue)
+    if (requestToken !== this.suggestRequestToken || covers.size === 0) { return }
+    this.suggestionSongQueue.forEach((song: songItemType) => {
+      const cover = covers.get(song.id)
+      if (cover && !song.img) { song.img = cover }
+    })
+    this.suggestionSongQueue = this.suggestionSongQueue.slice()
+    const items: SearchDisplayItem[] = this.suggestionItems.map((item: SearchDisplayItem) => {
+      const cover = covers.get(item.id)
+      if (!cover || item.image) { return item }
+      const updated: SearchDisplayItem = {
+        id: item.id, title: item.title, subtitle: item.subtitle, image: cover,
+        kind: item.kind, extra: item.extra, songIndex: item.songIndex,
+        uid: item.uid, playlist: item.playlist
+      }
+      return updated
+    })
+    this.suggestionItems = items
   }
 
   private async search(): Promise<void> {
@@ -198,6 +275,7 @@ export struct SearchPage {
     this.suggestionSongQueue = []
     this.suggestionLoading = false
     this.searchedKeyword = keyword
+    const requestToken = ++this.searchRequestToken
     this.loading = true
     this.message = ''
     this.sections = []
@@ -210,6 +288,8 @@ export struct SearchPage {
       ])
       if (response.code === 200 && response.result) {
         this.sections = this.mapSearchResult(response)
+        this.loading = false
+        await this.enrichSearchCovers(requestToken)
       }
       if (this.sections.length === 0) {
         this.message = `没有找到相关${this.activeTabTitle()}`
@@ -491,6 +571,8 @@ export struct SearchPage {
   }
 
   private async playSong(index: number): Promise<void> {
+    // 兜底：若补封面请求尚未返回，先补齐再进播放页，避免默认无封面
+    await this.enrichSearchCovers(this.searchRequestToken)
     await playerController.setQueue(this.songQueue, index, true)
     this.pageStack.pushPathByName('PlayPage', null)
   }

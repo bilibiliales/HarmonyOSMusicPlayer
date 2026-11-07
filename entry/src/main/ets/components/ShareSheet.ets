@@ -5,7 +5,6 @@ import {
   MsgRecentContactUser,
   PrivateChatPageParam,
   SharePageParam,
-  OperationResponse,
   ShareResourceResponse
 } from '../models/api'
 import { BubbleTip } from '../services/BubbleTip'
@@ -18,9 +17,6 @@ export struct ShareSheet {
   @Consume('authStore') authStore: AuthStore
   @Prop shareParam: SharePageParam = { type: 'song', id: '', name: '', img: '' }
   @Prop visible: boolean = false
-  @Prop confirmDelete: boolean = false
-  @State confirmingDelete: boolean = false
-  @State deleting: boolean = false
   @State shareMessage: string = ''
   @State sendingToDynamic: boolean = false
   @State contactsVisible: boolean = false
@@ -29,11 +25,9 @@ export struct ShareSheet {
   @State preparingSystemShare: boolean = false
   private nearbyShare: NearbyShareSession = new NearbyShareSession()
   onClose: () => void = () => {}
-  onDeleted: () => void = () => {}
   onShared: () => void = () => {}
 
   aboutToAppear(): void {
-    this.confirmingDelete = this.confirmDelete && this.canDelete()
     this.nearbyShare.activate(() => SystemShareService.linkRecords(SystemShareService.musicLink(this.shareParam)))
   }
 
@@ -131,30 +125,6 @@ export struct ShareSheet {
     this.pageStack.pushPathByName('PrivateChatPage', chatParam)
   }
 
-  private canDelete(): boolean {
-    return this.shareParam.type === 'event' && this.authStore.loggedIn &&
-      !!this.shareParam.eventUserId && this.shareParam.eventUserId === this.authStore.userId
-  }
-
-  private async deleteEvent(): Promise<void> {
-    if (!this.canDelete() || this.deleting) { return }
-    const userId = this.authStore.userId
-    this.deleting = true
-    this.shareMessage = ''
-    try {
-      const response = await ApiClient.get<OperationResponse>('/event/del', [
-        { key: 'evId', value: this.shareParam.id }
-      ])
-      if (response.code !== 200) { throw new Error(response.message || '动态删除失败') }
-      if (userId !== this.authStore.userId) { return }
-      BubbleTip.show(this.getUIContext(), '动态已删除')
-      this.onClose()
-      this.onDeleted()
-    } catch (error) {
-      this.shareMessage = error instanceof Error ? error.message : '动态删除失败'
-    } finally { this.deleting = false }
-  }
-
   @Builder
   private ShareOption(icon: Resource, title: string, onClick: () => void) {
     Column({ space: 8 }) {
@@ -204,15 +174,7 @@ export struct ShareSheet {
         }
         .width('100%').padding({ left: 20, right: 20, top: 18, bottom: 4 })
 
-        if (this.confirmingDelete && this.canDelete()) {
-          Text('确定删除这条动态？删除后无法恢复。').fontSize(14).fontColor('#ededf0')
-          Row({ space: 12 }) {
-            Button('取消').layoutWeight(1).backgroundColor('#2a2a30').enabled(!this.deleting)
-              .onClick(() => this.confirmingDelete = false)
-            Button(this.deleting ? '删除中…' : '删除').layoutWeight(1).backgroundColor('#ef233c').enabled(!this.deleting)
-              .onClick(() => this.deleteEvent())
-          }.width('100%').padding({ left: 20, right: 20 })
-        } else if (this.contactsVisible) {
+        if (this.contactsVisible) {
           Column({ space: 10 }) {
             if (this.contactsLoading) {
               Row() {
@@ -249,11 +211,6 @@ export struct ShareSheet {
           .width('100%').justifyContent(FlexAlign.Center).padding({ left: 20, right: 20 })
           Text('支持的设备可在此碰一碰分享或隔空传送')
             .fontSize(11).fontColor('#9999a0').margin({ top: 12 })
-        }
-
-        if (this.canDelete() && !this.confirmingDelete && !this.contactsVisible) {
-          Button('删除动态').height(40).width('90%').fontColor('#ff6577').backgroundColor('#25252b')
-            .onClick(() => this.confirmingDelete = true)
         }
 
         if (this.shareMessage) {
