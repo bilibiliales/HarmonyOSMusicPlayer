@@ -81,7 +81,7 @@ export struct FanClubListPage {
                   }.layoutWeight(1).alignItems(HorizontalAlign.Start)
                   SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(18).fontColor(['#66666e'])
                 }.width('100%').padding(16).backgroundColor('#1b1b20').borderRadius(18)
-                  .onClick(() => this.openDetail(group))
+                .onClick(() => this.openDetail(group))
               }, (group: FanClubGroup) => group.fansGroupId)
             }
           }.width('100%').padding({ left: 16, right: 16, top: 12, bottom: 32 })

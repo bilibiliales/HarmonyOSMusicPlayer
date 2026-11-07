@@ -110,7 +110,7 @@ export struct FanClubDetailPage {
                     Text('歌手主页').fontSize(13).fontColor('#ffffff').layoutWeight(1)
                     SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(18).fontColor(['#66666e'])
                   }.width('100%').padding(14).backgroundColor('#1b1b20').borderRadius(14)
-                    .onClick(() => this.openArtist())
+                  .onClick(() => this.openArtist())
                 }
               }.width('100%').padding(18).backgroundColor('#16161b').borderRadius(20)
             } else if (this.loading) {
