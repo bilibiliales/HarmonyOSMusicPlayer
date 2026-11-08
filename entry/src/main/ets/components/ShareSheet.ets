@@ -208,7 +208,9 @@ export struct ShareSheet {
           Row({ space: 16 }) {
             this.ShareOption($r('sys.symbol.share'), this.preparingSystemShare ? '准备分享…' : '系统分享', () => this.shareSystem())
             this.ShareOption($r('sys.symbol.ellipsis_bubble'), '私信分享', () => this.openContacts())
-            this.ShareOption($r('sys.symbol.textformat'), '动态分享', () => this.shareToDynamic())
+            if (SystemShareService.canShareToDynamic(this.shareParam)) {
+              this.ShareOption($r('sys.symbol.textformat'), '动态分享', () => this.shareToDynamic())
+            }
           }
           .width('100%').justifyContent(FlexAlign.Center).padding({ left: 20, right: 20 })
           Text('支持的设备可在此碰一碰分享或隔空传送')

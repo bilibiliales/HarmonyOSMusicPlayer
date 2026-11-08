@@ -1,4 +1,5 @@
 import { ShareSheet } from '../components/ShareSheet'
+import { DetailTopBar } from '../components/DetailTopBar'
 import { EventImages } from '../components/EventImages'
 import { ResourceComments } from '../components/ResourceComments'
 import { CommentResource } from '../models/CommentResource'
@@ -45,6 +46,8 @@ export struct EventDetailPage {
   @State songLiked: boolean = false
   @State eventLikeBusy: boolean = false
   @State deletingEvent: boolean = false
+  @State scrollOffset: number = 0
+  private scroller: Scroller = new Scroller()
 
   aboutToAppear(): void {
     this.event = this.pageParam.event
@@ -404,18 +407,11 @@ export struct EventDetailPage {
 
   build() {
     NavDestination() {
-      Stack() {
+      Stack({ alignContent: Alignment.TopStart }) {
         Column() {
-          Column().width('100%').height(this.topAvoidHeight)
-          Row() {
-          SymbolGlyph($r('sys.symbol.chevron_left')).fontSize(24).fontColor([TC.textPrimary()])
-            .onClick(() => this.pageStack.pop())
-          Text('动态详情').layoutWeight(1).fontSize(17).fontWeight(FontWeight.Bold)
-            .fontColor(TC.textPrimary()).textAlign(TextAlign.Center)
-          SymbolGlyph($r('sys.symbol.ellipsis_circle')).fontSize(23).fontColor([TC.textPrimary()])
-            .width(44).height(44).bindMenu(this.moreOptions())
-          }.height(56).padding({ left: 16, right: 16 })
-          Scroll() {
+          // 顶栏由 DetailTopBar 悬浮绘制，这里保留等高占位
+          Column().width('100%').height(this.topAvoidHeight + 54)
+          Scroll(this.scroller) {
             Column({ space: 14 }) {
             Row({ space: 11 }) {
               Image(this.event.user.avatarUrl).width(46).height(46)
@@ -504,11 +500,25 @@ export struct EventDetailPage {
             }.width('100%').height(50).backgroundColor(TC.surfaceCard()).borderRadius(14)
             }.padding({ left: 16, right: 16, top: 16, bottom: 28 })
           }.layoutWeight(1).scrollBar(BarState.Off)
+            .onDidScroll(() => { this.scrollOffset = this.scroller.currentOffset().yOffset })
         }.width('100%').height('100%').backgroundColor(TC.pageBackground())
         .bindSheet(this.commentSheetVisible, this.CommentSheet(), {
           height: '68%', backgroundColor: TC.sheetBackground(), showClose: false, dragBar: true,
           onDisappear: () => this.commentSheetVisible = false
         })
+        DetailTopBar({
+          title: '动态详情',
+          scrollOffset: this.scrollOffset,
+          onShare: () => this.openShare()
+        }) {
+          Row() {
+            SymbolGlyph($r('sys.symbol.ellipsis_circle')).fontSize(18).fontColor([TC.textOnMedia()])
+          }
+          .width(36).height(36).borderRadius(18)
+          .backgroundColor('rgba(0,0,0,0.35)')
+          .justifyContent(FlexAlign.Center)
+          .bindMenu(this.moreOptions())
+        }
         if (this.shareVisible) { this.ShareOptions() }
       }.width('100%').height('100%')
     }.hideTitleBar(true)

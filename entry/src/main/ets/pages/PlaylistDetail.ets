@@ -17,6 +17,7 @@ import { ApiClient } from '../services/ApiClient'
 import { playerController } from '../services/PlayerController'
 import { AuthStore } from '../stores/AuthStore'
 import { ShareSheet } from '../components/ShareSheet'
+import { DetailTopBar } from '../components/DetailTopBar'
 import { PlaylistCoverPreviewPageParam } from './PlaylistCoverPreview'
 import { PlaylistEditorPageParam } from './PlaylistEditor'
 import { PlaylistSongManagerPageParam } from './PlaylistSongManager'
@@ -38,6 +39,7 @@ export struct PlaylistDetail {
   @State message: string = ''
   @State searchVisible: boolean = false
   @State keyword: string = ''
+  @State scrollOffset: number = 0
   @State shareCount: number = 0
   @State commentCount: number = 0
   @State collectCount: number = 0
@@ -527,7 +529,7 @@ export struct PlaylistDetail {
 
   build() {
     NavDestination() {
-      Stack() {
+      Stack({ alignContent: Alignment.TopStart }) {
         Column() {
           Stack({ alignContent: Alignment.BottomStart }) {
             Image(this.playlist.cover).width('100%').height('100%').objectFit(ImageFit.Cover).blur(48).opacity(0.55)
@@ -535,37 +537,8 @@ export struct PlaylistDetail {
               .linearGradient({ angle: 180, colors: [[TC.headerScrimTop(), 0], [TC.pageBackground(), 1]] })
 
             Column() {
-              Row() {
-                SymbolGlyph($r('sys.symbol.chevron_left')).fontSize(24).fontColor([TC.textPrimary()])
-                  .onClick(() => this.pageStack.pop())
-                if (this.searchVisible) {
-                  TextInput({ text: this.keyword, placeholder: '搜索歌单内歌曲' })
-                    .layoutWeight(1).height(38).fontColor(TC.textPrimary()).placeholderColor(TC.textTertiary())
-                    .backgroundColor('rgba(20,20,25,0.62)').borderRadius(14)
-                    .onChange((value: string) => this.keyword = value)
-                } else {
-                  Text('歌单').layoutWeight(1).fontSize(17).fontWeight(FontWeight.Bold)
-                    .fontColor(TC.textPrimary()).textAlign(TextAlign.Center)
-                }
-                SymbolGlyph(this.searchVisible ? $r('sys.symbol.xmark_circle_fill') : $r('sys.symbol.magnifyingglass'))
-                  .fontSize(21).fontColor([TC.textPrimary()]).margin({ right: 16 })
-                  .onClick(() => {
-                    this.searchVisible = !this.searchVisible
-                    if (!this.searchVisible) this.keyword = ''
-                  })
-                if (!this.playlist.specialType) {
-                  SymbolGlyph($r('sys.symbol.ellipsis_circle')).fontSize(22).fontColor([TC.textPrimary()])
-                  .onClick(() => {
-                    if (this.isOwner()) {
-                      this.ownerMenuVisible = true
-                    } else {
-                      this.sharePlaylist()
-                    }
-                  })
-                }
-              }
-              .width('100%').height(56 + this.topAvoidHeight)
-              .padding({ top: this.topAvoidHeight })
+              // 顶栏由 DetailTopBar 悬浮绘制，这里保留等高占位
+              Column().width('100%').height(54 + this.topAvoidHeight)
 
               Row({ space: 16 }) {
                 if (this.playlist.specialType) {
@@ -732,6 +705,7 @@ export struct PlaylistDetail {
               }
             }
             .layoutWeight(1).backgroundColor(TC.pageBackground())
+            .onScrollIndex((start: number) => { this.scrollOffset = start * 62 })
           }
 
           if (this.message && this.songList.length > 0) {
@@ -740,6 +714,34 @@ export struct PlaylistDetail {
           }
         }
         .width('100%').height('100%').backgroundColor(TC.pageBackground())
+
+        DetailTopBar({
+          title: '歌单',
+          scrollOffset: this.scrollOffset,
+          shareEnabled: !this.playlist.specialType,
+          showSearch: true,
+          searchMode: this.searchVisible,
+          searchText: this.keyword,
+          searchPlaceholder: '搜索歌单内歌曲',
+          onSearchToggle: () => {
+            this.searchVisible = !this.searchVisible
+            if (!this.searchVisible) {
+              this.keyword = ''
+            }
+          },
+          onSearchTextChange: (value: string) => this.keyword = value,
+          onShare: () => this.sharePlaylist()
+        }) {
+          if (!this.playlist.specialType && this.isOwner()) {
+            Row() {
+              SymbolGlyph($r('sys.symbol.ellipsis_circle')).fontSize(18).fontColor([TC.textOnMedia()])
+            }
+            .width(36).height(36).borderRadius(18)
+            .backgroundColor('rgba(0,0,0,0.35)')
+            .justifyContent(FlexAlign.Center)
+            .onClick(() => this.ownerMenuVisible = true)
+          }
+        }
 
         if (this.ownerMenuVisible) {
           this.MenuSheetOverlay('owner')

@@ -1,4 +1,7 @@
 import {
+  ArtistFanItem,
+  ArtistFanProfile,
+  ArtistFansResponse,
   OperationResponse,
   SocialUser,
   UserFollowedsResponse,
@@ -32,8 +35,32 @@ export struct RelationshipListPage {
   @State selectedUser: SocialUser | null = null
   private readonly pageSize: number = 20
 
+  private isArtistFans(): boolean {
+    return this.pageParam.type === 'artistFans'
+  }
+
   private targetUid(): string {
     return this.pageParam.uid || this.authStore.userId
+  }
+
+  /** /artist/fans 的 userProfile → 列表通用的 SocialUser。 */
+  private mapArtistFan(item: ArtistFanItem): SocialUser | null {
+    const profile: ArtistFanProfile | undefined = item.userProfile
+    if (!profile || !profile.userId) {
+      return null
+    }
+    return {
+      userId: profile.userId,
+      nickname: profile.nickname || '',
+      avatarUrl: profile.avatarUrl || '',
+      signature: profile.signature || '',
+      followed: profile.followed === true,
+      mutual: profile.mutual === true,
+      follows: profile.follows,
+      followeds: profile.followeds,
+      userType: profile.userType,
+      authStatus: profile.authStatus
+    }
   }
 
   aboutToAppear(): void {
@@ -47,7 +74,27 @@ export struct RelationshipListPage {
     this.loading = true
     this.message = ''
     try {
-      if (this.pageParam.type === 'following') {
+      if (this.isArtistFans()) {
+        const response = await ApiClient.get<ArtistFansResponse>('/artist/fans', [
+          { key: 'id', value: this.targetUid() },
+          { key: 'limit', value: this.pageSize.toString() },
+          { key: 'offset', value: this.pageOffset.toString() }
+        ])
+        if (response.code === 200) {
+          const raw: ArtistFanItem[] = response.data || []
+          const incoming: SocialUser[] = []
+          raw.forEach((item: ArtistFanItem) => {
+            const user = this.mapArtistFan(item)
+            if (user) {
+              incoming.push(user)
+            }
+          })
+          this.users = [...this.users, ...incoming]
+          this.pageOffset += raw.length
+          // 该接口不返回 more，按整页推断
+          this.more = raw.length >= this.pageSize
+        }
+      } else if (this.pageParam.type === 'following') {
         const response = await ApiClient.get<UserFollowsResponse>('/user/follows', [
           { key: 'uid', value: this.targetUid() },
           { key: 'limit', value: this.pageSize.toString() },
@@ -83,7 +130,7 @@ export struct RelationshipListPage {
   }
 
   private isOwnRelationshipList(): boolean {
-    return this.targetUid() === this.authStore.userId
+    return !this.isArtistFans() && this.targetUid() === this.authStore.userId
   }
 
   private isFollowing(user: SocialUser): boolean {
@@ -259,7 +306,7 @@ export struct RelationshipListPage {
           .width('100%')
           .padding({ left: 16, right: 16 })
 
-          if (!this.authStore.loggedIn) {
+          if (!this.authStore.loggedIn && !this.isArtistFans()) {
             Column({ space: 14 }) {
               Text('登录后才能查看关系列表').fontSize(13).fontColor(TC.textTertiary())
               Button('去登录')

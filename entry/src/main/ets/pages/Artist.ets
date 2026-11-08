@@ -6,22 +6,30 @@ import {
   ArtistDetailArtist,
   ArtistDetailResponse,
   ArtistExpertIdentity,
+  ArtistFollowCountResponse,
   ArtistMvItem,
   ArtistMvResponse,
   ArtistPageParam,
+  ArtistSongsPageParam,
   ArtistTopSongsResponse,
   MvPlayerPageParam,
+  SharePageParam,
   SimilarArtistResponse,
+  UserEventItem,
+  UserEventResponse,
   mapApiSong
 } from '../models/api'
 import { songItemType } from '../models/music'
 import { ApiClient } from '../services/ApiClient'
 import { playerController } from '../services/PlayerController'
 import { resizeImageUrl } from '../services/ImageUrl'
-import { common } from '@kit.AbilityKit'
-import { SystemShareService, ShareLink, NearbyShareSession } from '../services/SystemShareService'
-import { BubbleTip } from '../services/BubbleTip'
+import { EventPresentation } from '../services/EventPresentation'
+import { EventUpdates } from '../services/EventUpdates'
 import { TC } from '../services/ThemeColors'
+import { DetailTopBar } from '../components/DetailTopBar'
+import { ShareSheet } from '../components/ShareSheet'
+import { EventCard } from '../components/EventCard'
+import { RelationshipPageParam } from './RelationshipList'
 
 @Component
 export struct ArtistPage {
@@ -34,7 +42,6 @@ export struct ArtistPage {
   @State artistDetail: ArtistDetailArtist = { name: '' }
   @State expertIdentities: ArtistExpertIdentity[] = []
   @State topSongs: songItemType[] = []
-  @State topSongsExpanded: boolean = false
   @State albums: ApiAlbum[] = []
   @State allAlbums: ApiAlbum[] = []
   @State mvs: ArtistMvItem[] = []
@@ -46,31 +53,67 @@ export struct ArtistPage {
   @State allAlbumsLoading: boolean = false
   @State allAlbumsMore: boolean = true
   private allAlbumsOffset: number = 0
-  @State preparingShare: boolean = false
-  private nearbyShare: NearbyShareSession = new NearbyShareSession()
+  // 认证信息、粉丝数、绑定用户与动态
+  @State verified: boolean = false
+  @State verifyIcon: string = ''
+  @State artistUid: string = ''
+  @State fansCount: number = 0
+  @State events: UserEventItem[] = []
+  @State eventsMore: boolean = true
+  @State eventsLoading: boolean = false
+  private eventsLastTime: number = -1
+  @State shareSheetVisible: boolean = false
+  @State scrollOffset: number = 0
+  private scroller: Scroller = new Scroller()
+  private stopEventUpdates?: () => void
 
-  private artistShareLink(): ShareLink {
+  private watchEventUpdates(): void {
+    this.stopEventUpdates?.()
+    this.stopEventUpdates = EventUpdates.subscribe((item: UserEventItem, deleted: boolean) => {
+      this.events = EventPresentation.changeList(this.events, item, deleted)
+    })
+  }
+
+  aboutToDisappear(): void {
+    this.stopEventUpdates?.()
+  }
+
+  private shareParam(): SharePageParam {
     return {
-      url: `https://music.163.com/artist?id=${encodeURIComponent(this.pageParam.id)}`,
-      title: this.displayName(),
-      description: this.artistDetail.briefDesc || `分享歌手「${this.displayName()}」`,
-      label: '歌手',
-      image: this.headerImage()
+      type: 'artist',
+      id: this.pageParam.id,
+      name: this.displayName(),
+      img: this.headerImage(),
+      author: `${this.totalSongs()} 首歌曲`
     }
   }
 
-  private async shareArtist(): Promise<void> {
-    if (this.preparingShare || !this.pageParam.id) { return }
-    this.preparingShare = true
-    try {
-      await SystemShareService.showLink(this.getUIContext().getHostContext() as common.UIAbilityContext,
-        this.artistShareLink())
-    } catch (error) {
-      BubbleTip.show(this.getUIContext(), error instanceof Error ? error.message : '分享歌手失败')
-    } finally { this.preparingShare = false }
+  /** 全部歌曲总数：优先用详情里的 musicSize。 */
+  private totalSongs(): number {
+    return this.artistDetail.musicSize || this.artist.musicSize || this.topSongs.length
+  }
+
+  private openAllSongs(): void {
+    const param: ArtistSongsPageParam = {
+      id: this.pageParam.id,
+      name: this.displayName(),
+      total: this.totalSongs(),
+      cover: this.headerImage()
+    }
+    this.pageStack.pushPathByName('ArtistSongsPage', param)
+  }
+
+  private openFans(): void {
+    const param: RelationshipPageParam = {
+      type: 'artistFans',
+      title: `${this.displayName()} 的粉丝`,
+      uid: this.pageParam.id
+    }
+    this.pageStack.pushPathByName('FollowersPage', param)
   }
 
   aboutToAppear(): void {
+    this.watchEventUpdates()
     this.artist = {
       id: Number(this.pageParam.id),
       name: this.pageParam.name || '',
@@ -97,7 +140,8 @@ export struct ArtistPage {
       this.loadAlbums(),
       this.loadMvs(),
       this.loadArtistDetail(),
-      this.loadSimilarArtists()
+      this.loadSimilarArtists(),
+      this.loadFollowCount()
     ])
     if (!this.hasContent()) {
       this.message = '暂时没有可展示的歌手内容'
@@ -176,6 +220,58 @@ export struct ArtistPage {
     if (tab === 'albums' && this.allAlbums.length === 0) {
       this.loadAllAlbums(true)
     }
+    if (tab === 'events' && this.events.length === 0) {
+      this.loadArtistEvents(true)
+    }
+  }
+
+  /** /artist/follow/count：歌手粉丝数。 */
+  private async loadFollowCount(): Promise<void> {
+    try {
+      const response = await ApiClient.get<ArtistFollowCountResponse>('/artist/follow/count', [
+        { key: 'id', value: this.pageParam.id }
+      ])
+      if (response.code === 200 && response.data) {
+        this.fansCount = response.data.fansCnt || 0
+      }
+    } catch (error) {
+      console.error(`[ArtistPage] load fans count failed: ${error instanceof Error ? error.message : 'unknown error'}`)
+    }
+  }
+
+  /** 歌手绑定的官方用户动态：/user/event，按 lasttime 分页。 */
+  private async loadArtistEvents(reset: boolean = false): Promise<void> {
+    if (this.eventsLoading || !this.artistUid || (!this.eventsMore && !reset)) {
+      return
+    }
+    if (reset) {
+      this.events = []
+      this.eventsLastTime = -1
+      this.eventsMore = true
+    }
+    this.eventsLoading = true
+    try {
+      const response = await ApiClient.get<UserEventResponse>('/user/event', [
+        { key: 'uid', value: this.artistUid },
+        { key: 'limit', value: '20' },
+        { key: 'lasttime', value: this.eventsLastTime.toString() }
+      ])
+      if (response.code === 200) {
+        this.events = this.events.concat(response.events || [])
+        if (response.lasttime) {
+          this.eventsLastTime = response.lasttime
+        }
+        this.eventsMore = response.more === true
+      }
+    } catch (error) {
+      console.error(`[ArtistPage] load events failed: ${error instanceof Error ? error.message : 'unknown error'}`)
+    } finally {
+      this.eventsLoading = false
+    }
+  }
+
+  private applyEventChange(item: UserEventItem, deleted: boolean): void {
+    EventUpdates.publish(item, deleted)
   }
 
   private async loadMvs(): Promise<void> {
@@ -201,6 +297,18 @@ export struct ArtistPage {
           this.artistDetail = response.data.artist
         }
         this.expertIdentities = response.data.secondaryExpertIdentiy || []
+        const boundUser = response.data.user
+        if (boundUser && boundUser.userId) {
+          this.artistUid = boundUser.userId.toString()
+        }
+        // 圆形认证标：优先用官方身份图，其次用「入驻艺人」标签判定
+        const icon = response.data.identify?.imageUrl || boundUser?.avatarDetail?.identityIconUrl || ''
+        this.verifyIcon = icon
+        this.verified = (boundUser?.authenticated === true) || icon.length > 0 ||
+          (this.artistDetail.identifyTag || []).length > 0
+        if (this.currentTab === 'events') {
+          this.loadArtistEvents(true)
+        }
       }
     } catch (error) {
       console.error(`[ArtistPage] load detail failed: ${error instanceof Error ? error.message : 'unknown error'}`)
@@ -238,6 +346,13 @@ export struct ArtistPage {
     this.pageStack.pushPathByName('PlayPage', null)
   }
 
+  /** 译名/别名，用于相似歌手卡片里的浅色括号。 */
+  private artistAlias(artist: ApiArtist): string {
+    const trans = artist.transNames || []
+    const names = trans.length > 0 ? trans : (artist.alias || [])
+    return names.length > 0 ? names[0] : ''
+  }
+
   private albumYear(album: ApiAlbum): string {
     if (!album.publishTime) {
       return ''
@@ -249,9 +364,16 @@ export struct ArtistPage {
     return this.artistDetail.name || this.artist.name || this.pageParam.name || '歌手'
   }
 
+  /** 歌手专属横版封面（artist/detail 的 cover），头图优先用它。 */
   private headerImage(): string {
-    return this.artistDetail.cover || this.artistDetail.avatar || this.artist.picUrl ||
-      this.artist.img1v1Url || this.pageParam.picUrl || ''
+    return this.artistDetail.cover || this.artist.cover || this.pageParam.picUrl ||
+      this.artistDetail.avatar || this.artist.picUrl || this.artist.img1v1Url || ''
+  }
+
+  /** 圆形头像用 avatar，与横版 cover 分开。 */
+  private avatarImage(): string {
+    return this.artistDetail.avatar || this.artist.picUrl || this.artist.img1v1Url ||
+      this.pageParam.picUrl || this.headerImage()
   }
 
   private formatCount(count: number | undefined): string {
@@ -319,20 +441,43 @@ export struct ArtistPage {
       Column().width('100%').height('100%')
         .linearGradient({ angle: 180, colors: [[TC.headerScrimTop(), 0], [TC.pageBackground(), 1]] })
       Column({ space: 9 }) {
-        Image(resizeImageUrl(
-          this.artistDetail.avatar || this.artist.picUrl || this.artist.img1v1Url || this.headerImage(), 220, 220))
-          .width(104).height(104).sourceSize({ width: 220, height: 220 })
-          .borderRadius(52).objectFit(ImageFit.Cover)
-          .border({ width: 2, color: 'rgba(255,255,255,0.78)' })
+        Stack({ alignContent: Alignment.BottomEnd }) {
+          Image(resizeImageUrl(this.avatarImage(), 220, 220))
+            .width(104).height(104).sourceSize({ width: 220, height: 220 })
+            .borderRadius(52).objectFit(ImageFit.Cover)
+            .border({ width: 2, color: 'rgba(255,255,255,0.78)' })
+          if (this.verified && this.verifyIcon) {
+            Image(this.verifyIcon).width(22).height(22).borderRadius(11)
+              .objectFit(ImageFit.Cover).border({ width: 1.5, color: '#FFFFFF' })
+          }
+        }
+        .width(104).height(104)
         Row({ space: 7 }) {
           Text(this.displayName())
             .fontSize(23).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary())
+          if (this.verified) {
+            if (this.verifyIcon) {
+              Image(this.verifyIcon).width(20).height(20).borderRadius(10).objectFit(ImageFit.Cover)
+            } else {
+              SymbolGlyph($r('sys.symbol.checkmark_circle_fill')).fontSize(20).fontColor([TC.accent()])
+            }
+          }
           Text('歌手').fontSize(9).fontColor(TC.accentSoft())
             .padding({ left: 6, right: 6, top: 2, bottom: 2 })
             .border({ width: 1, color: TC.accentSoft() }).borderRadius(5)
         }
         Text(`${this.artistDetail.musicSize || this.artist.musicSize || this.topSongs.length} 首单曲 · ${this.artistDetail.albumSize || this.artist.albumSize || this.albums.length} 张专辑 · ${this.artistDetail.mvSize || this.mvs.length} 个 MV`)
           .fontSize(11).fontColor(TC.textBody())
+        // 粉丝数：点击进粉丝列表
+        Row({ space: 4 }) {
+          Text(this.formatCount(this.fansCount)).fontSize(13).fontWeight(FontWeight.Bold)
+            .fontColor(TC.textPrimary())
+          Text('粉丝').fontSize(11).fontColor(TC.textBody())
+          SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(12).fontColor([TC.textBody()])
+        }
+        .padding({ left: 12, right: 10, top: 5, bottom: 5 })
+        .borderRadius(14).backgroundColor('rgba(255,255,255,0.18)')
+        .onClick(() => this.openFans())
         if ((this.artistDetail.alias || []).length > 0) {
           Text((this.artistDetail.alias || []).join(' / ')).width('82%').fontSize(11).fontColor(TC.textSecondary())
             .maxLines(1).textAlign(TextAlign.Center)
@@ -352,7 +497,7 @@ export struct ArtistPage {
       }
       .width('100%').height(50).padding({ left: 18 })
       .onClick(() => this.playSong(0))
-      ForEach(this.topSongsExpanded ? this.topSongs : this.topSongs.slice(0, 10), (song: songItemType, index: number) => {
+      ForEach(this.topSongs.slice(0, 5), (song: songItemType, index: number) => {
         Row({ space: 12 }) {
           Text((index + 1).toString()).width(28).fontSize(12)
             .fontColor(index < 3 ? TC.accentSoft() : TC.textTertiary()).textAlign(TextAlign.Center)
@@ -373,14 +518,17 @@ export struct ArtistPage {
         }
         .height(62).padding({ left: 12, right: 16 }).onClick(() => this.playSong(index))
       }, (song: songItemType) => song.id)
-      if (this.topSongs.length > 10) {
-        Text(this.topSongsExpanded ? '收起' : '查看更多')
-          .width('100%').constraintSize({ minHeight: 44 })
-          .fontSize(13).fontColor(TC.textSecondary()).textAlign(TextAlign.Center)
-          .onClick(() => this.topSongsExpanded = !this.topSongsExpanded)
+      Row({ space: 6 }) {
+        Text(`全部 ${this.totalSongs()} 曲`).fontSize(12).fontColor(TC.accent())
+        SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(13).fontColor([TC.accent()])
       }
+      .height(34).padding({ left: 16, right: 12 })
+      .borderRadius(17).backgroundColor(TC.accentContainer())
+      .margin({ top: 10, bottom: 12 })
+      .onClick(() => this.openAllSongs())
     }
     .width('100%')
+    .alignItems(HorizontalAlign.Center)
   }
 
   @Builder
@@ -421,6 +569,37 @@ export struct ArtistPage {
     .width('100%').padding({ top: 14, bottom: 30 })
   }
 
+  /** 歌手绑定的官方用户动态（与其他用户主页的「动态」二级页同款）。 */
+  @Builder
+  private EventsTab() {
+    Column({ space: 12 }) {
+      if (this.events.length === 0 && this.eventsLoading) {
+        LoadingProgress().width(38).height(38).color(TC.accent()).margin({ top: 80 })
+      } else if (this.events.length === 0) {
+        Text(this.artistUid ? '暂无动态' : '该歌手暂未绑定官方账号')
+          .width('100%').height(180).fontSize(13).fontColor(TC.textTertiary())
+          .textAlign(TextAlign.Center)
+      }
+      ForEach(this.events, (item: UserEventItem) => {
+        EventCard({
+          item: item,
+          onChanged: (event: UserEventItem, deleted: boolean) => this.applyEventChange(event, deleted)
+        })
+      }, (item: UserEventItem) => item.id.toString())
+      if (this.events.length > 0) {
+        Row() {
+          if (this.eventsLoading) {
+            LoadingProgress().width(24).height(24).color(TC.accent())
+          } else {
+            Text(this.eventsMore ? '继续上滑加载更多' : '已经到底了')
+              .fontSize(11).fontColor(TC.textQuaternary())
+          }
+        }.width('100%').height(56).justifyContent(FlexAlign.Center)
+      }
+    }
+    .width('100%').padding({ left: 16, right: 16, top: 14, bottom: 30 })
+  }
+
   @Builder
   private SectionHeader(title: string, subtitle: string = '') {
     Row() {
@@ -436,9 +615,9 @@ export struct ArtistPage {
   @Builder
   private ArtistNavigation() {
     Row() {
-      ForEach(['music', 'albums'], (tab: string) => {
+      ForEach(['music', 'albums', 'events'], (tab: string) => {
         Column({ space: 8 }) {
-          Text(tab === 'music' ? '音乐' : '全部专辑').fontSize(15)
+          Text(tab === 'music' ? '音乐' : tab === 'albums' ? '全部专辑' : '动态').fontSize(15)
             .fontWeight(this.currentTab === tab ? FontWeight.Bold : FontWeight.Regular)
             .fontColor(this.currentTab === tab ? TC.textPrimary() : TC.textTertiary())
           Column().width(this.currentTab === tab ? 28 : 0).height(3).borderRadius(2)
@@ -446,7 +625,7 @@ export struct ArtistPage {
         }
         .layoutWeight(1).height(52).justifyContent(FlexAlign.Center)
         .onClick(() => this.switchTab(tab))
-      })
+      }, (tab: string) => tab)
     }
     .width('100%')
   }
@@ -547,21 +726,28 @@ export struct ArtistPage {
   @Builder
   private SimilarArtistsSection() {
     Column() {
-      this.SectionHeader('更多歌手')
+      this.SectionHeader('相似歌手')
       Scroll() {
         Row({ space: 17 }) {
           ForEach(this.similarArtists, (artist: ApiArtist) => {
             Column({ space: 8 }) {
-              Image(resizeImageUrl(artist.picUrl || artist.img1v1Url || '', 180, 180)).width(82).height(82)
+              Image(resizeImageUrl(artist.picUrl || artist.img1v1Url || artist.cover || '', 180, 180))
+                .width(82).height(82)
                 .sourceSize({ width: 180, height: 180 }).borderRadius(41).objectFit(ImageFit.Cover)
-              Text(artist.name).width(88).fontSize(12).fontColor(TC.textBody()).maxLines(1)
-                .textAlign(TextAlign.Center).textOverflow({ overflow: TextOverflow.Ellipsis })
-              if ((artist.fansCount || 0) > 0) {
-                Text(`${this.formatCount(artist.fansCount)} 粉丝`).fontSize(9).fontColor(TC.textTertiary())
+              Text() {
+                Span(artist.name)
+                Span(this.artistAlias(artist) ? `(${this.artistAlias(artist)})` : '')
+                  .fontColor(TC.textQuaternary())
+              }
+              .width(110).fontSize(12).fontColor(TC.textBody()).maxLines(1)
+              .textAlign(TextAlign.Center).textOverflow({ overflow: TextOverflow.Ellipsis })
+              if ((artist.fansCount || artist.fansSize || 0) > 0) {
+                Text(`${this.formatCount(artist.fansCount || artist.fansSize)} 粉丝`)
+                  .fontSize(9).fontColor(TC.textTertiary())
               }
             }
             .onClick(() => this.openArtist(artist))
-          })
+          }, (artist: ApiArtist) => `${artist.id}_${artist.name}`)
         }
         .padding({ left: 16, right: 16 })
       }
@@ -573,7 +759,7 @@ export struct ArtistPage {
   build() {
     NavDestination() {
       Stack({ alignContent: Alignment.TopStart }) {
-          Scroll() {
+          Scroll(this.scroller) {
             Column() {
               this.ArtistHeader()
               if (this.loading) {
@@ -601,42 +787,41 @@ export struct ArtistPage {
                   Text(this.message).width('100%').height(180).fontSize(13).fontColor(TC.textTertiary())
                     .textAlign(TextAlign.Center)
                 }
-              } else {
+              } else if (this.currentTab === 'albums') {
                 this.AlbumsTab()
+              } else {
+                this.EventsTab()
               }
               }
             }
             .width('100%')
           }
           .width('100%').height('100%').scrollBar(BarState.Off)
+          .onDidScroll(() => { this.scrollOffset = this.scroller.currentOffset().yOffset })
           .onReachEnd(() => {
             if (this.currentTab === 'albums') {
               this.loadAllAlbums()
+            } else if (this.currentTab === 'events') {
+              this.loadArtistEvents()
             }
           })
-        Column() {
-          Column().width('100%').height(this.topAvoidHeight)
-          Row() {
-            SymbolGlyph($r('sys.symbol.chevron_left')).fontSize(24).fontColor([TC.textPrimary()])
-              .width(44).height(44).onClick(() => this.pageStack.pop())
-            Text('歌手主页').layoutWeight(1).fontSize(17).fontWeight(FontWeight.Bold)
-              .fontColor(TC.textPrimary()).textAlign(TextAlign.Center)
-            SymbolGlyph($r('sys.symbol.ellipsis_circle')).fontSize(22).fontColor([TC.textPrimary()])
-              .width(44).height(44)
-              .bindMenu([{
-                value: this.preparingShare ? '准备分享…' : '分享歌手',
-                action: () => { this.shareArtist() }
-              }])
-          }.height(54).width('100%').padding({ left: 6, right: 6 })
+
+        DetailTopBar({
+          title: this.displayName(),
+          scrollOffset: this.scrollOffset,
+          onShare: () => this.shareSheetVisible = true
+        })
+        if (this.shareSheetVisible) {
+          ShareSheet({
+            shareParam: this.shareParam(),
+            visible: this.shareSheetVisible,
+            onClose: () => this.shareSheetVisible = false
+          })
         }
-        .width('100%')
-        .linearGradient({ angle: 180, colors: [['rgba(0,0,0,0.5)', 0], ['rgba(0,0,0,0)', 1]] })
       }
       .width('100%').height('100%').backgroundColor(TC.pageBackground())
       .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP])
     }
     .hideTitleBar(true)
-    .onShown(() => this.nearbyShare.activate(() => SystemShareService.linkRecords(this.artistShareLink())))
-    .onHidden(() => this.nearbyShare.deactivate())
   }
 }

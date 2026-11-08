@@ -1,10 +1,8 @@
 import { EventUpdates } from '../services/EventUpdates'
 import { EventPresentation } from '../services/EventPresentation'
 import { EventCard } from '../components/EventCard'
-import { common } from '@kit.AbilityKit'
 import { ListeningPlaylistService } from '../services/ListeningPlaylistService'
 import { ListeningPlaylistCard } from '../components/ListeningPlaylistCard'
-import { SystemShareService, NearbyShareSession, ShareLink } from '../services/SystemShareService'
 import {
   ArtistPageParam,
   EventDetailPageParam,
@@ -19,6 +17,7 @@ import {
   PrivateChatPageParam,
   PrivateMsgContent,
   SendMsgResponse,
+  SharePageParam,
   UserDetailResponse,
   UserEventItem,
   UserEventResponse,
@@ -35,8 +34,9 @@ import { parseVipInfo } from '../services/VipService'
 import { resizeImageUrl } from '../services/ImageUrl'
 import { AuthStore } from '../stores/AuthStore'
 import { RelationshipPageParam } from './RelationshipList'
-import { BubbleTip } from '../services/BubbleTip'
 import { TC } from '../services/ThemeColors'
+import { DetailTopBar } from '../components/DetailTopBar'
+import { ShareSheet } from '../components/ShareSheet'
 
 @Component
 export struct UserProfilePage {
@@ -62,7 +62,9 @@ export struct UserProfilePage {
   @State vipLevel: number = 0
   @State followsTarget: boolean = false
   @State followedByTarget: boolean = false
-  @State moreMenuVisible: boolean = false
+  @State shareSheetVisible: boolean = false
+  @State scrollOffset: number = 0
+  private scroller: Scroller = new Scroller()
 
   private getVipText(vipLevel: number): string {
     return vipLevel == 1 ? '壹'
@@ -438,66 +440,22 @@ export struct UserProfilePage {
     this.pageStack.pushPathByName('ArtistPage', param)
   }
 
-  private isOtherUser(): boolean {
-    return !!this.pageParam.uid && this.pageParam.uid !== this.authStore.userId
-  }
-
-  private async shareUserProfile(): Promise<void> {
-    this.moreMenuVisible = false
+  /** 统一走 ShareSheet（与专辑/歌单/歌手一致：系统分享 + 私信 + 碰一碰）。 */
+  private shareUserProfile(): void {
     if (!this.pageParam.uid) {
       return
     }
-    try {
-      await SystemShareService.showLink(this.getUIContext().getHostContext() as common.UIAbilityContext,
-        this.profileShareLink())
-    } catch (error) {
-      BubbleTip.show(this.getUIContext(), error instanceof Error ? error.message : '无法打开系统分享面板')
+    this.shareSheetVisible = true
+  }
+
+  private shareParam(): SharePageParam {
+    return {
+      type: 'user',
+      id: this.pageParam.uid,
+      name: this.detail?.profile.nickname || '用户',
+      img: this.detail?.profile.avatarUrl || '',
+      author: this.detail?.profile.signature || ''
     }
-  }
-
-  private nearbyShare: NearbyShareSession = new NearbyShareSession()
-
-  private profileShareLink(): ShareLink {
-    return { url: `https://music.163.com/user/home?id=${encodeURIComponent(this.pageParam.uid)}`,
-      title: this.detail?.profile.nickname || '用户', description: this.detail?.profile.signature || '分享用户主页',
-      label: '用户', image: this.detail?.profile.avatarUrl }
-  }
-
-  @Builder
-  private MoreMenuOption() {
-    Row({ space: 13 }) {
-      Stack() {
-        SymbolGlyph($r('sys.symbol.share')).fontSize(21).fontColor([TC.textBody()])
-      }.width(42).height(42).borderRadius(13).backgroundColor(TC.chipBackground())
-      Column({ space: 3 }) {
-        Text('分享').fontSize(14).fontWeight(FontWeight.Medium).fontColor(TC.textBody())
-        Text('将这个用户主页分享给朋友').fontSize(10).fontColor(TC.textTertiary())
-      }.layoutWeight(1).alignItems(HorizontalAlign.Start)
-      SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(16).fontColor([TC.textQuaternary()])
-    }.width('100%').height(64).onClick(() => this.shareUserProfile())
-  }
-
-  @Builder
-  private MoreMenuOverlay() {
-    Stack({ alignContent: Alignment.Bottom }) {
-      Column().width('100%').height('100%').backgroundColor('rgba(0,0,0,0.58)')
-        .onClick(() => this.moreMenuVisible = false)
-      Column({ space: 4 }) {
-        Row() {
-          Column({ space: 3 }) {
-            Text('更多操作').fontSize(18).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary())
-            Text(this.detail?.profile.nickname || '').fontSize(10).fontColor(TC.textTertiary()).maxLines(1)
-          }.layoutWeight(1).alignItems(HorizontalAlign.Start)
-          SymbolGlyph($r('sys.symbol.xmark_circle_fill')).fontSize(25).fontColor([TC.textQuaternary()])
-            .onClick(() => this.moreMenuVisible = false)
-        }.width('100%').height(54)
-        this.MoreMenuOption()
-      }
-      .width('100%').height(174).padding({ left: 20, right: 20, top: 10, bottom: 24 })
-      .backgroundColor(TC.surfaceCard()).borderRadius({ topLeft: 28, topRight: 28 })
-      .shadow({ radius: 24, color: 'rgba(0,0,0,0.42)', offsetY: -4 })
-      .transition(TransitionEffect.translate({ y: 260 }).animation({ duration: 240, curve: Curve.EaseOut }))
-    }.width('100%').height('100%')
   }
 
   @Builder
@@ -639,26 +597,6 @@ export struct UserProfilePage {
     .width('100%').padding(24)
   }
 
-  @Builder
-  private ProfileNavigation() {
-    Column() {
-      Column().width('100%').height(this.topAvoidHeight)
-      Row() {
-        SymbolGlyph($r('sys.symbol.chevron_left'))
-          .fontSize(24).fontColor([TC.textPrimary()]).width(44).height(44).onClick(() => this.pageStack.pop())
-        Text('用户主页').layoutWeight(1).fontSize(17).fontWeight(FontWeight.Bold)
-          .fontColor(TC.textPrimary()).textAlign(TextAlign.Center)
-        SymbolGlyph($r('sys.symbol.ellipsis_circle')).fontSize(22).fontColor([TC.textPrimary()])
-          .width(44).height(44)
-          .visibility(this.isOtherUser() ? Visibility.Visible : Visibility.Hidden)
-          .onClick(() => this.moreMenuVisible = true)
-      }
-      .height(54).width('100%').padding({ left: 6, right: 6 })
-    }
-    .width('100%')
-    .linearGradient({ angle: 180, colors: [['rgba(0,0,0,0.5)', 0], ['rgba(0,0,0,0)', 1]] })
-  }
-
   build() {
     NavDestination() {
       Stack({ alignContent: Alignment.TopStart }) {
@@ -671,7 +609,7 @@ export struct UserProfilePage {
             }
             .layoutWeight(1).justifyContent(FlexAlign.Center)
           } else {
-            Scroll() {
+            Scroll(this.scroller) {
               Column() {
                 this.Header()
                 Row() {
@@ -706,12 +644,17 @@ export struct UserProfilePage {
 
                 Row() {
                   ForEach(['home', 'playlists', 'events'], (tab: string) => {
-                    Text(tab === 'home' ? '主页' : tab === 'playlists' ? '歌单' : '动态')
-                      .layoutWeight(1).height(44).fontSize(14)
-                      .fontWeight(this.currentTab === tab ? FontWeight.Bold : FontWeight.Regular)
-                      .fontColor(this.currentTab === tab ? TC.textPrimary() : TC.textTertiary())
-                      .textAlign(TextAlign.Center).onClick(() => this.currentTab = tab)
-                  })
+                    Column({ space: 8 }) {
+                      Text(tab === 'home' ? '主页' : tab === 'playlists' ? '歌单' : '动态')
+                        .fontSize(15)
+                        .fontWeight(this.currentTab === tab ? FontWeight.Bold : FontWeight.Regular)
+                        .fontColor(this.currentTab === tab ? TC.textPrimary() : TC.textTertiary())
+                      Column().width(this.currentTab === tab ? 28 : 0).height(3).borderRadius(2)
+                        .backgroundColor(TC.accent())
+                    }
+                    .layoutWeight(1).height(52).justifyContent(FlexAlign.Center)
+                    .onClick(() => this.currentTab = tab)
+                  }, (tab: string) => tab)
                 }
                 .width('100%')
 
@@ -744,6 +687,7 @@ export struct UserProfilePage {
               }
             }
             .layoutWeight(1).scrollBar(BarState.Off)
+            .onDidScroll(() => { this.scrollOffset = this.scroller.currentOffset().yOffset })
           }
         }
         .width('100%').height('100%')
@@ -754,16 +698,22 @@ export struct UserProfilePage {
           dragBar: false,
           onDisappear: () => this.cancelSheetVisible = false
         })
-        this.ProfileNavigation()
-        if (this.moreMenuVisible) {
-          this.MoreMenuOverlay()
+        DetailTopBar({
+          title: this.detail?.profile.nickname || '用户主页',
+          scrollOffset: this.scrollOffset,
+          onShare: () => this.shareUserProfile()
+        })
+        if (this.shareSheetVisible) {
+          ShareSheet({
+            shareParam: this.shareParam(),
+            visible: this.shareSheetVisible,
+            onClose: () => this.shareSheetVisible = false
+          })
         }
       }
       .width('100%').height('100%').backgroundColor(TC.pageBackground())
       .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP])
     }
     .hideTitleBar(true)
-    .onShown(() => this.nearbyShare.activate(() => SystemShareService.linkRecords(this.profileShareLink())))
-    .onHidden(() => this.nearbyShare.deactivate())
   }
 }

@@ -16,6 +16,7 @@ import { ApiClient } from '../services/ApiClient'
 import { playerController } from '../services/PlayerController'
 import { AuthStore } from '../stores/AuthStore'
 import { ShareSheet } from '../components/ShareSheet'
+import { DetailTopBar } from '../components/DetailTopBar'
 import { PlaylistCoverPreviewPageParam } from './PlaylistCoverPreview'
 import { TC } from '../services/ThemeColors'
 
@@ -45,6 +46,8 @@ export struct AlbumDetail {
   @State descExpanded: boolean = false
   @State commentSheetVisible: boolean = false
   @State shareSheetVisible: boolean = false
+  @State scrollOffset: number = 0
+  private scroller: Scroller = new Scroller()
   private shareParam: SharePageParam = { type: 'album', id: '', name: '', img: '' }
 
   aboutToAppear(): void {
@@ -243,7 +246,7 @@ export struct AlbumDetail {
         .justifyContent(FlexAlign.Center)
       } else {
         Stack({ alignContent: Alignment.TopStart }) {
-          Scroll() {
+          Scroll(this.scroller) {
             Column() {
               Stack({ alignContent: Alignment.Bottom }) {
                 Image(this.albumCover)
@@ -430,37 +433,13 @@ export struct AlbumDetail {
           .width('100%')
           .layoutWeight(1)
           .scrollBar(BarState.Off)
+          .onDidScroll(() => { this.scrollOffset = this.scroller.currentOffset().yOffset })
 
-          Row() {
-            Row() {
-              SymbolGlyph($r('sys.symbol.chevron_left'))
-                .fontSize(22)
-                .fontColor([TC.textPrimary()])
-            }
-            .width(36)
-            .height(36)
-            .borderRadius(18)
-            .backgroundColor('rgba(0,0,0,0.35)')
-            .justifyContent(FlexAlign.Center)
-            .onClick(() => this.pageStack.pop())
-
-            Column().layoutWeight(1)
-
-            Row() {
-              SymbolGlyph($r('sys.symbol.share'))
-                .fontSize(18)
-                .fontColor([TC.textPrimary()])
-            }
-            .width(36)
-            .height(36)
-            .borderRadius(18)
-            .backgroundColor('rgba(0,0,0,0.35)')
-            .justifyContent(FlexAlign.Center)
-            .onClick(() => this.shareSheetVisible = true)
-          }
-          .width('100%')
-          .padding({ left: 16, right: 16, top: this.topAvoidHeight + 14 })
-
+          DetailTopBar({
+            title: this.albumName || '专辑',
+            scrollOffset: this.scrollOffset,
+            onShare: () => this.shareSheetVisible = true
+          })
           if (this.shareSheetVisible) {
             ShareSheet({
               shareParam: this.shareParam,

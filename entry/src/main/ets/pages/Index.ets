@@ -49,6 +49,7 @@ import { PlaylistCoverPreview, PlaylistCoverPreviewPageParam } from './PlaylistC
 import {
   AlbumPageParam,
   ArtistPageParam,
+  ArtistSongsPageParam,
   EventDetailPageParam,
   MvPlayerPageParam,
   PrivateChatPageParam,
@@ -64,6 +65,7 @@ import { StartupOverlay } from '../components/StartupOverlay'
 import { DecoKeys } from '../services/DecorationRuntime'
 import { DecorationCenterPage } from './DecorationCenter'
 import { DecorationEditorPage, DecorationEditorParam } from './DecorationEditor'
+import { ArtistSongsPage } from './ArtistSongs'
 import { AuthStore } from '../stores/AuthStore'
 import { PlayerStore } from '../stores/PlayerStore'
 import { playerController } from '../services/PlayerController'
@@ -212,6 +214,8 @@ struct HomeIndex {
       AiSongStudioPage()
     } else if (name === 'ArtistPage') {
       ArtistPage({ pageParam: param as ArtistPageParam })
+    } else if (name === 'ArtistSongsPage') {
+      ArtistSongsPage({ pageParam: param as ArtistSongsPageParam })
     } else if (name === 'EventDetailPage') {
       EventDetailPage({ pageParam: param as EventDetailPageParam })
     } else if (name === 'AlbumDetailPage') {

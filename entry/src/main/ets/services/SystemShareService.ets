@@ -79,15 +79,25 @@ export class SystemShareService {
   }
 
   static musicLink(param: SharePageParam): ShareLink {
-    const label = param.type === 'song' ? '歌曲' : param.type === 'playlist' ? '歌单' : param.type === 'event' ? '动态' : '专辑'
+    const type = param.type
+    const label = type === 'song' ? '歌曲' : type === 'playlist' ? '歌单' : type === 'event' ? '动态' :
+      type === 'artist' ? '歌手' : type === 'user' ? '用户' : '专辑'
+    const url = type === 'user'
+      ? `https://music.163.com/user/home?id=${encodeURIComponent(param.id)}`
+      : `https://music.163.com/${type}?id=${encodeURIComponent(param.id)}` +
+        (type === 'event' ? '&uid=' + encodeURIComponent(param.eventUserId || '') : '')
     return {
-      url: `https://music.163.com/${param.type}?id=${encodeURIComponent(param.id)}` +
-        (param.type === 'event' ? '&uid=' + encodeURIComponent(param.eventUserId || '') : ''),
+      url: url,
       title: param.name,
       description: param.author ? `${label} · ${param.author}` : `分享${label}「${param.name}」`,
       label: label,
       image: param.img
     }
+  }
+
+  /** 歌手 / 用户主页不是可转发到动态的资源，分享面板里隐藏「动态分享」。 */
+  static canShareToDynamic(param: SharePageParam): boolean {
+    return param.type !== 'artist' && param.type !== 'user'
   }
 
   private static async thumbnail(url: string): Promise<Uint8Array | undefined> {
