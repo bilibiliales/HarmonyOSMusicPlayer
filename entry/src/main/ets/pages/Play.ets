@@ -36,6 +36,11 @@ import { AuthStore } from '../stores/AuthStore'
 import { PlayerStore } from '../stores/PlayerStore'
 import { ShareSheet } from '../components/ShareSheet'
 import { VinylRecord } from '../components/VinylRecord'
+import { PlayerBackdrop } from '../components/PlayerBackdrop'
+import { HeartBurst } from '../components/HeartBurst'
+import { PlayerStyleConfig } from '../models/decoration'
+import { DecoKeys } from '../services/DecorationRuntime'
+import { DecoColor } from '../services/DecorationColor'
 import { AppSettings } from '../services/AppSettings'
 import { BubbleTip } from '../services/BubbleTip'
 import { RectShape } from '@kit.ArkUI'
@@ -44,6 +49,9 @@ import { TC } from '../services/ThemeColors'
 @Component
 export struct Play {
   @StorageProp('skinVersion') skinVersionObs: number = 0
+  @StorageProp(DecoKeys.PLAYER_STYLE) @Watch('onPlayerStyleChanged') playerStyleRaw: string = ''
+  @State playerStyle: PlayerStyleConfig = new PlayerStyleConfig()
+  @State heartTrigger: number = 0
   @Consume('pageStack') pageStack: NavPathStack
   @Consume('topAvoidHeight') topAvoidHeight: number
   @Consume('playerStore') playerStore: PlayerStore
@@ -125,6 +133,43 @@ export struct Play {
     this.loadLikedState()
     this.loadLyrics()
     this.startLyricTracking()
+    this.playerStyle = PlayerStyleConfig.from(this.playerStyleRaw)
+  }
+
+  private onPlayerStyleChanged(): void {
+    this.playerStyle = PlayerStyleConfig.from(this.playerStyleRaw)
+  }
+
+  // ---- 播放器样式取色：装扮优先，未指定跟随主题（压图文字常白） ----
+  private psIcon(): ResourceColor {
+    return this.playerStyle.iconColor ? this.playerStyle.iconColor : TC.textOnMedia()
+  }
+
+  private psText(): ResourceColor {
+    return this.playerStyle.textColor ? this.playerStyle.textColor : TC.textOnMedia()
+  }
+
+  private psDim(): ResourceColor {
+    return this.playerStyle.textColor ? DecoColor.alpha(this.playerStyle.textColor, 0.66) : TC.textOnMediaSecondary()
+  }
+
+  private psFaint(): ResourceColor {
+    return this.playerStyle.textColor ? DecoColor.alpha(this.playerStyle.textColor, 0.42) : TC.textOnMediaTertiary()
+  }
+
+  private psControl(): ResourceColor {
+    return this.playerStyle.controlColor ? this.playerStyle.controlColor : TC.textOnMedia()
+  }
+
+  private psControlSoft(): ResourceColor {
+    if (this.playerStyle.controlColor) {
+      return DecoColor.alpha(this.playerStyle.controlColor, 0.24)
+    }
+    return 'rgba(255,255,255,0.22)'
+  }
+
+  private vinylRenderSize(): number {
+    return this.playerStyle.vinylSize > 0 ? this.playerStyle.vinylSize : this.vinylDiameter
   }
 
   aboutToDisappear(): void {
@@ -848,6 +893,9 @@ export struct Play {
           this.likedSongIds = this.likedSongIds.filter((id: string) => id !== this.playerStore.currentSong.id)
         }
         this.redCount = Math.max(0, this.redCount + (nextLiked ? 1 : -1))
+        if (nextLiked) {
+          this.heartTrigger = this.heartTrigger + 1
+        }
         BubbleTip.show(this.getUIContext(), nextLiked ? '已加入我喜欢的音乐' : '已取消喜欢')
       }
     } catch (error) {
@@ -1162,14 +1210,14 @@ export struct Play {
   }
 
   @Builder
-  private CurrentArtistLinks(fontSize: number, color: string) {
+  private CurrentArtistLinks(fontSize: number, color: ResourceColor) {
     Row({ space: 4 }) {
       if (this.playerStore.currentSong.artists && this.playerStore.currentSong.artists.length > 0) {
         ForEach(this.playerStore.currentSong.artists, (artist: SongArtist, index: number) => {
           Text(artist.name).fontSize(fontSize).fontColor(color).maxLines(1)
             .onClick(() => this.openArtist(artist))
           if (index < (this.playerStore.currentSong.artists || []).length - 1) {
-            Text('/').fontSize(fontSize).fontColor(TC.textQuaternary())
+            Text('/').fontSize(fontSize).fontColor(this.psFaint())
           }
         })
       } else {
@@ -1416,20 +1464,14 @@ export struct Play {
 
   @Builder
   private SmallAction(icon: Resource, text: string, onClick: () => void) {
-    Column({ space: 7 }) {
-      Stack() {
-        SymbolGlyph(icon)
-          .fontSize(21)
-          .fontColor([TC.textBody()])
-      }
-      .width(36)
-      .height(36)
-      .borderRadius(18)
-      .backgroundColor('rgba(255,255,255,0.08)')
-      Text(text)
-        .fontSize(10)
-        .fontColor(TC.textQuaternary())
+    // 只留图标：无底版、无文字。灰色在深浅画布下都可读，
+    // 后续可在「播放器样式」装扮里手动定义该颜色。
+    Row() {
+      SymbolGlyph(icon)
+        .fontSize(24)
+        .fontColor([this.playerStyle.iconColor ? this.playerStyle.iconColor : '#999999'])
     }
+    .justifyContent(FlexAlign.Center)
     .layoutWeight(1)
     .onClick(onClick)
   }
@@ -1789,19 +1831,7 @@ export struct Play {
   build() {
     NavDestination() {
         Stack() {
-        Image(this.playerStore.currentSong.img)
-          .width('100%')
-          .height('100%')
-          .objectFit(ImageFit.Cover)
-          .blur(90)
-          .opacity(0.44)
-        Column()
-          .width('100%')
-          .height('100%')
-          .linearGradient({
-            angle: 180,
-            colors: [['rgba(12,12,16,0.42)', 0], ['rgba(15,15,20,0.82)', 0.58], ['#121215', 1]]
-          })
+        PlayerBackdrop({ style: this.playerStyle, coverUrl: this.playerStore.currentSong.img })
 
         Scroll() {
         Column() {
@@ -1810,20 +1840,20 @@ export struct Play {
             Row() {
             SymbolGlyph($r('sys.symbol.chevron_left'))
               .fontSize(24)
-              .fontColor([TC.textOnMedia()])
+              .fontColor([this.psIcon()])
               .onClick(() => this.pageStack.pop())
             Column({ space: 2 }) {
-              Text('正在播放').fontSize(10).fontColor(TC.textOnMedia())
+              Text('正在播放').fontSize(10).fontColor(this.psDim())
               Text(this.playerStore.currentSong.album || '网易云音乐')
                 .fontSize(12)
-                .fontColor(TC.textOnMedia())
+                .fontColor(this.psText())
                 .maxLines(1)
                 .onClick(() => this.openCurrentAlbum())
             }
             .layoutWeight(1)
             SymbolGlyph($r('sys.symbol.ellipsis_circle'))
               .fontSize(24)
-              .fontColor([TC.textOnMedia()])
+              .fontColor([this.psIcon()])
               .onClick(() => this.activeSheet = 'more')
             }
             .width('100%')
@@ -1840,12 +1870,18 @@ export struct Play {
                 VinylRecord({
                   coverUrl: this.playerStore.currentSong.img,
                   isPlaying: this.playerStore.isPlaying && !this.playerStore.isLoading,
-                  diameter: this.vinylDiameter
+                  diameter: this.vinylRenderSize(),
+                  backImage: this.playerStyle.vinylImage,
+                  coverRatio: this.playerStyle.coverRatio,
+                  coverOffsetX: this.playerStyle.coverX,
+                  coverOffsetY: this.playerStyle.coverY,
+                  coverRadius: this.playerStyle.coverRadius,
+                  vinylOpacity: this.playerStyle.vinylOpacity
                 })
               }
-              .width(this.vinylDiameter).height(this.vinylDiameter)
+              .width(this.vinylRenderSize()).height(this.vinylRenderSize())
               .borderRadius('50%')
-              .translate({ x: this.vinylOffsetX })
+              .translate({ x: this.vinylOffsetX + this.playerStyle.vinylX, y: this.playerStyle.vinylY })
               .opacity(this.vinylOpacity)
               .shadow({
                 radius: 26,
@@ -1862,8 +1898,8 @@ export struct Play {
               )
 
               Row({ space: 6 }) {
-                SymbolGlyph($r('sys.symbol.text_alignleft')).fontSize(13).fontColor([TC.textOnMedia()])
-                Text('点击唱片查看滚动歌词').fontSize(10).fontColor(TC.textOnMedia())
+                SymbolGlyph($r('sys.symbol.text_alignleft')).fontSize(13).fontColor([this.psIcon()])
+                Text('点击唱片查看滚动歌词').fontSize(10).fontColor(this.psDim())
               }
               .padding({ left: 11, right: 11, top: 7, bottom: 7 })
               .backgroundColor('rgba(255,255,255,0.07)')
@@ -1887,7 +1923,7 @@ export struct Play {
                 Text(this.playerStore.currentSong.name)
                   .fontSize(24)
                   .fontWeight(FontWeight.Bold)
-                  .fontColor(TC.textOnMedia())
+                  .fontColor(this.psText())
                   .maxLines(1)
                   .textOverflow({ overflow: TextOverflow.Ellipsis })
                   .layoutWeight(1)
@@ -1902,7 +1938,7 @@ export struct Play {
                 }
               }
               .width('100%')
-              this.CurrentArtistLinks(14, '#a6a6ae')
+              this.CurrentArtistLinks(14, this.psDim())
             }
             .layoutWeight(1)
             .alignItems(HorizontalAlign.Start)
@@ -1911,9 +1947,9 @@ export struct Play {
             Column({ space: 3 }) {
               SymbolGlyph(this.liked ? $r('sys.symbol.heart_fill') : $r('sys.symbol.heart'))
                 .fontSize(27)
-                .fontColor([this.liked ? '#ff4058' : '#ffffff'])
+                .fontColor([this.liked ? '#ff4058' : this.psIcon()])
               Text(this.redCountLoading ? '…' : this.formatMetricCount(this.redCount))
-                .fontSize(9).fontColor(TC.textOnMedia())
+                .fontSize(9).fontColor(this.psDim())
             }
             .onClick(() => this.toggleLike())
             }
@@ -1922,10 +1958,10 @@ export struct Play {
             Column({ space: 3 }) {
               SymbolGlyph($r('sys.symbol.ellipsis_bubble'))
                 .fontSize(25)
-                .fontColor([TC.textOnMedia()])
+                .fontColor([this.psIcon()])
               Text((this.playerStore.currentSong.commentCount || 0).toString())
                 .fontSize(9)
-                .fontColor(TC.textOnMedia())
+                .fontColor(this.psDim())
             }
             .onClick(() => this.openComments())
             }
@@ -1941,25 +1977,25 @@ export struct Play {
               max: Math.max(this.playerStore.duration, 1)
             })
               .width('100%')
-              .blockColor('#ffffff')
+              .blockColor(this.psControl())
               .blockSize({ width: 11, height: 11 })
-              .selectedColor(TC.textOnMedia())
-              .trackColor('rgba(255,255,255,0.22)')
+              .selectedColor(this.psControl())
+              .trackColor(this.psControlSoft())
               .trackThickness(2)
               .onChange((value: number, mode: SliderChangeMode) => this.handleProgressChange(value, mode))
             Row() {
-              Text(this.formatTime(this.progressPosition())).fontSize(10).fontColor(TC.textOnMediaSecondary())
+              Text(this.formatTime(this.progressPosition())).fontSize(10).fontColor(this.psDim())
               Row({ space: 4 }) {
-                Text(this.playerStore.qualityTitle()).fontSize(10).fontColor(TC.textOnMedia())
+                Text(this.playerStore.qualityTitle()).fontSize(10).fontColor(this.psText())
                 if (!this.isNonCatalogAudio()) {
-                  SymbolGlyph($r('sys.symbol.chevron_up')).fontSize(10).fontColor([TC.textOnMediaTertiary()])
+                  SymbolGlyph($r('sys.symbol.chevron_up')).fontSize(10).fontColor([this.psFaint()])
                 }
               }
               .padding({ left: 8, right: 8, top: 4, bottom: 4 })
               .backgroundColor('rgba(255,255,255,0.08)')
               .borderRadius(10)
               .onClick(() => { if (!this.isNonCatalogAudio()) { this.openQualitySheet() } })
-              Text(this.formatTime(this.playerStore.duration)).fontSize(10).fontColor(TC.textOnMediaSecondary())
+              Text(this.formatTime(this.playerStore.duration)).fontSize(10).fontColor(this.psDim())
             }
             .width('100%')
             .justifyContent(FlexAlign.SpaceBetween)
@@ -1971,26 +2007,26 @@ export struct Play {
             Column({ space: 4 }) {
               SymbolGlyph(this.modeSymbol())
                 .fontSize(24)
-                .fontColor([TC.textOnMedia()])
-              Text(this.playerStore.modeTitle()).fontSize(8).fontColor(TC.textOnMediaTertiary())
+                .fontColor([this.psIcon()])
+              Text(this.playerStore.modeTitle()).fontSize(8).fontColor(this.psFaint())
             }
             .width(60)
             .onClick(() => playerController.cycleMode())
 
             SymbolGlyph($r('sys.symbol.backward_fill'))
               .fontSize(31)
-              .fontColor([TC.textOnMedia()])
+              .fontColor([this.psIcon()])
               .opacity(this.switchingSong ? 0.45 : 1)
               .onClick(() => this.switchSong(-1))
 
             Stack() {
               if (this.playerStore.isLoading) {
-                LoadingProgress().width(58).height(58).color(TC.textOnMedia())
+                LoadingProgress().width(58).height(58).color(this.psIcon())
               } else {
                 SymbolGlyph(this.playerStore.isPlaying ? $r('sys.symbol.pause_circle_fill') :
                   $r('sys.symbol.play_circle_fill'))
                   .fontSize(64)
-                  .fontColor([TC.textOnMedia()])
+                  .fontColor([this.psIcon()])
               }
             }
             .width(72)
@@ -1999,15 +2035,15 @@ export struct Play {
 
             SymbolGlyph($r('sys.symbol.forward_end_fill'))
               .fontSize(31)
-              .fontColor([TC.textOnMedia()])
+              .fontColor([this.psIcon()])
               .opacity(this.switchingSong ? 0.45 : 1)
               .onClick(() => this.switchSong(1))
 
             Column({ space: 4 }) {
               SymbolGlyph($r('sys.symbol.list_bullet'))
                 .fontSize(24)
-                .fontColor([TC.textOnMedia()])
-              Text(`${this.playerStore.queue.length} 首`).fontSize(8).fontColor(TC.textOnMediaTertiary())
+                .fontColor([this.psIcon()])
+              Text(`${this.playerStore.queue.length} 首`).fontSize(8).fontColor(this.psFaint())
             }
             .width(60)
             .onClick(() => this.activeSheet = 'queue')
@@ -2066,6 +2102,9 @@ export struct Play {
         if (this.coverPreviewVisible) {
           this.CoverPreview()
         }
+
+        HeartBurst({ trigger: this.heartTrigger })
+          .position({ x: '68%', y: '40%' })
         }
         .width('100%')
         .height('100%')

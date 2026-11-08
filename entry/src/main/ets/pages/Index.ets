@@ -59,6 +59,11 @@ import { StyleDetailPageParam } from '../models/style'
 import { DigitalAlbumDetailPageParam } from '../models/digitalAlbum'
 import { FloatingMusicCard } from '../components/FloatingMusicCard'
 import { Sidebar } from '../components/Sidebar'
+import { AppBackdrop } from '../components/AppBackdrop'
+import { StartupOverlay } from '../components/StartupOverlay'
+import { DecoKeys } from '../services/DecorationRuntime'
+import { DecorationCenterPage } from './DecorationCenter'
+import { DecorationEditorPage, DecorationEditorParam } from './DecorationEditor'
 import { AuthStore } from '../stores/AuthStore'
 import { PlayerStore } from '../stores/PlayerStore'
 import { playerController } from '../services/PlayerController'
@@ -79,6 +84,36 @@ struct HomeIndex {
   @State currentIndex: number = 0
   @State sidebarVisible: boolean = false
   @State sidebarMounted: boolean = false
+  // 底部导航装扮
+  @StorageProp(DecoKeys.DOCK_ICONS) dockIcons: string = ''
+  @StorageProp(DecoKeys.DOCK_ICON_COLOR) dockIconColor: string = ''
+  @StorageProp(DecoKeys.DOCK_ACTIVE_COLOR) dockActiveColor: string = ''
+  @StorageProp(DecoKeys.DOCK_TEXT_COLOR) dockTextColor: string = ''
+  @StorageProp(DecoKeys.DOCK_TEXT_SIZE) dockTextSize: number = 10
+  @StorageProp(DecoKeys.DOCK_BG) dockBgColor: string = ''
+  @StorageProp(DecoKeys.DOCK_INDICATOR) dockIndicator: string = ''
+  @StorageProp(DecoKeys.DOCK_SHOW_TEXT) dockShowText: boolean = true
+
+  private dockIcon(index: number): string {
+    if (!this.dockIcons) { return '' }
+    const parts = this.dockIcons.split('\n')
+    return index < parts.length ? parts[index] : ''
+  }
+
+  private dockIconTint(active: boolean): ResourceColor {
+    if (active) {
+      return this.dockActiveColor.length > 0 ? this.dockActiveColor : TC.textOnAccent()
+    }
+    return this.dockIconColor.length > 0 ? this.dockIconColor : TC.textTertiary()
+  }
+
+  private dockTextTint(active: boolean): ResourceColor {
+    if (active) {
+      return this.dockTextColor.length > 0 ? this.dockTextColor : TC.textPrimary()
+    }
+    return this.dockIconColor.length > 0 ? this.dockIconColor : TC.textTertiary()
+  }
+
 
   async aboutToAppear(): Promise<void> {
     await this.loadWindowAvoidArea()
@@ -211,34 +246,47 @@ struct HomeIndex {
       SatiPage()
     } else if (name === 'PlaylistCoverPreviewPage') {
       PlaylistCoverPreview({ pageParam: param as PlaylistCoverPreviewPageParam })
+    } else if (name === 'DecorationCenterPage') {
+      DecorationCenterPage()
+    } else if (name === 'DecorationEditorPage') {
+      DecorationEditorPage({ pageParam: param as DecorationEditorParam })
     }
   }
 
   @Builder
-  getTabBar(item: TabClass) {
+  getTabBar(item: TabClass, index: number) {
     Column({ space: 4 }) {
       Stack() {
         if (item.name === this.currentName) {
           Column()
             .width(30)
             .height(30)
-            .backgroundColor(TC.accent())
+            .backgroundColor(this.dockIndicator ? this.dockIndicator : TC.accent())
             .borderRadius(15)
             .shadow({ radius: 10, color: 'rgba(239,35,60,0.28)', offsetY: 4 })
         }
-        Image(item.icon)
-          .width(21)
-          .height(21)
-          .fillColor(item.name === this.currentName ? TC.textOnAccent() : TC.textTertiary())
+        if (this.dockIcon(index)) {
+          Image(this.dockIcon(index))
+            .width(22)
+            .height(22)
+            .objectFit(ImageFit.Contain)
+        } else {
+          Image(item.icon)
+            .width(21)
+            .height(21)
+            .fillColor(this.dockIconTint(item.name === this.currentName))
+        }
       }
       .width(36)
       .height(30)
       .alignContent(Alignment.Center)
 
-      Text(item.title)
-        .fontSize(10)
-        .fontColor(item.name === this.currentName ? TC.textPrimary() : TC.textTertiary())
-        .fontWeight(item.name === this.currentName ? FontWeight.Medium : FontWeight.Regular)
+      if (this.dockShowText) {
+        Text(item.title)
+          .fontSize(this.dockTextSize)
+          .fontColor(this.dockTextTint(item.name === this.currentName))
+          .fontWeight(item.name === this.currentName ? FontWeight.Medium : FontWeight.Regular)
+      }
     }
     .width('100%')
     .alignItems(HorizontalAlign.Center)
@@ -250,8 +298,10 @@ struct HomeIndex {
   build() {
     Navigation(this.pageStack) {
       Stack() {
+        AppBackdrop()
+
         Tabs({ barPosition: BarPosition.End, index: this.currentIndex }) {
-          ForEach(tabsData, (item: TabClass) => {
+          ForEach(tabsData, (item: TabClass, index: number) => {
             TabContent() {
               if (item.name === 'recommend') {
                 Recommend({ onMenuClick: () => this.openSidebar() })
@@ -263,13 +313,14 @@ struct HomeIndex {
                 Mine()
               }
             }
-            .tabBar(this.getTabBar(item))
+            .tabBar(this.getTabBar(item, index))
             .padding({ top: item.name === 'mine' ? 0 : this.topAvoidHeight })
             .backgroundColor(TC.pageBackground())
           })
         }
         .barHeight(60)
         .barMode(BarMode.Fixed)
+        .barBackgroundColor(this.dockBgColor ? this.dockBgColor : TC.navBackground())
         .onChange((index: number) => {
           this.currentIndex = index
           this.currentName = tabsData[index].name
@@ -288,6 +339,8 @@ struct HomeIndex {
             onOpenMine: () => this.openMineFromSidebar()
           })
         }
+
+        StartupOverlay()
       }
       .width('100%')
       .height('100%')
@@ -295,6 +348,7 @@ struct HomeIndex {
     }
     .hideTitleBar(true)
     .mode(NavigationMode.Stack)
+    .backgroundColor(Color.Transparent)
     .navDestination(this.PageMap)
   }
 }

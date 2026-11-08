@@ -5,6 +5,7 @@ import { SleepTimerService } from '../services/SleepTimerService'
 import { parseVipInfo, VipDisplayInfo } from '../services/VipService'
 import { AuthStore } from '../stores/AuthStore'
 import { TC } from '../services/ThemeColors'
+import { DecoKeys } from '../services/DecorationRuntime'
 
 interface SidebarMenuItem {
   icon: Resource
@@ -18,6 +19,15 @@ interface SidebarMenuItem {
 @Component
 export struct Sidebar {
   @StorageProp('skinVersion') skinVersionObs: number = 0
+  @StorageProp(DecoKeys.SIDEBAR_BG) sidebarBg: string = ''
+  @StorageProp(DecoKeys.SIDEBAR_BG_OPACITY) sidebarBgOpacity: number = 100
+  @StorageProp(DecoKeys.SIDEBAR_BG_BLUR) sidebarBgBlur: number = 0
+  @StorageProp(DecoKeys.SIDEBAR_BG_COLOR) sidebarBgColor: string = ''
+  @StorageProp(DecoKeys.SIDEBAR_TEXT_COLOR) sidebarTextColor: string = ''
+  @StorageProp(DecoKeys.SIDEBAR_TEXT_SIZE) sidebarTextSize: number = 16
+  @StorageProp(DecoKeys.SIDEBAR_ICON_COLOR) sidebarIconColor: string = ''
+  @StorageProp(DecoKeys.VIP_CARD) vipCardImage: string = ''
+  @StorageProp(DecoKeys.VIP_BADGES) vipBadges: string = ''
   @Consume('pageStack') pageStack: NavPathStack
   @Consume('authStore') authStore: AuthStore
   @Prop visible: boolean = false
@@ -47,11 +57,33 @@ export struct Sidebar {
     { icon: $r('sys.symbol.clock'), title: '最近播放', subtitle: '歌曲、声音及更多播放记录', available: true, route: 'RecentPlaybackPage' },
     { icon: $r('sys.symbol.cloud'), title: '我的云盘', subtitle: '上传、管理与播放云盘音乐', available: true, route: 'CloudDrivePage' },
     { icon: $r('sys.symbol.arrow_down_circle'), title: '本地与下载', subtitle: '下载管理、导入音乐与离线播放', available: true, route: 'LocalMusicPage' },
+    { icon: $r('sys.symbol.square_and_pencil'), title: '装扮中心', subtitle: '皮肤、播放器与图标自定义', available: true, route: 'DecorationCenterPage' },
     { icon: $r('sys.symbol.wand_and_stars'), title: 'AI 写歌', subtitle: '风格改编、AI 作词与灵感创作', available: true, route: 'AiSongStudioPage' },
     { icon: $r('sys.symbol.cart'), title: '云贝中心', subtitle: '签到、任务与收支记录', available: true, route: 'YunbeiPage' },
     { icon: $r('sys.symbol.clock'), title: '定时关闭', subtitle: '倒计时结束自动暂停播放', available: true, action: 'sleep' },
     { icon: $r('sys.symbol.gearshape'), title: '设置', subtitle: '播放与网络设置', available: true, route: 'SettingsPage' }
   ]
+
+  /** 侧边栏文字色 / 图标色：装扮优先，未指定跟随主题。 */
+  private sbText(): ResourceColor {
+    return this.sidebarTextColor ? this.sidebarTextColor : TC.textPrimary()
+  }
+
+  private sbTextDim(): ResourceColor {
+    return this.sidebarTextColor ? this.sidebarTextColor : TC.textSecondary()
+  }
+
+  private sbIcon(): ResourceColor {
+    return this.sidebarIconColor ? this.sidebarIconColor : TC.textPrimary()
+  }
+
+  /** 当前等级对应的自定义贴图；没有则返回空串。 */
+  private vipBadgeSrc(): string {
+    if (!this.vipBadges || this.vipLevel <= 0) { return '' }
+    const parts = this.vipBadges.split('\n')
+    const index = this.vipLevel - 1
+    return index >= 0 && index < parts.length ? parts[index] : ''
+  }
 
   private openLogin(): void {
     this.onClose()
@@ -194,11 +226,22 @@ export struct Sidebar {
   }
 
   @Builder
+  private VipMark() {
+    if (this.vipBadgeSrc()) {
+      Image(this.vipBadgeSrc()).width(40).height(18).objectFit(ImageFit.Contain)
+    } else if (this.vipSvip) {
+      Image($r('app.media.ic_svip')).width(40).height(18).objectFit(ImageFit.Contain)
+    } else {
+      Image($r('app.media.ic_vip')).width(34).height(18).objectFit(ImageFit.Contain)
+    }
+  }
+
+  @Builder
   private VipCard() {
     Column({ space: 0 }) {
-      if (this.vipCardBg.length > 0 && this.vipActive) {
+      if (this.vipCardImage.length > 0 || (this.vipCardBg.length > 0 && this.vipActive)) {
         Stack({ alignContent: Alignment.TopStart }) {
-          Image(this.vipCardBg)
+          Image(this.vipCardImage ? this.vipCardImage : this.vipCardBg)
             .width('100%')
             .height(140)
             .objectFit(ImageFit.Cover)
@@ -208,11 +251,7 @@ export struct Sidebar {
             Row() {
               Column({ space: 3 }) {
                 Row({ space: 4 }) {
-                  if (this.vipSvip) {
-                    Image($r('app.media.ic_svip')).width(40).height(18).objectFit(ImageFit.Contain)
-                  } else {
-                    Image($r('app.media.ic_vip')).width(34).height(18).objectFit(ImageFit.Contain)
-                  }
+                  this.VipMark()
                   Text(this.vipLevel > 0 ? this.getVipText(this.vipLevel) : '')
                     .fontSize(11)
                     .fontWeight(FontWeight.Regular)
@@ -266,11 +305,7 @@ export struct Sidebar {
             Column({ space: 3 }) {
               Row({ space: 4 }) {
                 if (this.vipActive) {
-                  if (this.vipSvip) {
-                    Image($r('app.media.ic_svip')).width(40).height(18).objectFit(ImageFit.Contain)
-                  } else {
-                    Image($r('app.media.ic_vip')).width(34).height(18).objectFit(ImageFit.Contain)
-                  }
+                  this.VipMark()
                   Text(this.vipLevel > 0 ? this.getVipText(this.vipLevel) : '')
                     .fontSize(11)
                     .fontWeight(FontWeight.Regular)
@@ -556,7 +591,23 @@ export struct Sidebar {
         .onClick(() => this.onClose())
         .opacity(this.visible ? 1 : 0)
 
-      Column() {
+      Stack({ alignContent: Alignment.TopStart }) {
+        Column()
+          .width('100%')
+          .height('100%')
+          .backgroundColor(this.sidebarBgColor ? this.sidebarBgColor : TC.sheetBackground())
+
+        if (this.sidebarBg) {
+          Image(this.sidebarBg)
+            .width('100%')
+            .height('100%')
+            .objectFit(ImageFit.Cover)
+            .scale({ x: 1.08, y: 1.08 })
+            .blur(this.sidebarBgBlur)
+            .opacity(Math.max(0, Math.min(100, this.sidebarBgOpacity)) / 100)
+        }
+
+        Column() {
         Column({ space: 16 }) {
           Row({ space: 12 }) {
             if (this.authStore.avatarUrl) {
@@ -569,7 +620,7 @@ export struct Sidebar {
               Stack() {
                 SymbolGlyph($r('sys.symbol.person_fill'))
                   .fontSize(25)
-                  .fontColor([TC.textTertiary()])
+                  .fontColor([this.sbIcon()])
               }
               .width(52)
               .height(52)
@@ -581,17 +632,17 @@ export struct Sidebar {
               Text(this.authStore.nickname)
                 .fontSize(18)
                 .fontWeight(FontWeight.Bold)
-                .fontColor(TC.textPrimary())
+                .fontColor(this.sbText())
               Text(this.authStore.loggedIn ? '查看个人主页' : '登录后同步收藏与歌单')
                 .fontSize(11)
-                .fontColor(TC.textSecondary())
+                .fontColor(this.sbTextDim())
             }
             .layoutWeight(1)
             .alignItems(HorizontalAlign.Start)
 
             SymbolGlyph($r('sys.symbol.chevron_right'))
               .fontSize(18)
-              .fontColor([TC.textTertiary()])
+              .fontColor([this.sbIcon()])
           }
           .width('100%')
           .onClick(() => {
@@ -613,12 +664,12 @@ export struct Sidebar {
               Row({ space: 14 }) {
                 SymbolGlyph(item.icon)
                   .fontSize(22)
-                  .fontColor([item.available ? TC.textPrimary() : TC.textQuaternary()])
+                  .fontColor([item.available ? this.sbIcon() : TC.textQuaternary()])
 
                 Text(item.title)
-                  .fontSize(16)
+                  .fontSize(this.sidebarTextSize)
                   .fontWeight(FontWeight.Medium)
-                  .fontColor(item.available ? TC.textPrimary() : TC.textQuaternary())
+                  .fontColor(item.available ? this.sbText() : TC.textQuaternary())
                   .layoutWeight(1)
 
                 if (!item.available) {
@@ -684,10 +735,12 @@ export struct Sidebar {
         }
         .width('100%')
         .padding({ left: 20, right: 20, top: 8, bottom: 20 })
+        }
+        .width('100%')
+        .height('100%')
       }
       .width('84%')
       .height('100%')
-      .backgroundColor(TC.sheetBackground())
       .borderRadius({ topRight: 28, bottomRight: 28 })
       .clip(true)
       .translate({ x: this.visible ? 0 : -360 })

@@ -4,6 +4,7 @@ import { window } from '@kit.ArkUI';
 import { AppSettings } from '../services/AppSettings';
 import { ThemeService } from '../services/ThemeService';
 import { SkinService } from '../services/SkinService';
+import { DecorationStore } from '../services/DecorationStore';
 import { playerController } from '../services/PlayerController';
 import { PlaybackControlBridge } from '../services/PlaybackControlBridge';
 import { NearbyShareSession, SystemShareService } from '../services/SystemShareService';
@@ -38,6 +39,8 @@ export default class EntryAbility extends UIAbility {
     // 读取持久化的深浅色偏好与皮肤覆盖，并在首帧前生效，避免启动闪屏
     ThemeService.init(this.context);
     SkinService.init(this.context);
+    // 读取装扮（皮肤颜色会覆盖到 SkinService，其余发布到 AppStorage），首帧即生效
+    DecorationStore.init(this.context);
     AppSettings.context = this.context;
     SystemShareService.bindAbility(this.context);
     this.handlePlaybackWant(want);

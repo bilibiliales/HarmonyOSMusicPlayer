@@ -40,6 +40,7 @@ import { PublishEventPageParam } from './PublishEvent'
 import { PlaylistEditorPageParam } from './PlaylistEditor'
 import { ProfileEditorPageParam } from './ProfileEditor'
 import { TC } from '../services/ThemeColors'
+import { DecoKeys } from '../services/DecorationRuntime'
 
 interface SubTabItem {
   name: string
@@ -66,6 +67,13 @@ export interface UserProfile {
 @Component
 export struct Mine {
   @StorageProp('skinVersion') skinVersionObs: number = 0
+  @StorageProp(DecoKeys.HOME_BG) homeBg: string = ''
+  @StorageProp(DecoKeys.HOME_BG_BLUR) homeBgBlur: number = 0
+  @StorageProp(DecoKeys.HOME_BG_OPACITY) homeBgOpacity: number = 100
+  @StorageProp(DecoKeys.HOME_BG_FADE) homeBgFade: number = 100
+  @StorageProp(DecoKeys.AVATAR_FRAME) avatarFrame: string = ''
+  @StorageProp(DecoKeys.VIP_BADGES) vipBadges: string = ''
+  @State homeBgVersion: number = 0
   @Consume('pageStack') pageStack: NavPathStack
   @Consume('topAvoidHeight') topAvoidHeight: number
   @Consume('authStore') @Watch('onAuthStoreChanged') authStore: AuthStore
@@ -157,6 +165,13 @@ export struct Mine {
     }
     this.loadUserData()
     this.loadVipInfo()
+  }
+
+  private vipBadgeSrc(): string {
+    if (!this.vipBadges || this.vipLevel <= 0) { return '' }
+    const parts = this.vipBadges.split('\n')
+    const index = this.vipLevel - 1
+    return index >= 0 && index < parts.length ? parts[index] : ''
   }
 
   private getVipText(vipLevel: number): string {
@@ -805,7 +820,15 @@ export struct Mine {
   @Builder
   HeaderSection() {
     Stack({ alignContent: Alignment.BottomStart }) {
-      if (this.userProfile.avatar) {
+      if (this.homeBg) {
+        Image(this.homeBg)
+          .width('100%')
+          .height('100%')
+          .objectFit(ImageFit.Cover)
+          .scale({ x: 1.06, y: 1.06 })
+          .blur(this.homeBgBlur)
+          .opacity(Math.max(0, Math.min(100, this.homeBgOpacity)) / 100)
+      } else if (this.userProfile.avatar) {
         Image(this.userProfile.avatar)
           .width('100%')
           .height('100%')
@@ -822,27 +845,41 @@ export struct Mine {
         .width('100%')
         .height('100%')
         .linearGradient({ angle: 180, colors: [[TC.headerScrimTop(), 0], [TC.pageBackground(), 1]] })
+        // 装扮头图的「向下渐隐」：只影响这张蒙版，文字仍由主题/皮肤保证对比度
+        .opacity(this.homeBg ? Math.max(0, Math.min(100, this.homeBgFade)) / 100 : 1)
 
       Column({ space: 8 }) {
-        if (this.userProfile.avatar) {
-          Image(this.userProfile.avatar)
+        Stack() {
+          if (this.userProfile.avatar) {
+            Image(this.userProfile.avatar)
+              .width(72)
+              .height(72)
+              .borderRadius(36)
+              .objectFit(ImageFit.Cover)
+              .border({ width: 2, color: '#ffffff' })
+          } else {
+            Stack() {
+              SymbolGlyph($r('sys.symbol.person_crop_circle_fill'))
+                .fontSize(52)
+                .fontColor([TC.textSecondary()])
+            }
             .width(72)
             .height(72)
             .borderRadius(36)
-            .objectFit(ImageFit.Cover)
+            .backgroundColor(TC.surfaceRaised())
             .border({ width: 2, color: '#ffffff' })
-        } else {
-          Stack() {
-            SymbolGlyph($r('sys.symbol.person_crop_circle_fill'))
-              .fontSize(52)
-              .fontColor([TC.textSecondary()])
           }
-          .width(72)
-          .height(72)
-          .borderRadius(36)
-          .backgroundColor(TC.surfaceRaised())
-          .border({ width: 2, color: '#ffffff' })
+          if (this.avatarFrame) {
+            Image(this.avatarFrame)
+              .width(104)
+              .height(104)
+              .objectFit(ImageFit.Contain)
+              .hitTestBehavior(HitTestMode.None)
+          }
         }
+        .width(104)
+        .height(104)
+        .alignContent(Alignment.Center)
 
         Row({ space: 6 }) {
           Text(this.userProfile.nickName)
@@ -852,10 +889,17 @@ export struct Mine {
 
           if (this.vipActive) {
             Row({ space: 3 }) {
-              Image(this.vipSvip ? $r('app.media.ic_svip') : $r('app.media.ic_vip'))
-                .width(this.vipSvip ? 40 : 34)
-                .height(18)
-                .objectFit(ImageFit.Contain)
+              if (this.vipBadgeSrc()) {
+                Image(this.vipBadgeSrc())
+                  .width(40)
+                  .height(18)
+                  .objectFit(ImageFit.Contain)
+              } else {
+                Image(this.vipSvip ? $r('app.media.ic_svip') : $r('app.media.ic_vip'))
+                  .width(this.vipSvip ? 40 : 34)
+                  .height(18)
+                  .objectFit(ImageFit.Contain)
+              }
 
               Text(`${this.getVipText(this.vipLevel)}`)
                 .fontSize(10)

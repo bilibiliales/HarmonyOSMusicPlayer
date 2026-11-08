@@ -118,6 +118,11 @@ export class ThemeService {
     }
   }
 
+  /** 是否已完成初始化（EntryAbility.onCreate 调过 init）。预览器单页预览时不会走 Ability 生命周期，TC 据此回落 $r 资源取色。 */
+  static isReady(): boolean {
+    return ThemeService.context !== undefined
+  }
+
   static isDark(): boolean {
     if (ThemeService.mode === ThemeMode.DARK) { return true }
     if (ThemeService.mode === ThemeMode.LIGHT) { return false }
