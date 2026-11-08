@@ -81,6 +81,7 @@ struct HomeIndex {
   @Provide('playerStore') playerStore: PlayerStore = new PlayerStore()
   @Provide('topAvoidHeight') topAvoidHeight: number = 0
   @State currentName: string = 'recommend'
+  @State pageHeight: number = 0
   @State currentIndex: number = 0
   @State sidebarVisible: boolean = false
   @State sidebarMounted: boolean = false
@@ -91,8 +92,13 @@ struct HomeIndex {
   @StorageProp(DecoKeys.DOCK_TEXT_COLOR) dockTextColor: string = ''
   @StorageProp(DecoKeys.DOCK_TEXT_SIZE) dockTextSize: number = 10
   @StorageProp(DecoKeys.DOCK_BG) dockBgColor: string = ''
+  @StorageProp(DecoKeys.DOCK_BG_IMAGE) dockBgImage: string = ''
   @StorageProp(DecoKeys.DOCK_INDICATOR) dockIndicator: string = ''
   @StorageProp(DecoKeys.DOCK_SHOW_TEXT) dockShowText: boolean = true
+
+  private dockBarTop(): number {
+    return Math.max(0, this.pageHeight - 60)
+  }
 
   private dockIcon(index: number): string {
     if (!this.dockIcons) { return '' }
@@ -300,6 +306,15 @@ struct HomeIndex {
       Stack() {
         AppBackdrop()
 
+        // 底部导航背景图：画在 Tabs 之下，Tab 栏背景改透明透出
+        if (this.dockBgImage) {
+          Image(this.dockBgImage)
+            .width('100%')
+            .height(60)
+            .objectFit(ImageFit.Cover)
+            .position({ x: 0, y: this.dockBarTop() })
+        }
+
         Tabs({ barPosition: BarPosition.End, index: this.currentIndex }) {
           ForEach(tabsData, (item: TabClass, index: number) => {
             TabContent() {
@@ -320,7 +335,8 @@ struct HomeIndex {
         }
         .barHeight(60)
         .barMode(BarMode.Fixed)
-        .barBackgroundColor(this.dockBgColor ? this.dockBgColor : TC.navBackground())
+        .barBackgroundColor(this.dockBgImage ? 'rgba(0,0,0,0)' :
+          (this.dockBgColor ? this.dockBgColor : TC.navBackground()))
         .onChange((index: number) => {
           this.currentIndex = index
           this.currentName = tabsData[index].name
@@ -343,6 +359,9 @@ struct HomeIndex {
         StartupOverlay()
       }
       .width('100%')
+      .onAreaChange((_old: Area, area: Area) => {
+        this.pageHeight = px2vp(Number(area.height))
+      })
       .height('100%')
       .backgroundColor(TC.pageBackground())
     }

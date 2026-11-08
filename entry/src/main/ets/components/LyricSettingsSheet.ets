@@ -2,6 +2,7 @@ import { LyricPreferences } from '../models/lyricPreferences'
 import { AppSettings } from '../services/AppSettings'
 import { BubbleTip } from '../services/BubbleTip'
 import { TC } from '../services/ThemeColors'
+import { DecoColorPicker } from './DecoControls'
 
 @Component
 export struct LyricSettingsSheet {
@@ -89,14 +90,17 @@ export struct LyricSettingsSheet {
           this.Control('时间偏移 · ' + this.timeOffset.toFixed(1) + ' 秒', this.timeOffset, -4, 4, 0.1,
             (v: number) => this.timeOffset = Math.round(v * 10) / 10)
           Text('正值提前显示歌词，负值延后显示').fontSize(11).fontColor(TC.textSecondary())
-          Text('高亮颜色').width('100%').fontSize(13).fontColor(TC.textBody())
-          Row({ space: 16 }) {
-            ForEach(['#ef233c', '#ffffff', '#ffd166', '#66ddaa', '#69b9ff', '#cda0ff'], (color: string) => {
-              Circle().width(30).height(30).fill(color).stroke(this.color === color ? '#ffffff' : '#55555d')
-                .strokeWidth(this.color === color ? 3 : 1)
-                .onClick(() => { this.color = color; this.onPreview(this.current()) })
-            })
-          }
+          // 高亮颜色：RGBA 半模态选择器（禁透明度，恒输出 #RRGGBB，与存储格式一致）
+          DecoColorPicker({
+            label: '高亮颜色',
+            value: this.color,
+            allowEmpty: false,
+            withAlpha: false,
+            onChange: (color: string) => {
+              this.color = color
+              this.onPreview(this.current())
+            }
+          })
         }.width('100%')
       }.layoutWeight(1)
       Button(this.saving ? '保存中…' : '保存').width('100%').enabled(!this.saving)

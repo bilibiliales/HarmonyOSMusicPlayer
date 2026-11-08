@@ -194,8 +194,10 @@ export class PlayerStyleConfig {
   coverY: number = 0
   /** 封面圆角百分比 0-50（50=圆形）。 */
   coverRadius: number = 50
-  /** 控件颜色（进度条、播放按钮等）；空=跟随主题。 */
+  /** 控件颜色（播放按钮等）；空=跟随主题。 */
   controlColor: string = ''
+  /** 进度条颜色；空=跟随控件色。 */
+  progressColor: string = ''
   /** 图标颜色；空=跟随主题。 */
   iconColor: string = ''
   /** 文字颜色；空=跟随主题。 */
@@ -223,6 +225,7 @@ export class PlayerStyleConfig {
       out.coverY = src.coverY ?? 0
       out.coverRadius = src.coverRadius ?? 50
       out.controlColor = src.controlColor ?? ''
+      out.progressColor = src.progressColor ?? ''
       out.iconColor = src.iconColor ?? ''
       out.textColor = src.textColor ?? ''
     } catch (_error) {
@@ -245,6 +248,8 @@ export class DockConfig {
   textSize: number = 10
   /** 底板颜色；空=跟随主题。 */
   bgColor: string = ''
+  /** 底板背景图片（本地路径，铺满底部导航区）；优先于 bgColor。 */
+  bgImage: string = ''
   /** 选中指示块颜色；空=主题色。 */
   indicatorColor: string = ''
   /** 是否显示文字。 */
@@ -265,6 +270,7 @@ export class DockConfig {
       out.textColor = src.textColor ?? ''
       out.textSize = src.textSize ?? 10
       out.bgColor = src.bgColor ?? ''
+      out.bgImage = src.bgImage ?? ''
       out.indicatorColor = src.indicatorColor ?? ''
       out.showText = src.showText ?? true
     } catch (_error) {

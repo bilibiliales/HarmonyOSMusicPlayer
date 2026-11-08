@@ -72,7 +72,7 @@ const DARK: Record<string, string> = {
   'text_on_media_secondary': '#CCFFFFFF',
   'text_on_media_tertiary': '#99FFFFFF',
   'accent': '#ef233c',
-  'accent_soft': '#ff6577',
+  'accent_soft': '#e01e35',
   'accent_container': '#2B2024',
   'divider': '#303038',
   'border_subtle': '#2a2a30',

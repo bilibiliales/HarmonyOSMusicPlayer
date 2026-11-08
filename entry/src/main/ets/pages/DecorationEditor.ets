@@ -19,6 +19,7 @@ import {
   VipBadgeConfig
 } from '../models/decoration'
 import { TC } from '../services/ThemeColors'
+import { DecoColor } from '../services/DecorationColor'
 import { DecoCard, DecoColorPicker, DecoMediaPicker, DecoSlider, DecoToggleRow } from '../components/DecoControls'
 
 /** 装扮编辑器入参。 */
@@ -79,6 +80,7 @@ export struct DecorationEditorPage {
   @State private coverY: number = 0
   @State private coverRadius: number = 50
   @State private playerControlColor: string = ''
+  @State private playerProgressColor: string = ''
   @State private playerIconColor: string = ''
   @State private playerTextColor: string = ''
   @State private stageW: number = 0
@@ -93,6 +95,7 @@ export struct DecorationEditorPage {
   @State private dockTextColor: string = ''
   @State private dockTextSize: number = 10
   @State private dockBgColor: string = ''
+  @State private dockBgImage: string = ''
   @State private dockShowText: boolean = true
 
   // ---- 侧边栏 ----
@@ -192,6 +195,7 @@ export struct DecorationEditorPage {
     this.coverY = 0
     this.coverRadius = 50
     this.playerControlColor = ''
+    this.playerProgressColor = ''
     this.playerIconColor = ''
     this.playerTextColor = ''
 
@@ -201,6 +205,7 @@ export struct DecorationEditorPage {
     this.dockTextColor = ''
     this.dockTextSize = 10
     this.dockBgColor = ''
+    this.dockBgImage = ''
     this.dockShowText = true
 
     this.sideBgImage = ''
@@ -270,6 +275,7 @@ export struct DecorationEditorPage {
       this.coverY = cfg.coverY
       this.coverRadius = cfg.coverRadius
       this.playerControlColor = cfg.controlColor
+      this.playerProgressColor = cfg.progressColor
       this.playerIconColor = cfg.iconColor
       this.playerTextColor = cfg.textColor
       return
@@ -282,6 +288,7 @@ export struct DecorationEditorPage {
       this.dockTextColor = cfg.textColor
       this.dockTextSize = cfg.textSize
       this.dockBgColor = cfg.bgColor
+      this.dockBgImage = cfg.bgImage
       this.dockShowText = cfg.showText
       return
     }
@@ -374,6 +381,7 @@ export struct DecorationEditorPage {
       cfg.coverY = this.coverY
       cfg.coverRadius = this.coverRadius
       cfg.controlColor = this.playerControlColor
+      cfg.progressColor = this.playerProgressColor
       cfg.iconColor = this.playerIconColor
       cfg.textColor = this.playerTextColor
       return JSON.stringify(cfg)
@@ -386,6 +394,7 @@ export struct DecorationEditorPage {
       cfg.textColor = this.dockTextColor
       cfg.textSize = this.dockTextSize
       cfg.bgColor = this.dockBgColor
+      cfg.bgImage = this.dockBgImage
       cfg.showText = this.dockShowText
       return JSON.stringify(cfg)
     }
@@ -589,6 +598,42 @@ export struct DecorationEditorPage {
       if (layer.id === this.selectedLayerId) { result.push(layer) }
     }
     return result
+  }
+
+  // ---- 舞台预览取色：装扮优先，未指定按白字画布 ----
+  private stageIcon(): string {
+    return this.playerIconColor ? this.playerIconColor : '#FFFFFF'
+  }
+
+  private stageSmallIcon(): string {
+    return this.playerIconColor ? this.playerIconColor : '#999999'
+  }
+
+  private stageText(): string {
+    return this.playerTextColor ? this.playerTextColor : '#FFFFFF'
+  }
+
+  private stageTextDim(): string {
+    return this.playerTextColor ? DecoColor.alpha(this.playerTextColor, 0.66) : '#B3FFFFFF'
+  }
+
+  private stageTextFaint(): string {
+    return this.playerTextColor ? DecoColor.alpha(this.playerTextColor, 0.42) : '#6BFFFFFF'
+  }
+
+  private stageControl(): string {
+    return this.playerControlColor ? this.playerControlColor : '#FFFFFF'
+  }
+
+  private stageProgress(): string {
+    if (this.playerProgressColor) { return this.playerProgressColor }
+    return this.stageControl()
+  }
+
+  private stageProgressTrack(): string {
+    const base = this.playerProgressColor ? this.playerProgressColor : this.playerControlColor
+    if (base) { return DecoColor.alpha(base, 0.24) }
+    return 'rgba(255,255,255,0.22)'
   }
 
   private stageVinylSize(): number {
@@ -907,24 +952,97 @@ export struct DecorationEditorPage {
         this.StageLayer(layer)
       }, (layer: PlayerLayer) => layer.id)
 
-      // 示意控件
-      Column({ space: 10 }) {
-        Text('歌曲名')
-          .fontSize(13)
-          .fontWeight(FontWeight.Bold)
-          .fontColor(this.playerTextColor ? this.playerTextColor : '#FFFFFF')
-        Row({ space: 14 }) {
-          SymbolGlyph($r('sys.symbol.backward_end_fill')).fontSize(18)
-            .fontColor([this.playerIconColor ? this.playerIconColor : '#FFFFFF'])
-          SymbolGlyph($r('sys.symbol.play_fill')).fontSize(24)
-            .fontColor([this.playerControlColor ? this.playerControlColor : '#FFFFFF'])
-          SymbolGlyph($r('sys.symbol.forward_end_fill')).fontSize(18)
-            .fontColor([this.playerIconColor ? this.playerIconColor : '#FFFFFF'])
+      // 顶部栏：「正在播放」
+      Row({ space: 8 }) {
+        SymbolGlyph($r('sys.symbol.chevron_left'))
+          .fontSize(16)
+          .fontColor([this.stageIcon()])
+        Column({ space: 1 }) {
+          Text('正在播放').fontSize(7).fontColor(this.stageTextDim())
+          Text('网易云音乐').fontSize(9).fontColor(this.stageText())
+            .maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
         }
+        .alignItems(HorizontalAlign.Start)
+        .layoutWeight(1)
+        SymbolGlyph($r('sys.symbol.ellipsis_circle'))
+          .fontSize(16)
+          .fontColor([this.stageIcon()])
       }
       .width('100%')
-      .position({ x: 0, y: '78%' })
-      .alignItems(HorizontalAlign.Center)
+      .padding({ left: 10, right: 10, top: 8 })
+      .position({ x: 0, y: 0 })
+      .hitTestBehavior(HitTestMode.None)
+
+      // 底部集群：歌名歌手 / 进度条 / 播放控制 / 四个小图标
+      Column({ space: 6 }) {
+        // 歌名 + 收藏/评论
+        Row({ space: 8 }) {
+          Column({ space: 2 }) {
+            Text('示例歌曲名').fontSize(13).fontWeight(FontWeight.Bold).fontColor(this.stageText())
+              .maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
+            Text('歌手名').fontSize(9).fontColor(this.stageTextDim())
+          }
+          .layoutWeight(1)
+          .alignItems(HorizontalAlign.Start)
+          SymbolGlyph($r('sys.symbol.heart')).fontSize(15).fontColor([this.stageIcon()])
+          SymbolGlyph($r('sys.symbol.ellipsis_bubble')).fontSize(14).fontColor([this.stageIcon()])
+        }
+        .width('100%')
+
+        // 进度条
+        Column({ space: 1 }) {
+          Stack({ alignContent: Alignment.Start }) {
+            Column().width('100%').height(2).borderRadius(1)
+              .backgroundColor(this.stageProgressTrack())
+            Column().width('38%').height(2).borderRadius(1)
+              .backgroundColor(this.stageProgress())
+            Column().width(7).height(7).borderRadius(4)
+              .backgroundColor(this.stageProgress())
+              .position({ x: '36%', y: -2.5 })
+          }
+          .width('100%')
+          .height(8)
+
+          Row() {
+            Text('1:23').fontSize(7).fontColor(this.stageTextDim())
+            Blank()
+            Text('3:45').fontSize(7).fontColor(this.stageTextDim())
+          }
+          .width('100%')
+        }
+        .width('100%')
+
+        // 播放控制
+        Row() {
+          SymbolGlyph($r('sys.symbol.repeat')).fontSize(13).fontColor([this.stageIcon()])
+            .layoutWeight(1)
+          SymbolGlyph($r('sys.symbol.backward_fill')).fontSize(19).fontColor([this.stageIcon()])
+            .layoutWeight(1)
+          SymbolGlyph($r('sys.symbol.pause_circle_fill')).fontSize(38).fontColor([this.stageControl()])
+            .layoutWeight(1)
+          SymbolGlyph($r('sys.symbol.forward_end_fill')).fontSize(19).fontColor([this.stageIcon()])
+            .layoutWeight(1)
+          SymbolGlyph($r('sys.symbol.list_bullet')).fontSize(13).fontColor([this.stageIcon()])
+            .layoutWeight(1)
+        }
+        .width('100%')
+
+        // 底部四个小图标
+        Row() {
+          SymbolGlyph($r('sys.symbol.folder_badge_plus')).fontSize(13).fontColor([this.stageSmallIcon()])
+            .layoutWeight(1)
+          SymbolGlyph($r('sys.symbol.arrow_down_circle')).fontSize(13).fontColor([this.stageSmallIcon()])
+            .layoutWeight(1)
+          SymbolGlyph($r('sys.symbol.arrow_right_up_and_square')).fontSize(13).fontColor([this.stageSmallIcon()])
+            .layoutWeight(1)
+          SymbolGlyph($r('sys.symbol.info_circle')).fontSize(13).fontColor([this.stageSmallIcon()])
+            .layoutWeight(1)
+        }
+        .width('100%')
+      }
+      .width('100%')
+      .padding({ left: 12, right: 12, bottom: 8 })
+      .position({ x: 0, y: this.stageH - 118 })
       .hitTestBehavior(HitTestMode.None)
     }
     .width('100%')
@@ -943,8 +1061,9 @@ export struct DecorationEditorPage {
       .borderRadius(16)
       .clip(true)
       .onAreaChange((_old: Area, area: Area) => {
-        this.stageW = Number(area.width)
-        this.stageH = Number(area.height)
+        // onAreaChange 返回 px，position/offset 用 vp，统一换算
+        this.stageW = px2vp(Number(area.width))
+        this.stageH = px2vp(Number(area.height))
       })
 
       Text('点选图层后可拖动；滑杆可精调位置与大小')
@@ -1122,8 +1241,12 @@ export struct DecorationEditorPage {
 
       DecoCard({ title: '控件配色', hint: '留空跟随主题；压图文字默认常白，保证任何背景下都看得清' }) {
         DecoColorPicker({
-          label: '控件色（播放键 / 进度条）', value: this.playerControlColor,
+          label: '控件色（播放键）', value: this.playerControlColor,
           onChange: (v: string) => this.playerControlColor = v
+        })
+        DecoColorPicker({
+          label: '进度条色（留空跟随控件色）', value: this.playerProgressColor,
+          onChange: (v: string) => this.playerProgressColor = v
         })
         DecoColorPicker({
           label: '图标色', value: this.playerIconColor,
@@ -1189,6 +1312,68 @@ export struct DecorationEditorPage {
           label: '底板色', value: this.dockBgColor,
           onChange: (v: string) => this.dockBgColor = v
         })
+        DecoMediaPicker({
+          label: '底板背景图片（优先于底板色）', value: this.dockBgImage, mediaType: 'image',
+          onChange: (path: string) => this.dockBgImage = path
+        })
+        if (this.dockBgImage) {
+          Row({ space: 8 }) {
+            Text('清除背景图').fontSize(11).fontColor(TC.accent())
+              .onClick(() => this.dockBgImage = '')
+          }
+          .width('100%')
+          .justifyContent(FlexAlign.End)
+        }
+      }
+
+      // 效果预览
+      DecoCard({ title: '效果预览' }) {
+        Stack({ alignContent: Alignment.Center }) {
+          if (this.dockBgImage) {
+            Image(this.dockBgImage)
+              .width('100%')
+              .height('100%')
+              .objectFit(ImageFit.Cover)
+          }
+          Column()
+            .width('100%')
+            .height('100%')
+            .backgroundColor(this.dockBgImage
+              ? 'rgba(0,0,0,0)'
+              : (this.dockBgColor ? this.dockBgColor : TC.navBackground()))
+          Row() {
+            ForEach(this.dockIcons, (icon: string, index: number) => {
+              Column({ space: 2 }) {
+                if (icon) {
+                  Image(icon).width(17).height(17).objectFit(ImageFit.Contain)
+                } else {
+                  SymbolGlyph(index === 0 ? $r('sys.symbol.play_circle') :
+                    (index === 1 ? $r('sys.symbol.line_3_horizontal') :
+                      (index === 2 ? $r('sys.symbol.camera_fill') : $r('sys.symbol.person_crop_circle_fill'))))
+                    .fontSize(16)
+                    .fontColor([index === 0
+                      ? (this.dockActiveColor ? this.dockActiveColor : TC.textOnAccent())
+                      : (this.dockIconColor ? this.dockIconColor : TC.textTertiary())])
+                }
+                if (this.dockShowText) {
+                  Text(index === 0 ? '推荐' : (index === 1 ? '发现' : (index === 2 ? '动态' : '我的')))
+                    .fontSize(this.dockTextSize)
+                    .fontColor(index === 0
+                      ? (this.dockTextColor ? this.dockTextColor : TC.textPrimary())
+                      : (this.dockIconColor ? this.dockIconColor : TC.textTertiary()))
+                }
+              }
+              .layoutWeight(1)
+              .alignItems(HorizontalAlign.Center)
+            }, (icon: string, index: number) => `${index}_${icon}`)
+          }
+          .width('100%')
+          .padding({ left: 8, right: 8 })
+        }
+        .width('100%')
+        .height(56)
+        .borderRadius(14)
+        .clip(true)
       }
     }
     .width('100%')

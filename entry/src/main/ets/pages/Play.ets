@@ -168,6 +168,22 @@ export struct Play {
     return 'rgba(255,255,255,0.22)'
   }
 
+  /** 进度条主色：装扮指定 > 控件色 > 主题。 */
+  private psProgress(): ResourceColor {
+    if (this.playerStyle.progressColor) {
+      return this.playerStyle.progressColor
+    }
+    return this.psControl()
+  }
+
+  private psProgressSoft(): ResourceColor {
+    const base = this.playerStyle.progressColor ? this.playerStyle.progressColor : this.playerStyle.controlColor
+    if (base) {
+      return DecoColor.alpha(base, 0.24)
+    }
+    return 'rgba(255,255,255,0.22)'
+  }
+
   private vinylRenderSize(): number {
     return this.playerStyle.vinylSize > 0 ? this.playerStyle.vinylSize : this.vinylDiameter
   }
@@ -592,6 +608,19 @@ export struct Play {
       this.lyricResumeTimer = -1
       this.scrollToCurrentLyric(true)
     }, 3500)
+  }
+
+  /**
+   * 点击歌词的行为（防误触）：
+   *  - 默认状态：点击任意歌词只返回唱片，不跳转进度；
+   *  - 暂停跟随状态（手动滑动浏览中）：点击歌词立即取消暂停跟随并跳转到对应进度。
+   */
+  private onLyricTap(line: LyricLine, index: number): void {
+    if (this.lyricUserScrolling) {
+      this.seekToLyric(line, index)
+      return
+    }
+    this.closeLyrics()
   }
 
   private seekToLyric(line: LyricLine, index: number): void {
@@ -1325,10 +1354,10 @@ export struct Play {
             .fontSize(15)
             .fontWeight(FontWeight.Bold)
             .fontColor(TC.textPrimary())
-          Text(this.lyricUserScrolling ? '正在浏览，3.5 秒后恢复跟随' :
-            (this.hasPreciseLyrics() ? '逐字歌词 · 点击任意歌词可跳转' : '点击任意歌词可跳转播放'))
+          Text(this.lyricUserScrolling ? '已暂停跟随 · 点击歌词可跳转进度' :
+            (this.hasPreciseLyrics() ? '逐字歌词 · 点击歌词返回唱片' : '点击歌词返回唱片'))
             .fontSize(9)
-            .fontColor(this.lyricUserScrolling ? '#ff8b9a' : '#85858e')
+            .fontColor(this.lyricUserScrolling ? TC.accentSoft() : '#85858e')
         }
         .layoutWeight(1)
         .alignItems(HorizontalAlign.Start)
@@ -1337,9 +1366,9 @@ export struct Play {
             .onClick(() => this.activeSheet = 'lyricSettings')
           Row({ space: 5 }) {
             SymbolGlyph($r('sys.symbol.arrow_up_left_and_arrow_down_right'))
-              .fontSize(14).fontColor([this.lyricsImmersive ? '#ff7b8b' : '#d9d9de'])
+              .fontSize(14).fontColor([this.lyricsImmersive ? TC.accentSoft() : '#d9d9de'])
             Text(this.lyricsImmersive ? '退出沉浸' : '沉浸歌词')
-              .fontSize(10).fontColor(this.lyricsImmersive ? '#ff7b8b' : '#d9d9de')
+              .fontSize(10).fontColor(this.lyricsImmersive ? TC.accentSoft() : '#d9d9de')
           }
           .padding({ left: 10, right: 10, top: 7, bottom: 7 })
           .backgroundColor(this.lyricsImmersive ? 'rgba(239,35,60,0.16)' : 'rgba(255,255,255,0.08)')
@@ -1421,7 +1450,7 @@ export struct Play {
                   curve: curves.springMotion(0.56, 0.68, 0.24),
                   delay: this.lyricLineDelay(index)
                 })
-                .onClick(() => this.seekToLyric(line, index))
+                .onClick(() => this.onLyricTap(line, index))
               }
             })
             ListItem() {
@@ -1468,7 +1497,7 @@ export struct Play {
     // 后续可在「播放器样式」装扮里手动定义该颜色。
     Row() {
       SymbolGlyph(icon)
-        .fontSize(24)
+        .fontSize(21)
         .fontColor([this.playerStyle.iconColor ? this.playerStyle.iconColor : '#999999'])
     }
     .justifyContent(FlexAlign.Center)
@@ -1897,13 +1926,6 @@ export struct Play {
                   })
               )
 
-              Row({ space: 6 }) {
-                SymbolGlyph($r('sys.symbol.text_alignleft')).fontSize(13).fontColor([this.psIcon()])
-                Text('点击唱片查看滚动歌词').fontSize(10).fontColor(this.psDim())
-              }
-              .padding({ left: 11, right: 11, top: 7, bottom: 7 })
-              .backgroundColor('rgba(255,255,255,0.07)')
-              .borderRadius(15)
             }
             .width('100%')
             .layoutWeight(1)
@@ -1977,10 +1999,10 @@ export struct Play {
               max: Math.max(this.playerStore.duration, 1)
             })
               .width('100%')
-              .blockColor(this.psControl())
+              .blockColor(this.psProgress())
               .blockSize({ width: 11, height: 11 })
-              .selectedColor(this.psControl())
-              .trackColor(this.psControlSoft())
+              .selectedColor(this.psProgress())
+              .trackColor(this.psProgressSoft())
               .trackThickness(2)
               .onChange((value: number, mode: SliderChangeMode) => this.handleProgressChange(value, mode))
             Row() {
@@ -2067,8 +2089,8 @@ export struct Play {
             }
             }
             .width('100%')
-            .constraintSize({ minHeight: 60 })
-            .padding({ left: 16, right: 16, bottom: 18 })
+            .constraintSize({ minHeight: 50 })
+            .padding({ left: 16, right: 16, bottom: 10 })
 
             if (this.playerStore.errorMessage) {
               Text(this.playerStore.errorMessage)

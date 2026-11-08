@@ -58,89 +58,251 @@ export struct DecoSlider {
   }
 }
 
-/** 颜色选择：预设色板 + 手填色值 + 恢复跟随主题。 */
+/** 解析 #rgb/#rrggbb/#aarrggbb/rgba()，返回 [r,g,b,a(0-100)]；无法解析时用默认红。 */
+function parseColorRGBA(color: string): number[] {
+  const fallback: number[] = [239, 35, 60, 100]
+  const value = color.trim()
+  if (value.startsWith('#')) {
+    let body = value.substring(1)
+    let alphaPercent = 100
+    if (body.length === 3) {
+      body = `${body[0]}${body[0]}${body[1]}${body[1]}${body[2]}${body[2]}`
+    } else if (body.length === 8) {
+      alphaPercent = Math.round(parseInt(body.substring(0, 2), 16) / 255 * 100)
+      body = body.substring(2)
+    }
+    if (body.length === 6) {
+      const r = parseInt(body.substring(0, 2), 16)
+      const g = parseInt(body.substring(2, 4), 16)
+      const b = parseInt(body.substring(4, 6), 16)
+      if (!Number.isNaN(r) && !Number.isNaN(g) && !Number.isNaN(b)) {
+        return [r, g, b, alphaPercent]
+      }
+    }
+    return fallback
+  }
+  const match = value.match(/rgba?\(([^)]+)\)/)
+  if (match) {
+    const parts = match[1].split(',')
+    if (parts.length >= 3) {
+      const r = parseInt(parts[0].trim(), 10)
+      const g = parseInt(parts[1].trim(), 10)
+      const b = parseInt(parts[2].trim(), 10)
+      let alphaPercent = 100
+      if (parts.length >= 4) {
+        alphaPercent = Math.round(parseFloat(parts[3].trim()) * 100)
+      }
+      if (!Number.isNaN(r) && !Number.isNaN(g) && !Number.isNaN(b)) {
+        return [r, g, b, alphaPercent]
+      }
+    }
+  }
+  return fallback
+}
+
+/** 0-255 转两位大写 hex。 */
+function colorChannelHex(component: number): string {
+  const clamped = Math.max(0, Math.min(255, Math.round(component)))
+  const text = clamped.toString(16).toUpperCase()
+  return text.length === 1 ? `0${text}` : text
+}
+
+/**
+ * 颜色选择：RGBA 四滑块半模态（自研，替代 HdsColorPicker —— 该组件要 API 26，
+ * 项目下限目前到不了 26）。行内显示当前色板，点开半模态调 红/绿/蓝/透明度，
+ * 实时回传；也支持直接填 hex / rgba()。
+ *
+ * - allowEmpty：是否允许「恢复跟随主题」（皮肤、播放器配色用）；
+ * - withAlpha：是否提供透明度滑块。false 时恒输出 #RRGGBB（歌词高亮等只收 hex 的场景）。
+ */
 @Component
 export struct DecoColorPicker {
   @StorageProp('skinVersion') skinVersionObs: number = 0
   @Prop label: string = ''
-  @Prop @Watch('syncText') value: string = ''
+  @Prop @Watch('onValueChanged') value: string = ''
+  @Prop allowEmpty: boolean = true
+  @Prop withAlpha: boolean = true
   onChange: (value: string) => void = () => {}
-  @State private text: string = ''
+  @State private sheetOpen: boolean = false
+  @State private red: number = 239
+  @State private green: number = 35
+  @State private blue: number = 60
+  @State private alpha: number = 100
+  @State private hexText: string = ''
 
   aboutToAppear(): void {
-    this.text = this.value
+    this.loadFromValue()
   }
 
-  private syncText(): void {
-    this.text = this.value
+  private onValueChanged(): void {
+    this.loadFromValue()
+  }
+
+  /** 把外部传入值拆成 RGBA 四个分量；无法解析时用默认红。 */
+  private loadFromValue(): void {
+    const parsed = parseColorRGBA(this.value)
+    this.red = parsed[0]
+    this.green = parsed[1]
+    this.blue = parsed[2]
+    this.alpha = parsed[3]
+    this.hexText = this.value
+  }
+
+  private currentColor(): string {
+    if (this.withAlpha && this.alpha < 100) {
+      const a = Math.round(this.alpha) / 100
+      return `rgba(${this.red},${this.green},${this.blue},${a})`
+    }
+    return `#${colorChannelHex(this.red)}${colorChannelHex(this.green)}${colorChannelHex(this.blue)}`
+  }
+
+  private emit(): void {
+    const color = this.currentColor()
+    this.hexText = color
+    this.onChange(color)
+  }
+
+  @Builder
+  private ChannelSlider(label: string, value: number, min: number, max: number, unit: string,
+    change: (v: number) => void) {
+    Row({ space: 10 }) {
+      Text(label).fontSize(13).fontColor(TC.textBody()).width(52)
+      Slider({ value: value, min: min, max: max, step: 1, style: SliderStyle.OutSet })
+        .layoutWeight(1)
+        .selectedColor(TC.accent())
+        .trackColor(TC.surfaceInset())
+        .blockColor(TC.accent())
+        .onChange((v: number) => { change(v); this.emit() })
+      Text(`${Math.round(value)}${unit}`).fontSize(12).fontColor(TC.textTertiary()).width(40)
+        .textAlign(TextAlign.End)
+    }
+    .width('100%')
+  }
+
+  @Builder
+  private SheetContent() {
+    Column({ space: 16 }) {
+      Text(this.label ? this.label : '选择颜色')
+        .fontSize(17)
+        .fontWeight(FontWeight.Bold)
+        .fontColor(TC.textPrimary())
+        .width('100%')
+
+      // 预览条
+      Row({ space: 12 }) {
+        Column()
+          .width(52)
+          .height(52)
+          .borderRadius(14)
+          .backgroundColor(this.currentColor())
+          .border({ width: 1, color: TC.borderSubtle() })
+        Column({ space: 4 }) {
+          Text(this.currentColor()).fontSize(13).fontColor(TC.textPrimary())
+            .maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
+          Text('拖动滑块实时生效').fontSize(11).fontColor(TC.textTertiary())
+        }
+        .layoutWeight(1)
+        .alignItems(HorizontalAlign.Start)
+      }
+      .width('100%')
+
+      this.ChannelSlider('红 R', this.red, 0, 255, '', (v: number) => this.red = v)
+      this.ChannelSlider('绿 G', this.green, 0, 255, '', (v: number) => this.green = v)
+      this.ChannelSlider('蓝 B', this.blue, 0, 255, '', (v: number) => this.blue = v)
+      if (this.withAlpha) {
+        this.ChannelSlider('透明度', this.alpha, 0, 100, '%', (v: number) => this.alpha = v)
+      }
+
+      // 预设色板
+      Text('常用色').fontSize(12).fontColor(TC.textTertiary()).width('100%')
+      Flex({ wrap: FlexWrap.Wrap }) {
+        ForEach(PRESET_COLORS, (color: string) => {
+          Column()
+            .width(30)
+            .height(30)
+            .borderRadius(15)
+            .backgroundColor(color)
+            .border({ width: 1, color: TC.borderSubtle() })
+            .margin({ right: 12, bottom: 12 })
+            .onClick(() => {
+              const parsed = parseColorRGBA(color)
+              this.red = parsed[0]
+              this.green = parsed[1]
+              this.blue = parsed[2]
+              this.alpha = 100
+              this.emit()
+            })
+        }, (color: string) => color)
+      }
+      .width('100%')
+
+      Button('完成')
+        .width('100%')
+        .height(44)
+        .fontColor(TC.textOnAccent())
+        .backgroundColor(TC.accent())
+        .borderRadius(22)
+        .onClick(() => this.sheetOpen = false)
+    }
+    .width('100%')
+    .padding({ left: 20, right: 20, top: 8, bottom: 24 })
   }
 
   build() {
     Column({ space: 8 }) {
-      Row() {
+      Row({ space: 10 }) {
         Text(this.label).fontSize(13).fontColor(TC.textBody()).layoutWeight(1)
         if (this.value) {
+          Text(this.value)
+            .fontSize(11)
+            .fontColor(TC.textTertiary())
+            .maxLines(1)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+        }
+        if (this.allowEmpty && this.value) {
           Text('恢复跟随主题')
             .fontSize(11)
             .fontColor(TC.accent())
-            .onClick(() => {
-              this.text = ''
-              this.onChange('')
-            })
-        } else {
+            .onClick(() => this.onChange(''))
+        } else if (this.allowEmpty && !this.value) {
           Text('跟随主题').fontSize(11).fontColor(TC.textTertiary())
         }
+        Column()
+          .width(26)
+          .height(26)
+          .borderRadius(13)
+          .backgroundColor(this.value ? this.value : TC.surfaceInset())
+          .border({ width: 1, color: TC.borderSubtle() })
+          .onClick(() => {
+            this.loadFromValue()
+            this.sheetOpen = true
+          })
       }
       .width('100%')
 
-      Scroll() {
-        Row({ space: 10 }) {
-          ForEach(PRESET_COLORS, (color: string) => {
-            Stack() {
-              if (this.value.toUpperCase() === color.toUpperCase()) {
-                Column()
-                  .width(30)
-                  .height(30)
-                  .borderRadius(15)
-                  .border({ width: 2, color: TC.accent() })
-              }
-              Column()
-                .width(24)
-                .height(24)
-                .borderRadius(12)
-                .backgroundColor(color)
-                .border({ width: 1, color: TC.borderSubtle() })
-            }
-            .width(32)
-            .height(32)
-            .onClick(() => {
-              this.text = color
-              this.onChange(color)
-            })
-          }, (color: string) => color)
-        }
-        .padding({ left: 2, right: 2 })
-      }
-      .scrollable(ScrollDirection.Horizontal)
-      .scrollBar(BarState.Off)
-      .width('100%')
-
-      TextInput({ text: this.text, placeholder: '色值，如 #EF233C 或 rgba(0,0,0,0.4)' })
-        .height(42)
+      TextInput({ text: this.hexText, placeholder: '#EF233C 或 rgba(0,0,0,0.4)' })
+        .height(38)
         .fontSize(12)
         .fontColor(TC.textPrimary())
         .placeholderColor(TC.textQuaternary())
         .backgroundColor(TC.surfaceInset())
-        .borderRadius(12)
-        .onChange((value: string) => {
-          this.text = value
-          const normalized = DecoColor.normalize(value)
+        .borderRadius(10)
+        .onChange((text: string) => {
+          this.hexText = text
+          const normalized = DecoColor.normalize(text)
           if (normalized) {
             this.onChange(normalized)
           }
         })
     }
     .width('100%')
+    .bindSheet(this.sheetOpen, this.SheetContent(), {
+      height: SheetSize.MEDIUM,
+      backgroundColor: TC.sheetBackground(),
+      showClose: false,
+      dragBar: true,
+      onDisappear: () => this.sheetOpen = false
+    })
   }
 }
 

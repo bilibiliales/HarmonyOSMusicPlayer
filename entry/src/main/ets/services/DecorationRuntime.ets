@@ -30,6 +30,7 @@ export class DecoKeys {
   static readonly DOCK_TEXT_COLOR: string = 'decoDockTextColor'
   static readonly DOCK_TEXT_SIZE: string = 'decoDockTextSize'
   static readonly DOCK_BG: string = 'decoDockBg'
+  static readonly DOCK_BG_IMAGE: string = 'decoDockBgImage'
   static readonly DOCK_INDICATOR: string = 'decoDockIndicator'
   static readonly DOCK_SHOW_TEXT: string = 'decoDockShowText'
   // 侧边栏
@@ -174,6 +175,7 @@ export class DecorationRuntime {
     AppStorage.setOrCreate<string>(DecoKeys.DOCK_TEXT_COLOR, cfg ? cfg.textColor : '')
     AppStorage.setOrCreate<number>(DecoKeys.DOCK_TEXT_SIZE, cfg ? cfg.textSize : 10)
     AppStorage.setOrCreate<string>(DecoKeys.DOCK_BG, cfg ? cfg.bgColor : '')
+    AppStorage.setOrCreate<string>(DecoKeys.DOCK_BG_IMAGE, cfg ? cfg.bgImage : '')
     AppStorage.setOrCreate<string>(DecoKeys.DOCK_INDICATOR, cfg ? cfg.indicatorColor : '')
     AppStorage.setOrCreate<boolean>(DecoKeys.DOCK_SHOW_TEXT, cfg ? cfg.showText : true)
   }
