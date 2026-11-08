@@ -74,6 +74,8 @@ export struct Mine {
   @StorageProp(DecoKeys.AVATAR_FRAME) avatarFrame: string = ''
   @StorageProp(DecoKeys.VIP_BADGES) vipBadges: string = ''
   @State homeBgVersion: number = 0
+  /** 由宿主（Index）注入：点击右上角菜单图标时展开侧边栏。 */
+  onMenuClick: () => void = () => {}
   @Consume('pageStack') pageStack: NavPathStack
   @Consume('topAvoidHeight') topAvoidHeight: number
   @Consume('authStore') @Watch('onAuthStoreChanged') authStore: AuthStore
@@ -952,6 +954,14 @@ export struct Mine {
         .width(40).height(40).borderRadius(14).backgroundColor('rgba(20,20,25,0.55)')
         .position({ right: 18, top: this.topAvoidHeight + 28 }).onClick(() => this.openProfileEditor())
       }
+
+      // 右上角菜单：展开侧边栏（登录态下与编辑资料按钮并排）
+      Stack() {
+        SymbolGlyph($r('sys.symbol.line_3_horizontal')).fontSize(19).fontColor(['#FFFFFF'])
+      }
+      .width(40).height(40).borderRadius(14).backgroundColor('rgba(20,20,25,0.55)')
+      .position({ right: this.authStore.loggedIn ? 66 : 18, top: this.topAvoidHeight + 28 })
+      .onClick(() => this.onMenuClick())
     }
     .width('100%')
     .height(this.topAvoidHeight + 220)

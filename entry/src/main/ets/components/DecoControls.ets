@@ -299,6 +299,8 @@ export struct DecoColorPicker {
     .bindSheet(this.sheetOpen, this.SheetContent(), {
       height: SheetSize.MEDIUM,
       backgroundColor: TC.sheetBackground(),
+      // 展开时暗化背后内容，半模态与页面区分开
+      maskColor: 'rgba(0,0,0,0.45)',
       showClose: false,
       dragBar: true,
       onDisappear: () => this.sheetOpen = false

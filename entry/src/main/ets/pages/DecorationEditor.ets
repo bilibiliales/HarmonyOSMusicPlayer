@@ -458,6 +458,16 @@ export struct DecorationEditorPage {
     return JSON.stringify(cfg)
   }
 
+  /** 恢复默认：把当前类型的表单值重置为出厂默认，保留名称与已保存条目的绑定，保存后才生效。 */
+  private restoreDefaults(): void {
+    const keepId = this.editingId
+    const keepName = this.name
+    this.resetDraft()
+    this.editingId = keepId
+    this.name = keepName
+    BubbleTip.show(this.getUIContext(), '已恢复默认，保存后生效')
+  }
+
   private async save(activate: boolean): Promise<void> {
     const item = new DecorationItem()
     item.kind = this.kind
@@ -687,6 +697,12 @@ export struct DecorationEditorPage {
   @Builder
   private ActionBar() {
     Row({ space: 10 }) {
+      Text('恢复默认')
+        .fontSize(12)
+        .fontColor(TC.textTertiary())
+        .padding({ left: 8, right: 8, top: 12, bottom: 12 })
+        .onClick(() => this.restoreDefaults())
+
       Button('保存')
         .layoutWeight(1)
         .height(44)

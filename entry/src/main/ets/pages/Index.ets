@@ -325,7 +325,7 @@ struct HomeIndex {
               } else if (item.name === 'moment') {
                 Moment()
               } else if (item.name === 'mine') {
-                Mine()
+                Mine({ onMenuClick: () => this.openSidebar() })
               }
             }
             .tabBar(this.getTabBar(item, index))
