@@ -106,7 +106,7 @@ export struct DeviceManagementPage {
                 .height(50).fontColor(TC.textPrimary()).placeholderColor(TC.textQuaternary()).backgroundColor(TC.surfaceInset())
                 .borderRadius(14).onChange((value: string) => this.alias = value)
               Button(this.aliasSaving ? '上报中…' : '上报设备别名')
-                .width('100%').height(46).borderRadius(23).backgroundColor(TC.accent())
+                .width('100%').height(46).borderRadius(23).fontColor(TC.textOnAccent()).backgroundColor(TC.accent())
                 .enabled(!this.aliasSaving).onClick(() => this.saveAlias())
             }.width('100%').padding(18).backgroundColor(TC.surfaceCard()).borderRadius(20)
 
@@ -125,7 +125,7 @@ export struct DeviceManagementPage {
                       Row({ space: 8 }) {
                         Text(device.deviceName).fontSize(14).fontColor(TC.textPrimary()).maxLines(1)
                         if (device.isCurrent) {
-                          Text('本机').fontSize(10).fontColor(TC.textPrimary())
+                          Text('本机').fontSize(10).fontColor(TC.textOnAccent())
                             .backgroundColor(TC.accent()).borderRadius(8).padding({ left: 6, right: 6, top: 2, bottom: 2 })
                         }
                       }

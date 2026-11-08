@@ -1000,8 +1000,8 @@ export struct SongWiki {
 
         Button() {
           Row({ space: 6 }) {
-            SymbolGlyph($r('sys.symbol.arrow_down_circle')).fontSize(16).fontColor([TC.textPrimary()])
-            Text('保存到图库').fontSize(13).fontColor(TC.textPrimary())
+            SymbolGlyph($r('sys.symbol.arrow_down_circle')).fontSize(16).fontColor([TC.textOnAccent()])
+            Text('保存到图库').fontSize(13).fontColor(TC.textOnAccent())
           }
         }
         .layoutWeight(1)

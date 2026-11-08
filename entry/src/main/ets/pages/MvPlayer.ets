@@ -612,7 +612,7 @@ export struct MvPlayerPage {
           SymbolGlyph($r('sys.symbol.exclamationmark_triangle_fill')).fontSize(31).fontColor([TC.accentSoft()])
           Text(this.message).width('80%').fontSize(12).lineHeight(19).fontColor(TC.textBody())
             .textAlign(TextAlign.Center)
-          Button('重新获取').height(38).fontSize(12).fontColor(TC.textPrimary()).backgroundColor(TC.accent())
+          Button('重新获取').height(38).fontSize(12).fontColor(TC.textOnAccent()).backgroundColor(TC.accent())
             .borderRadius(18).onClick(() => this.loadVideoUrl(this.selectedResolution))
         }
       }

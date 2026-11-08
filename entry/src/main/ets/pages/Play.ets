@@ -956,7 +956,7 @@ export struct Play {
       if (AppSettings.askDownloadSaveMode) {
         const result = await this.getUIContext().getPromptAction().showActionMenu({
           title: '保存方式',
-          buttons: [{ text: '保存到下载目录', color: TC.accent() }, { text: '另存为…', color: '#777777' }]
+          buttons: [{ text: '保存到下载目录', color: TC.accentMenu() }, { text: '另存为…', color: '#777777' }]
         })
         saveMode = result.index === 1 ? 'saveAs' : 'download'
       }
@@ -1724,7 +1724,7 @@ export struct Play {
               Text(this.coverSaving ? '正在保存…' : '保存图片')
                 .fontSize(14)
                 .fontWeight(FontWeight.Medium)
-                .fontColor(TC.textPrimary())
+                .fontColor(TC.textOnAccent())
             }
           }
           .width(176)

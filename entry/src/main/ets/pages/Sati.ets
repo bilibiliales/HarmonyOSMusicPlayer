@@ -255,7 +255,7 @@ export struct SatiPage {
         Text('数字专辑').fontSize(13).fontColor(TC.textTertiary())
           .padding({ left: 12, right: 12, top: 9, bottom: 9 }).backgroundColor(TC.surfaceCardAlt()).borderRadius(18)
           .onClick(() => this.pageStack.replacePathByName('DigitalAlbumPage', null))
-        Text('助眠解压').fontSize(13).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary())
+        Text('助眠解压').fontSize(13).fontWeight(FontWeight.Bold).fontColor(TC.textOnAccent())
           .padding({ left: 12, right: 12, top: 9, bottom: 9 }).backgroundColor(TC.accent()).borderRadius(18)
       }.padding({ left: 16, right: 16 })
     }.width('100%').scrollable(ScrollDirection.Horizontal).scrollBar(BarState.Off)

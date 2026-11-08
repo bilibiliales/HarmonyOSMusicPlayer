@@ -192,7 +192,7 @@ export struct DigitalAlbumDetailPage {
           Text('已购买').fontSize(9).fontColor(TC.textQuaternary())
         }.layoutWeight(1)
       }.width('92%').height(72).backgroundColor(TC.surfaceCardAlt()).borderRadius(20)
-      Button('查看歌曲与普通专辑详情').width('86%').height(45).fontSize(13).fontColor(TC.textPrimary())
+      Button('查看歌曲与普通专辑详情').width('86%').height(45).fontSize(13).fontColor(TC.textOnAccent())
         .backgroundColor(TC.accent()).borderRadius(23).onClick(() => this.openAlbum())
     }.width('100%').padding({ left: 16, right: 16, top: 20, bottom: 8 })
   }

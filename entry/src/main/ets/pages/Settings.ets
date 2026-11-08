@@ -210,7 +210,7 @@ export struct SettingsPage {
       Text('隐私设置').width('100%').fontSize(16).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary())
       if (!this.authStore.loggedIn) {
         Text('登录后管理账号隐私设置').fontSize(12).fontColor(TC.textSecondary())
-        Button('去登录').backgroundColor(TC.accent()).onClick(() => this.pageStack.pushPathByName('LoginPage', null))
+        Button('去登录').fontColor(TC.textOnAccent()).backgroundColor(TC.accent()).onClick(() => this.pageStack.pushPathByName('LoginPage', null))
       } else if (this.privacyLoading) {
         LoadingProgress().width(28).height(28).color(TC.accent())
       } else {
@@ -394,7 +394,7 @@ export struct SettingsPage {
               Text('下载音质').width('100%').fontSize(12).fontColor(TC.textBody())
               QualitySelector({ selected: $defaultDownloadQuality })
               Button('保存默认播放设置').width('100%').height(46).borderRadius(23)
-                .backgroundColor(TC.accent()).onClick(() => this.savePlaybackDefaults())
+                .fontColor(TC.textOnAccent()).backgroundColor(TC.accent()).onClick(() => this.savePlaybackDefaults())
             }.width('100%').padding(18).backgroundColor(TC.surfaceCard()).borderRadius(20)
 
             Column({ space: 10 }) {
@@ -403,7 +403,7 @@ export struct SettingsPage {
                 .height(50).fontColor(TC.textPrimary()).placeholderColor(TC.textQuaternary()).backgroundColor(TC.surfaceInset())
                 .borderRadius(14).onChange((value: string) => this.serverUrl = value)
               Button('保存服务地址').width('100%').height(46).borderRadius(23)
-                .backgroundColor(TC.accent()).onClick(() => this.saveServer())
+                .fontColor(TC.textOnAccent()).backgroundColor(TC.accent()).onClick(() => this.saveServer())
             }.width('100%').padding(18).backgroundColor(TC.surfaceCard()).borderRadius(20)
 
             Column({ space: 10 }) {
@@ -418,7 +418,7 @@ export struct SettingsPage {
                 .height(48).fontColor(TC.textPrimary()).placeholderColor(TC.textQuaternary()).backgroundColor(TC.surfaceInset())
                 .borderRadius(14).onChange((value: string) => this.aiModel = value)
               Button('保存 AI 模型连接').width('100%').height(46).borderRadius(23)
-                .backgroundColor(TC.accent()).onClick(() => this.saveAiConnection())
+                .fontColor(TC.textOnAccent()).backgroundColor(TC.accent()).onClick(() => this.saveAiConnection())
             }.width('100%').padding(18).backgroundColor(TC.surfaceCard()).borderRadius(20)
           }.width('100%').padding({ left: 16, right: 16, top: 12, bottom: 32 })
         }.width('100%').layoutWeight(1)

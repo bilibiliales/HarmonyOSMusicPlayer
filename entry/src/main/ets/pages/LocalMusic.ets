@@ -188,7 +188,7 @@ export struct LocalMusicPage {
           }.layoutWeight(1).alignItems(HorizontalAlign.Start)
         }.width('100%').padding(14).backgroundColor(TC.surfaceInset()).borderRadius(16)
         Text('关联信息保存到本机，继续播放原本的音频文件。').width('100%').fontSize(13).fontColor(TC.textSecondary())
-        Button(this.matching ? '正在保存…' : '确认关联').width('100%').backgroundColor(TC.accent())
+        Button(this.matching ? '正在保存…' : '确认关联').width('100%').fontColor(TC.textOnAccent()).backgroundColor(TC.accent())
           .enabled(!this.matching).onClick(() => this.confirmMatch())
         Button('重新选择').width('100%').backgroundColor(TC.surfaceRaised()).enabled(!this.matching)
           .onClick(() => { this.selectedMatch = undefined; this.matchMessage = '' })

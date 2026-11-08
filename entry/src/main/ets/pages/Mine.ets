@@ -774,7 +774,7 @@ export struct Mine {
 
       if (this.currentTab === 'moment' && this.authStore.loggedIn) {
         Stack() {
-          SymbolGlyph($r('sys.symbol.plus_circle_fill')).fontSize(31).fontColor([TC.textPrimary()])
+          SymbolGlyph($r('sys.symbol.plus_circle_fill')).fontSize(31).fontColor([TC.textOnAccent()])
         }
         .width(58).height(58).borderRadius(29).backgroundColor(TC.accent())
         .shadow({ radius: 18, color: 'rgba(239,35,60,0.38)', offsetY: 7 })
@@ -994,7 +994,7 @@ export struct Mine {
           Column() {
             Text(item.title)
               .fontSize(18)
-              .fontColor(this.currentTab === item.name ? TC.textOnAccent() : TC.textTertiary())
+              .fontColor(this.currentTab === item.name ? TC.textPrimary() : TC.textTertiary())
               .fontWeight(this.currentTab === item.name ? FontWeight.Medium : FontWeight.Regular)
               .transition({ type: TransitionType.All })
               .padding({ top: 4, bottom: 4 })
@@ -1050,7 +1050,6 @@ export struct Mine {
           .alignItems(HorizontalAlign.Start)
           Button('去登录')
             .fontSize(12)
-            .fontColor(TC.textPrimary())
             .backgroundColor(TC.accent())
             .borderRadius(16)
             .onClick(() => this.pageStack.pushPathByName('LoginPage', null))
@@ -1283,7 +1282,6 @@ export struct Mine {
           .alignItems(HorizontalAlign.Start)
           Button('去登录')
             .fontSize(12)
-            .fontColor(TC.textPrimary())
             .backgroundColor(TC.accent())
             .borderRadius(16)
             .onClick(() => this.pageStack.pushPathByName('LoginPage', null))
@@ -1685,7 +1683,6 @@ export struct Mine {
         .width('90%')
         .height(44)
         .fontSize(15)
-        .fontColor(TC.textPrimary())
         .backgroundColor(TC.accent())
         .borderRadius(22)
         .margin({ top: 20 })
@@ -1707,7 +1704,7 @@ export struct Mine {
           SymbolGlyph($r('sys.symbol.person_crop_circle_fill'))
             .fontSize(40).fontColor([TC.textQuaternary()])
           Text('登录后查看订阅电台').fontSize(13).fontColor(TC.textTertiary())
-          Button('去登录').fontSize(12).fontColor(TC.textPrimary()).backgroundColor(TC.accent())
+          Button('去登录').fontSize(12).fontColor(TC.textOnAccent()).backgroundColor(TC.accent())
             .borderRadius(16).onClick(() => this.pageStack.pushPathByName('LoginPage', null))
         }
         .width('100%').height(200).justifyContent(FlexAlign.Center)
@@ -1769,7 +1766,7 @@ export struct Mine {
           SymbolGlyph($r('sys.symbol.person_crop_circle_fill'))
             .fontSize(40).fontColor([TC.textQuaternary()])
           Text('登录后查看笔记').fontSize(13).fontColor(TC.textTertiary())
-          Button('去登录').fontSize(12).fontColor(TC.textPrimary()).backgroundColor(TC.accent())
+          Button('去登录').fontSize(12).fontColor(TC.textOnAccent()).backgroundColor(TC.accent())
             .borderRadius(16).onClick(() => this.pageStack.pushPathByName('LoginPage', null))
         }
         .width('100%').height(200).justifyContent(FlexAlign.Center)

@@ -557,96 +557,74 @@ export struct Sidebar {
         .opacity(this.visible ? 1 : 0)
 
       Column() {
-        Stack({ alignContent: Alignment.TopStart }) {
-          Column()
-            .width('100%')
-            .height('100%')
-            .linearGradient({
-              angle: 145,
-              colors: [['#48222a', 0], ['#231a21', 0.48], ['#17171c', 1]]
-            })
-
-          Column({ space: 16 }) {
-            Row({ space: 12 }) {
-              if (this.authStore.avatarUrl) {
-                Image(this.authStore.avatarUrl)
-                  .width(52)
-                  .height(52)
-                  .borderRadius(26)
-                  .objectFit(ImageFit.Cover)
-              } else {
-                Stack() {
-                  SymbolGlyph($r('sys.symbol.person_fill'))
-                    .fontSize(25)
-                    .fontColor([TC.textOnMedia()])
-                }
+        Column({ space: 16 }) {
+          Row({ space: 12 }) {
+            if (this.authStore.avatarUrl) {
+              Image(this.authStore.avatarUrl)
                 .width(52)
                 .height(52)
                 .borderRadius(26)
-                .backgroundColor('rgba(255,255,255,0.12)')
+                .objectFit(ImageFit.Cover)
+            } else {
+              Stack() {
+                SymbolGlyph($r('sys.symbol.person_fill'))
+                  .fontSize(25)
+                  .fontColor([TC.textTertiary()])
               }
-
-              Column({ space: 5 }) {
-                Text(this.authStore.nickname)
-                  .fontSize(18)
-                  .fontWeight(FontWeight.Bold)
-                  .fontColor(TC.textOnMedia())
-                Text(this.authStore.loggedIn ? '查看个人主页' : '登录后同步收藏与歌单')
-                  .fontSize(11)
-                  .fontColor(TC.textOnMedia())
-              }
-              .layoutWeight(1)
-              .alignItems(HorizontalAlign.Start)
-
-              SymbolGlyph($r('sys.symbol.chevron_right'))
-                .fontSize(18)
-                .fontColor([TC.textOnMedia()])
+              .width(52)
+              .height(52)
+              .borderRadius(26)
+              .backgroundColor(TC.surfaceInset())
             }
-            .width('100%')
-            .onClick(() => {
-              if (!this.authStore.loggedIn) {
-                this.openLogin()
-              } else {
-                this.onClose()
-                this.onOpenMine()
-              }
-            })
 
-            this.VipCard()
+            Column({ space: 5 }) {
+              Text(this.authStore.nickname)
+                .fontSize(18)
+                .fontWeight(FontWeight.Bold)
+                .fontColor(TC.textPrimary())
+              Text(this.authStore.loggedIn ? '查看个人主页' : '登录后同步收藏与歌单')
+                .fontSize(11)
+                .fontColor(TC.textSecondary())
+            }
+            .layoutWeight(1)
+            .alignItems(HorizontalAlign.Start)
+
+            SymbolGlyph($r('sys.symbol.chevron_right'))
+              .fontSize(18)
+              .fontColor([TC.textTertiary()])
           }
-          .padding({ left: 20, right: 20, top: this.topAvoidHeight + 18 })
+          .width('100%')
+          .onClick(() => {
+            if (!this.authStore.loggedIn) {
+              this.openLogin()
+            } else {
+              this.onClose()
+              this.onOpenMine()
+            }
+          })
+
+          this.VipCard()
         }
-        .height(238 + this.topAvoidHeight)
+        .padding({ left: 20, right: 20, top: this.topAvoidHeight + 18 })
 
         List({ space: 8 }) {
           ForEach(this.menuItems, (item: SidebarMenuItem) => {
             ListItem() {
               Row({ space: 14 }) {
-                Stack() {
-                  SymbolGlyph(item.icon)
-                    .fontSize(20)
-                    .fontColor([item.available ? '#e7e7eb' : '#66666e'])
-                }
-                .width(40)
-                .height(40)
-                .borderRadius(13)
-                .backgroundColor(item.available ? '#25252c' : '#1c1c21')
+                SymbolGlyph(item.icon)
+                  .fontSize(22)
+                  .fontColor([item.available ? TC.textPrimary() : TC.textQuaternary()])
 
-                Column({ space: 3 }) {
-                  Text(item.title)
-                    .fontSize(14)
-                    .fontColor(item.available ? '#ededf0' : '#77777f')
-                  Text(item.subtitle)
-                    .fontSize(10)
-                    .fontColor(TC.textQuaternary())
-                }
-                .layoutWeight(1)
-                .alignItems(HorizontalAlign.Start)
+                Text(item.title)
+                  .fontSize(16)
+                  .fontWeight(FontWeight.Medium)
+                  .fontColor(item.available ? TC.textPrimary() : TC.textQuaternary())
+                  .layoutWeight(1)
 
                 if (!item.available) {
                   Text('暂不可用')
                     .fontSize(9)
-                    .fontColor(TC.textOnMediaTertiary())
+                    .fontColor(TC.textTertiary())
                     .padding({ left: 7, right: 7, top: 3, bottom: 3 })
                     .backgroundColor(TC.surfaceInset())
                     .borderRadius(8)
@@ -657,7 +635,7 @@ export struct Sidebar {
                 }
               }
               .width('100%')
-              .padding({ left: 14, right: 14, top: 8, bottom: 8 })
+              .padding({ left: 14, right: 14, top: 10, bottom: 10 })
               .borderRadius(16)
               .onClick(() => {
                 if (!item.available) {
@@ -693,8 +671,8 @@ export struct Sidebar {
           Button(this.authStore.loggedIn ? '退出登录' : '登录账号')
             .layoutWeight(1)
             .height(44)
-            .fontColor(this.authStore.loggedIn ? '#ff7785' : '#ffffff')
-            .backgroundColor(this.authStore.loggedIn ? '#2b2024' : '#ef233c')
+            .fontColor(this.authStore.loggedIn ? TC.accentSoft() : TC.textOnAccent())
+            .backgroundColor(this.authStore.loggedIn ? TC.accentContainer() : TC.accent())
             .borderRadius(15)
             .onClick(() => {
               if (this.authStore.loggedIn) {

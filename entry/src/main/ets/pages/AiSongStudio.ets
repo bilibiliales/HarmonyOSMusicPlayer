@@ -391,7 +391,7 @@ export struct AiSongStudioPage {
           .enterKeyType(EnterKeyType.Search)
           .onChange((value: string) => this.searchKeyword = value)
           .onSubmit(() => this.searchSongs())
-        Button('搜索').height(44).fontSize(12).fontColor(TC.textPrimary()).backgroundColor(TC.accent())
+        Button('搜索').height(44).fontSize(12).fontColor(TC.textOnAccent()).backgroundColor(TC.accent())
           .borderRadius(13).enabled(!this.searchLoading).onClick(() => this.searchSongs())
       }.width('100%')
       if (this.searchLoading) {
@@ -477,7 +477,7 @@ export struct AiSongStudioPage {
                   .fontColor(TC.textBody()).backgroundColor(TC.surfaceRaised()).borderRadius(14)
                   .enabled(!this.polishing && !this.generating).onClick(() => this.polishPrompt())
                 Button(this.generating ? '创作中…' : '生成歌曲').layoutWeight(1).height(44)
-                  .fontColor(TC.textPrimary()).backgroundColor(TC.accent()).borderRadius(14)
+                  .fontColor(TC.textOnAccent()).backgroundColor(TC.accent()).borderRadius(14)
                   .enabled(!this.polishing && !this.generating).onClick(() => this.generateSong())
               }
             }

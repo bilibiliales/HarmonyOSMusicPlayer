@@ -607,7 +607,7 @@ export struct PrivateChatPage {
           Row({ space: 8 }) {
             Text(`发送「${this.pageParam.shareMsg || '分享内容'}」`).fontSize(13).fontColor(TC.textBody())
               .layoutWeight(1).maxLines(1)
-            Button('发送').height(32).fontSize(12).fontColor(TC.textPrimary()).backgroundColor(TC.accent())
+            Button('发送').height(32).fontSize(12).fontColor(TC.textOnAccent()).backgroundColor(TC.accent())
               .borderRadius(16).enabled(!this.sending)
               .onClick(() => this.sendShareMessage())
           }
@@ -622,7 +622,7 @@ export struct PrivateChatPage {
             .onChange((value: string) => this.inputText = value)
             .onSubmit(() => this.sendTextMessage())
           Button(this.sending ? '…' : '发送')
-            .height(42).fontSize(13).fontColor(TC.textPrimary()).backgroundColor(TC.accent())
+            .height(42).fontSize(13).fontColor(TC.textOnAccent()).backgroundColor(TC.accent())
             .borderRadius(21).enabled(!this.sending)
             .onClick(() => this.sendTextMessage())
         }

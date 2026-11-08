@@ -136,7 +136,7 @@ export struct PlaylistSongManagerPage {
           .fontColor(TC.textPrimary()).placeholderColor(TC.textQuaternary()).backgroundColor(TC.surfaceInset()).borderRadius(13)
           .enterKeyType(EnterKeyType.Search).onChange((value: string) => this.keyword = value)
           .onSubmit(() => this.search())
-        Button('搜索').height(44).fontSize(12).fontColor(TC.textPrimary()).backgroundColor(TC.accent())
+        Button('搜索').height(44).fontSize(12).fontColor(TC.textOnAccent()).backgroundColor(TC.accent())
           .borderRadius(13).enabled(!this.loading).onClick(() => this.search())
       }.width('100%')
       if (this.loading) {

@@ -347,7 +347,7 @@ export struct CloudDrivePage {
           .fontSize(12).fontColor(TC.textTertiary())
         Button('纠偏 / 解除关联').width('100%').backgroundColor(TC.surfaceRaised()).enabled(!this.busy && !this.sheetLoading)
           .onClick(() => this.openMatch())
-        Button('删除').width('100%').backgroundColor(TC.accent()).enabled(!this.busy)
+        Button('删除').width('100%').fontColor(TC.textOnAccent()).backgroundColor(TC.accent()).enabled(!this.busy)
           .onClick(() => { if (this.target) { this.requestDelete([String(this.target.songId)]) } })
       } else if (this.sheet === 'match') {
         Search({ value: this.matchQuery, placeholder: '搜索要关联的歌名或歌手' })
@@ -372,7 +372,7 @@ export struct CloudDrivePage {
       } else if (this.sheet === 'delete') {
         Text(`确认从云盘删除 ${this.actionIds.length} 首歌曲？删除后需重新上传才能恢复。`)
           .fontSize(15).fontColor(TC.textBody())
-        Button('确认删除').backgroundColor(TC.accent()).enabled(!this.busy).onClick(() => this.batch())
+        Button('确认删除').fontColor(TC.textOnAccent()).backgroundColor(TC.accent()).enabled(!this.busy).onClick(() => this.batch())
       } else if (this.sheet === 'collect') {
         List() {
           ForEach(this.playlists, (playlist: playlistType) => {

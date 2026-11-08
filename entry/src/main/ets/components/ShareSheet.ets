@@ -167,7 +167,7 @@ export struct ShareSheet {
         Row() {
           Column({ space: 4 }) {
             Text(`分享「${this.shareParam.name}」`).fontSize(16).fontWeight(FontWeight.Bold).fontColor(
-              $r('sys.color.white')).maxLines(2)
+              TC.textPrimary()).maxLines(2)
             Text('选择分享方式').fontSize(11).fontColor(TC.textTertiary())
           }
           .layoutWeight(1).alignItems(HorizontalAlign.Start)

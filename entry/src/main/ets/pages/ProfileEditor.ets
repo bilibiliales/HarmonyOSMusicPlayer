@@ -228,7 +228,7 @@ export struct ProfileEditorPage {
               Image(this.avatarUri || this.pageParam.avatarUrl).width(112).height(112).borderRadius(56)
                 .objectFit(ImageFit.Cover).backgroundColor(TC.chipBackground())
               Stack() {
-                SymbolGlyph($r('sys.symbol.camera_fill')).fontSize(18).fontColor([TC.textPrimary()])
+                SymbolGlyph($r('sys.symbol.camera_fill')).fontSize(18).fontColor([TC.textOnAccent()])
               }.width(38).height(38).borderRadius(19).backgroundColor(TC.accent())
             }.width(112).height(112).onClick(() => this.selectAvatar())
 

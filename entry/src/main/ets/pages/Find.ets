@@ -294,7 +294,7 @@ struct Find {
           Column({ space: 7 }) {
             Text(title).fontSize(13)
               .fontWeight(this.currentSection === index ? FontWeight.Bold : FontWeight.Regular)
-              .fontColor(this.currentSection === index ? TC.textOnAccent() : TC.textTertiary())
+              .fontColor(this.currentSection === index ? TC.textPrimary() : TC.textTertiary())
             Column().width(24).height(3).borderRadius(2)
               .backgroundColor(this.currentSection === index ? TC.accent() : 'transparent')
           }.width(title.length > 4 ? 82 : 66).height(46).justifyContent(FlexAlign.Center)
@@ -325,7 +325,7 @@ struct Find {
                 this.NetworkImage(creative.items[0].image, 138, 138, 17)
                 if (creative.items[0].playCount > 0) {
                   Text(`▷ ${this.formatCount(creative.items[0].playCount)}`)
-                    .fontSize(9).fontColor(TC.textPrimary())
+                    .fontSize(9).fontColor(TC.textOnMedia())
                     .padding({ left: 6, right: 6, top: 3, bottom: 3 })
                     .backgroundColor('rgba(0,0,0,0.48)').borderRadius(9).margin(7)
                 }

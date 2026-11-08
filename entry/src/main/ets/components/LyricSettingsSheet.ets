@@ -100,7 +100,7 @@ export struct LyricSettingsSheet {
         }.width('100%')
       }.layoutWeight(1)
       Button(this.saving ? '保存中…' : '保存').width('100%').enabled(!this.saving)
-        .backgroundColor(TC.accent()).onClick(() => this.save())
+        .fontColor(TC.textOnAccent()).backgroundColor(TC.accent()).onClick(() => this.save())
     }.width('100%').height('100%').padding(20)
   }
 }

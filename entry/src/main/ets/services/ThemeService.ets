@@ -20,7 +20,7 @@ export class ThemeService {
   private static listeners: Array<(isDark: boolean) => void> = []
 
   /** 同步读取持久化的模式并在首帧前设置 colorMode，避免启动闪白/闪黑。 */
-  static init(context: common.Context): void {
+  static init(context: common.UIAbilityContext): void {
     ThemeService.context = context
     let saved: string = ThemeMode.SYSTEM
     try {
@@ -33,7 +33,7 @@ export class ThemeService {
     // 用应用上下文读取当前系统色彩模式，作为「跟随系统」时的初始值
     try {
       ThemeService.systemDark =
-        context.getApplicationContext().config.colorMode === ConfigurationConstant.ColorMode.COLOR_MODE_DARK
+        context.config.colorMode === ConfigurationConstant.ColorMode.COLOR_MODE_DARK
     } catch (_error) {
       ThemeService.systemDark = false
     }
@@ -57,6 +57,10 @@ export class ThemeService {
       ? ConfigurationConstant.ColorMode.COLOR_MODE_DARK
       : ConfigurationConstant.ColorMode.COLOR_MODE_LIGHT)
     AppStorage.setOrCreate<boolean>('themeIsDark', effectiveDark)
+    // 广播重渲染：TC 手动解析颜色（不依赖系统资源切换），所有订阅 skinVersion 的
+    // 组件随主题切换原地刷新（皮肤变化也复用同一通道）。
+    const version: number = (AppStorage.get<number>('skinVersion') ?? 0) + 1
+    AppStorage.setOrCreate<number>('skinVersion', version)
     // 通知监听方（如状态栏图标颜色），让沉浸式窗口跟随有效模式
     ThemeService.listeners.forEach((fn: (isDark: boolean) => void) => {
       try { fn(effectiveDark) } catch (_error) { /* 单个监听失败不影响其余 */ }

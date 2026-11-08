@@ -40,7 +40,10 @@ export class SkinService {
     } catch (_error) {
       SkinService.overrides = new Map<string, string>()
     }
-    AppStorage.setOrCreate<number>(AS_VERSION, SkinService.version)
+    // 不覆盖 ThemeService.init 已广播的版本号，仅在不存在时占位
+    if (AppStorage.get<number>(AS_VERSION) === undefined) {
+      AppStorage.setOrCreate<number>(AS_VERSION, SkinService.version)
+    }
   }
 
   /** 供 TC 查询：皮肤是否覆盖了某个语义色 token；未覆盖返回 undefined。 */

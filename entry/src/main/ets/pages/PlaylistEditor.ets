@@ -159,7 +159,7 @@ export struct PlaylistEditorPage {
                   }.width(148).height(148).borderRadius(18).backgroundColor(TC.surfaceInset())
                 }
                 Stack() {
-                  SymbolGlyph($r('sys.symbol.camera_fill')).fontSize(18).fontColor([TC.textPrimary()])
+                  SymbolGlyph($r('sys.symbol.camera_fill')).fontSize(18).fontColor([TC.textOnAccent()])
                 }.width(38).height(38).borderRadius(19).backgroundColor(TC.accent())
               }.width(148).height(148).onClick(() => this.selectCover())
             }.width('100%').alignItems(HorizontalAlign.Center)

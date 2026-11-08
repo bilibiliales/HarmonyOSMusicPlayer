@@ -411,7 +411,7 @@ struct Moment {
         Column({ space: 7 }) {
           Text(tab === 'following' ? '关注' : '发现')
             .fontSize(14).fontWeight(this.currentTab === tab ? FontWeight.Bold : FontWeight.Regular)
-            .fontColor(this.currentTab === tab ? TC.textOnAccent() : TC.textTertiary())
+            .fontColor(this.currentTab === tab ? TC.textPrimary() : TC.textTertiary())
           Column().width(24).height(3).borderRadius(2)
             .backgroundColor(this.currentTab === tab ? TC.accent() : 'transparent')
         }
@@ -430,7 +430,7 @@ struct Moment {
           .sourceSize({ width: 360, height: 520 })
           .borderRadius({ topLeft: 15, topRight: 15 }).objectFit(ImageFit.Cover)
         if ((item.pics || []).length > 1) {
-          Text(`${(item.pics || []).length} 图`).fontSize(9).fontColor(TC.textPrimary())
+          Text(`${(item.pics || []).length} 图`).fontSize(9).fontColor(TC.textOnMedia())
             .padding({ left: 7, right: 7, top: 4, bottom: 4 })
             .margin({ top: 8, right: 8 }).borderRadius(10).backgroundColor('rgba(0,0,0,0.55)')
         }
@@ -467,14 +467,14 @@ struct Moment {
     Column() {
       Row() {
         Column({ space: 3 }) {
-          Text('动态').fontSize(22).fontWeight(FontWeight.Bold).fontColor($r('sys.color.white'))
+          Text('动态').fontSize(22).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary())
           Text(this.currentTab === 'discover' ? '从热门话题中发现图片动态' :
             (this.authStore.loggedIn ? '关注的人最近分享' : '登录后查看关注动态'))
             .fontSize(10).fontColor(TC.textQuaternary())
         }
         .layoutWeight(1).alignItems(HorizontalAlign.Start)
         if (this.currentTab === 'following' && !this.authStore.loggedIn) {
-          Button('登录').fontSize(12).fontColor($r('sys.color.white')).backgroundColor(TC.accent())
+          Button('登录').fontSize(12).fontColor(TC.textOnAccent()).backgroundColor(TC.accent())
             .onClick(() => this.pageStack.pushPathByName('LoginPage', null))
         }
       }

@@ -130,7 +130,7 @@ export struct PublishEventPage {
           .backgroundColor(TC.surfaceRaised()).borderRadius(13).enterKeyType(EnterKeyType.Search)
           .onChange((value: string) => this.searchKeyword = value)
           .onSubmit(() => this.searchSongs())
-        Button('搜索').height(44).fontSize(12).fontColor(TC.textPrimary()).backgroundColor(TC.accent())
+        Button('搜索').height(44).fontSize(12).fontColor(TC.textOnAccent()).backgroundColor(TC.accent())
           .borderRadius(13).enabled(!this.searchLoading).onClick(() => this.searchSongs())
       }.width('100%')
 
@@ -211,7 +211,7 @@ export struct PublishEventPage {
             } else {
               Row({ space: 12 }) {
                 Stack() {
-                  SymbolGlyph($r('sys.symbol.music_note_list')).fontSize(23).fontColor([TC.textPrimary()])
+                  SymbolGlyph($r('sys.symbol.music_note_list')).fontSize(23).fontColor([TC.textOnAccent()])
                 }.width(48).height(48).borderRadius(14).backgroundColor(TC.accent())
                 Column({ space: 4 }) {
                   Text('添加歌曲').fontSize(14).fontWeight(FontWeight.Medium).fontColor(TC.textBody())

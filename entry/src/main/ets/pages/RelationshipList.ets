@@ -220,7 +220,6 @@ export struct RelationshipListPage {
           Button('取消关注')
             .layoutWeight(1)
             .height(46)
-            .fontColor(TC.textPrimary())
             .backgroundColor(TC.accent())
             .borderRadius(23)
             .onClick(() => this.cancelFollow())
@@ -264,7 +263,7 @@ export struct RelationshipListPage {
             Column({ space: 14 }) {
               Text('登录后才能查看关系列表').fontSize(13).fontColor(TC.textTertiary())
               Button('去登录')
-                .fontColor(TC.textPrimary()).backgroundColor(TC.accent())
+                .fontColor(TC.textOnAccent()).backgroundColor(TC.accent())
                 .onClick(() => this.pageStack.pushPathByName('LoginPage', null))
             }
             .layoutWeight(1)

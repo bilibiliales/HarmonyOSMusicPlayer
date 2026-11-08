@@ -264,9 +264,9 @@ export struct RadioProgramPage {
               Button('重试').backgroundColor(TC.surfaceRaised()).onClick(() => this.load())
             } else if (this.program) {
               Text(RadioService.author(this.program) + ' · ' + RadioService.duration(this.program.duration)).fontSize(13).fontColor(TC.textTertiary())
-              Button(this.playing ? '准备播放…' : '播放节目').backgroundColor(TC.accent()).enabled(!this.playing).onClick(() => this.play())
+              Button(this.playing ? '准备播放…' : '播放节目').fontColor(TC.textOnAccent()).backgroundColor(TC.accent()).enabled(!this.playing).onClick(() => this.play())
               if (this.program.radio?.id) {
-                Text('查看电台：' + (this.program.radio.name || '') + ' ›').fontSize(14).fontColor('#ff6577').onClick(() => this.openRadio())
+                Text('查看电台：' + (this.program.radio.name || '') + ' ›').fontSize(14).fontColor(TC.accentSoft()).onClick(() => this.openRadio())
               }
               this.CommentEntry()
               Text(this.program.description || '暂无节目介绍').width('100%').fontSize(15).lineHeight(26).fontColor(TC.textBody())

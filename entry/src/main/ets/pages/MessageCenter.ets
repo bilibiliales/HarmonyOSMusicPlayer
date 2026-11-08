@@ -284,7 +284,7 @@ export struct MessageCenterPage {
         Column({ space: 7 }) {
           Text(tab === 'private' ? '私信' : tab === 'comments' ? '评论' : '通知')
             .fontSize(14).fontWeight(this.currentTab === tab ? FontWeight.Bold : FontWeight.Regular)
-            .fontColor(this.currentTab === tab ? TC.textOnAccent() : TC.textTertiary())
+            .fontColor(this.currentTab === tab ? TC.textPrimary() : TC.textTertiary())
           Column().width(24).height(3).borderRadius(2)
             .backgroundColor(this.currentTab === tab ? TC.accent() : 'transparent')
         }
@@ -304,7 +304,7 @@ export struct MessageCenterPage {
               Image(this.otherUser(item).avatarUrl).width(52).height(52).borderRadius(18).objectFit(ImageFit.Cover)
               if ((item.newMsgCount || 0) > 0) {
                 Text(item.newMsgCount > 99 ? '99+' : item.newMsgCount.toString())
-                  .fontSize(8).fontColor(TC.textPrimary()).padding({ left: 5, right: 5, top: 2, bottom: 2 })
+                  .fontSize(8).fontColor(TC.textOnAccent()).padding({ left: 5, right: 5, top: 2, bottom: 2 })
                   .borderRadius(9).backgroundColor(TC.accent())
               }
             }
@@ -372,7 +372,7 @@ export struct MessageCenterPage {
                 .onClick(() => this.openUser(this.noticeDisplay(item).user?.userId || 0))
             } else {
               Stack() {
-                SymbolGlyph($r('sys.symbol.bell_fill')).fontSize(21).fontColor([TC.textPrimary()])
+                SymbolGlyph($r('sys.symbol.bell_fill')).fontSize(21).fontColor([TC.textOnAccent()])
               }
               .width(44).height(44).borderRadius(16).backgroundColor(TC.accent())
             }
@@ -428,7 +428,7 @@ export struct MessageCenterPage {
           Column({ space: 13 }) {
             SymbolGlyph($r('sys.symbol.envelope_fill')).fontSize(42).fontColor([TC.textQuaternary()])
             Text('登录后查看消息中心').fontSize(13).fontColor(TC.textTertiary())
-            Button('去登录').fontSize(12).fontColor(TC.textPrimary()).backgroundColor(TC.accent())
+            Button('去登录').fontSize(12).fontColor(TC.textOnAccent()).backgroundColor(TC.accent())
               .onClick(() => this.pageStack.pushPathByName('LoginPage', null))
           }
           .layoutWeight(1).justifyContent(FlexAlign.Center)

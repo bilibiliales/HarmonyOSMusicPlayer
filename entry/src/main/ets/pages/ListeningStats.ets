@@ -334,7 +334,7 @@ export struct ListeningStatsPage {
         Column({ space: 7 }) {
           Text(period === 'week' ? '本周' : '本月').fontSize(15)
             .fontWeight(this.currentPeriod === period ? FontWeight.Bold : FontWeight.Regular)
-            .fontColor(this.currentPeriod === period ? TC.textOnAccent() : TC.textTertiary())
+            .fontColor(this.currentPeriod === period ? TC.textPrimary() : TC.textTertiary())
           Column().width(24).height(3).borderRadius(2)
             .backgroundColor(this.currentPeriod === period ? TC.accent() : 'transparent')
         }.layoutWeight(1).height(48).justifyContent(FlexAlign.Center)
@@ -482,7 +482,7 @@ export struct ListeningStatsPage {
             SymbolGlyph($r('sys.symbol.clock')).fontSize(44).fontColor([TC.textQuaternary()])
             Text(this.message).fontSize(13).fontColor(TC.textTertiary()).textAlign(TextAlign.Center)
             if (!this.authStore.loggedIn) {
-              Button('去登录').backgroundColor(TC.accent())
+              Button('去登录').fontColor(TC.textOnAccent()).backgroundColor(TC.accent())
                 .onClick(() => this.pageStack.pushPathByName('LoginPage', null))
             }
           }
@@ -505,7 +505,7 @@ export struct ListeningStatsPage {
               } else {
                 Text(this.activeMessage() || '暂无该周期的听歌数据').width('100%').fontSize(13)
                   .fontColor(TC.textSecondary()).textAlign(TextAlign.Center).padding(24)
-                Button('重新加载').backgroundColor(TC.accent()).onClick(() => this.loadData())
+                Button('重新加载').fontColor(TC.textOnAccent()).backgroundColor(TC.accent()).onClick(() => this.loadData())
               }
 
               Text('听歌足迹数据由网易云接口提供，部分账号或数据维度可能需要会员权益。')

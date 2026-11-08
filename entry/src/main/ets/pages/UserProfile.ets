@@ -587,7 +587,7 @@ export struct UserProfilePage {
               .borderRadius(18).onClick(() => this.follow())
             Button('私聊')
               .height(36).fontSize(12)
-              .fontColor($r('sys.color.white')).backgroundColor(TC.surfaceRaised())
+              .fontColor(TC.textPrimary()).backgroundColor(TC.surfaceRaised())
               .borderRadius(18).onClick(() => this.openChat())
           }
         }
@@ -632,7 +632,7 @@ export struct UserProfilePage {
       Row({ space: 12 }) {
         Button('暂不取消').layoutWeight(1).backgroundColor(TC.surfaceRaised())
           .onClick(() => this.cancelSheetVisible = false)
-        Button('取消关注').layoutWeight(1).backgroundColor(TC.accent())
+        Button('取消关注').layoutWeight(1).fontColor(TC.textOnAccent()).backgroundColor(TC.accent())
           .onClick(() => this.cancelFollow())
       }
     }

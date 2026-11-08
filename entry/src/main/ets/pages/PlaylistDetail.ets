@@ -621,13 +621,13 @@ export struct PlaylistDetail {
           if (this.playlist.specialType === 'record') {
             Row({ space: 28 }) {
               Column({ space: 7 }) {
-                Text('最近一周').fontSize(14).fontColor(this.recordType === 1 ? TC.textOnAccent() : TC.textTertiary())
+                Text('最近一周').fontSize(14).fontColor(this.recordType === 1 ? TC.textPrimary() : TC.textTertiary())
                   .fontWeight(this.recordType === 1 ? FontWeight.Bold : FontWeight.Regular)
                 Column().width(24).height(3).borderRadius(2)
                   .backgroundColor(this.recordType === 1 ? TC.accent() : 'transparent')
               }.height(46).justifyContent(FlexAlign.Center).onClick(() => this.switchRecordType(1))
               Column({ space: 7 }) {
-                Text('全部时间').fontSize(14).fontColor(this.recordType === 0 ? TC.textOnAccent() : TC.textTertiary())
+                Text('全部时间').fontSize(14).fontColor(this.recordType === 0 ? TC.textPrimary() : TC.textTertiary())
                   .fontWeight(this.recordType === 0 ? FontWeight.Bold : FontWeight.Regular)
                 Column().width(24).height(3).borderRadius(2)
                   .backgroundColor(this.recordType === 0 ? TC.accent() : 'transparent')
@@ -638,9 +638,9 @@ export struct PlaylistDetail {
           Row({ space: 10 }) {
             Button() {
               Row({ space: 6 }) {
-                SymbolGlyph($r('sys.symbol.play_fill')).fontSize(15).fontColor([TC.textPrimary()])
+                SymbolGlyph($r('sys.symbol.play_fill')).fontSize(15).fontColor([TC.textOnAccent()])
                 Text(`播放全部 ${this.filteredSongs().length}`).fontSize(13).fontWeight(FontWeight.Medium)
-                  .fontColor(TC.textPrimary())
+                  .fontColor(TC.textOnAccent())
               }
             }
             .layoutWeight(1).height(40).backgroundColor(TC.accent()).borderRadius(20)

@@ -405,7 +405,7 @@ export struct Login {
                 this.Field(this.password, '设置密码（至少 6 位）', InputType.Password,
                   (value: string) => this.password = value)
                 Button(this.loading ? '创建中…' : '完成并登录')
-                  .width('100%').height(50).borderRadius(25).backgroundColor(TC.accent())
+                  .width('100%').height(50).borderRadius(25).fontColor(TC.textOnAccent()).backgroundColor(TC.accent())
                   .enabled(!this.loading).onClick(() => this.completeRegistration())
               }
             } else if (this.currentMethod === 'password') {
@@ -413,7 +413,7 @@ export struct Login {
                 this.Field(this.phone, '手机号码', InputType.PhoneNumber, (value: string) => this.phone = value)
                 this.Field(this.password, '密码', InputType.Password, (value: string) => this.password = value)
                 Button(this.loading ? '登录中…' : '登录')
-                  .width('100%').height(50).borderRadius(25).backgroundColor(TC.accent())
+                  .width('100%').height(50).borderRadius(25).fontColor(TC.textOnAccent()).backgroundColor(TC.accent())
                   .enabled(!this.loading).onClick(() => this.passwordLogin())
               }
             } else if (this.currentMethod === 'captcha') {
@@ -421,7 +421,7 @@ export struct Login {
                 this.Field(this.phone, '手机号码', InputType.PhoneNumber, (value: string) => this.phone = value)
                 this.CaptchaField()
                 Button(this.loading ? '登录中…' : '验证码登录')
-                  .width('100%').height(50).borderRadius(25).backgroundColor(TC.accent())
+                  .width('100%').height(50).borderRadius(25).fontColor(TC.textOnAccent()).backgroundColor(TC.accent())
                   .enabled(!this.loading).onClick(() => this.captchaLogin())
               }
             } else {

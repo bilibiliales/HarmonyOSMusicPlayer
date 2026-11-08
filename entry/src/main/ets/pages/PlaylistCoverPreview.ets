@@ -205,10 +205,10 @@ export struct PlaylistCoverPreview {
                   if (this.coverSaving) {
                     LoadingProgress().width(18).height(18).color(TC.textPrimary())
                   } else {
-                    SymbolGlyph($r('sys.symbol.arrow_down_circle')).fontSize(18).fontColor([TC.textPrimary()])
+                    SymbolGlyph($r('sys.symbol.arrow_down_circle')).fontSize(18).fontColor([TC.textOnAccent()])
                   }
                   Text(this.coverSaving ? '正在保存…' : '保存封面')
-                    .fontColor(TC.textPrimary()).fontSize(16).fontWeight(FontWeight.Medium)
+                    .fontColor(TC.textOnAccent()).fontSize(16).fontWeight(FontWeight.Medium)
                 }
               }
               .width(200).height(44).backgroundColor(TC.accent()).borderRadius(22)

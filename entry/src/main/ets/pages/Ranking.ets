@@ -192,7 +192,7 @@ export struct RankingPage {
       Row({ space: 6 }) {
       Text('发现').fontSize(13).fontColor(TC.textTertiary()).padding({ left: 12, right: 12, top: 9, bottom: 9 })
         .backgroundColor(TC.surfaceCardAlt()).borderRadius(18).onClick(() => this.pageStack.pop())
-      Text('排行榜').fontSize(13).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary())
+      Text('排行榜').fontSize(13).fontWeight(FontWeight.Bold).fontColor(TC.textOnAccent())
         .padding({ left: 12, right: 12, top: 9, bottom: 9 }).backgroundColor(TC.accent()).borderRadius(18)
       Text('曲风').fontSize(13).fontColor(TC.textTertiary()).padding({ left: 12, right: 12, top: 9, bottom: 9 })
         .backgroundColor(TC.surfaceCardAlt()).borderRadius(18)

@@ -85,7 +85,7 @@ export default class EntryAbility extends UIAbility {
 
   onConfigurationUpdate(newConfig: Configuration): void {
     // 系统深浅色变化：仅在「跟随系统」时同步 UI，手动模式下忽略
-    ThemeService.onSystemColorModeChange(newConfig.colorMode);
+    ThemeService.onSystemColorModeChange(newConfig.colorMode ?? ConfigurationConstant.ColorMode.COLOR_MODE_NOT_SET);
   }
 
   onWindowStageDestroy(): void {

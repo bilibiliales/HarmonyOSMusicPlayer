@@ -187,7 +187,7 @@ export struct DigitalAlbumPage {
         Text('电台').fontSize(13).fontColor(TC.textTertiary()).padding({ left: 12, right: 12, top: 9, bottom: 9 })
           .backgroundColor(TC.surfaceCardAlt()).borderRadius(18)
           .onClick(() => this.pageStack.replacePathByName('RadioPage', null))
-        Text('数字专辑').fontSize(13).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary())
+        Text('数字专辑').fontSize(13).fontWeight(FontWeight.Bold).fontColor(TC.textOnAccent())
           .padding({ left: 12, right: 12, top: 9, bottom: 9 }).backgroundColor(TC.accent()).borderRadius(18)
         Text('助眠解压').fontSize(13).fontColor(TC.textTertiary())
           .padding({ left: 12, right: 12, top: 9, bottom: 9 }).backgroundColor(TC.surfaceCardAlt()).borderRadius(18)
@@ -214,7 +214,7 @@ export struct DigitalAlbumPage {
         Image(resizeImageUrl(item.coverUrl, 280, 280)).width(126).height(126)
           .sourceSize({ width: 280, height: 280 }).borderRadius(15).objectFit(ImageFit.Cover)
         if (badge.length > 0) {
-          Text(badge).fontSize(10).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary())
+          Text(badge).fontSize(10).fontWeight(FontWeight.Bold).fontColor(TC.textOnAccent())
             .padding({ left: 8, right: 8, top: 5, bottom: 5 }).backgroundColor(TC.accent())
             .borderRadius({ topLeft: 15, bottomRight: 12 })
         }

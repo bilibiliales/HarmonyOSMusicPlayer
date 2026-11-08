@@ -145,7 +145,7 @@ export struct UserLevelPage {
         } else if (!this.response.data) {
           Column({ space: 14 }) {
             Text(this.message).fontSize(13).fontColor(TC.textTertiary())
-            Button(this.authStore.loggedIn ? '重试' : '去登录').backgroundColor(TC.accent())
+            Button(this.authStore.loggedIn ? '重试' : '去登录').fontColor(TC.textOnAccent()).backgroundColor(TC.accent())
               .onClick(() => {
                 if (this.authStore.loggedIn) { this.loadLevel() } else { this.pageStack.pushPathByName('LoginPage', null) }
               })

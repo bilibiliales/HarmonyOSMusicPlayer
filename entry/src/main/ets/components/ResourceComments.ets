@@ -645,7 +645,7 @@ export struct ResourceComments {
             .layoutWeight(1).height(42).fontSize(14).fontColor(TC.textPrimary()).placeholderColor(TC.textTertiary())
             .backgroundColor(TC.chipBackground()).borderRadius(21).maxLength(1400)
             .onChange((value: string) => this.input = value).onSubmit(() => this.submit())
-          Button(this.submitting ? '发送中' : '发送').height(38).fontSize(13).backgroundColor(TC.accent())
+          Button(this.submitting ? '发送中' : '发送').height(38).fontSize(13).fontColor(TC.textOnAccent()).backgroundColor(TC.accent())
             .enabled(!this.submitting && !this.deleting && this.input.trim().length > 0).onClick(() => this.submit())
         }.width('100%')
       }.width('100%').padding({ left: 16, right: 16, top: 16, bottom: 16 })
