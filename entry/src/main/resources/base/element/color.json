@@ -2,7 +2,7 @@
   "color": [
     {
       "name": "start_window_background",
-      "value": "#FFFFFFFF"
+      "value": "#FFFFF4F4F7"
     },
     {
       "name": "primary_light",
@@ -11,6 +11,106 @@
     {
       "name": "primary_dark",
       "value": "#4bb0c4"
+    },
+    {
+      "name": "page_background",
+      "value": "#f4f4f7"
+    },
+    {
+      "name": "nav_background",
+      "value": "#f4f4f7"
+    },
+    {
+      "name": "surface_card",
+      "value": "#ffffff"
+    },
+    {
+      "name": "surface_card_alt",
+      "value": "#fbfbfd"
+    },
+    {
+      "name": "surface_inset",
+      "value": "#eeeef2"
+    },
+    {
+      "name": "surface_raised",
+      "value": "#e6e6ec"
+    },
+    {
+      "name": "chip_background",
+      "value": "#ecebf1"
+    },
+    {
+      "name": "sheet_background",
+      "value": "#ffffff"
+    },
+    {
+      "name": "text_primary",
+      "value": "#111114"
+    },
+    {
+      "name": "text_body",
+      "value": "#2b2b31"
+    },
+    {
+      "name": "text_secondary",
+      "value": "#6b6b75"
+    },
+    {
+      "name": "text_tertiary",
+      "value": "#8c8c96"
+    },
+    {
+      "name": "text_quaternary",
+      "value": "#a0a0a8"
+    },
+    {
+      "name": "text_on_accent",
+      "value": "#ffffff"
+    },
+    {
+      "name": "text_on_media",
+      "value": "#ffffff"
+    },
+    {
+      "name": "accent",
+      "value": "#ef233c"
+    },
+    {
+      "name": "accent_soft",
+      "value": "#e01e35"
+    },
+    {
+      "name": "divider",
+      "value": "#e3e3e8"
+    },
+    {
+      "name": "border_subtle",
+      "value": "#e8e8ee"
+    },
+    {
+      "name": "scrim",
+      "value": "#000000"
+    },
+    {
+      "name": "text_on_media_secondary",
+      "value": "#CCFFFFFF"
+    },
+    {
+      "name": "text_on_media_tertiary",
+      "value": "#99FFFFFF"
+    },
+    {
+      "name": "header_scrim_top",
+      "value": "#B8FFFFFF"
+    },
+    {
+      "name": "header_scrim_mid",
+      "value": "#E8F4F4F7"
+    },
+    {
+      "name": "accent_container",
+      "value": "#FCEBEC"
     }
   ]
 }

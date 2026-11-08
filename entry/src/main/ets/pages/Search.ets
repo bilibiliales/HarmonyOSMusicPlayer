@@ -26,9 +26,11 @@ import { playlistType, songItemType } from '../models/music'
 import { RadioPageParam } from '../models/radio'
 import { ApiClient } from '../services/ApiClient'
 import { playerController } from '../services/PlayerController'
+import { TC } from '../services/ThemeColors'
 
 @Component
 export struct SearchPage {
+  @StorageProp('skinVersion') skinVersionObs: number = 0
   @Consume('pageStack') pageStack: NavPathStack
   @Consume('topAvoidHeight') topAvoidHeight: number
   @State keyword: string = ''
@@ -643,29 +645,29 @@ export struct SearchPage {
       } else {
         Stack() {
           SymbolGlyph(item.kind === '用户' ? $r('sys.symbol.person_fill') : $r('sys.symbol.music'))
-            .fontSize(23).fontColor(['#909098'])
+            .fontSize(23).fontColor([TC.textSecondary()])
         }
-        .width(54).height(54).borderRadius(11).backgroundColor('#292930')
+        .width(54).height(54).borderRadius(11).backgroundColor(TC.chipBackground())
       }
       Column({ space: 5 }) {
         Row({ space: 7 }) {
-          Text(item.kind).fontSize(9).fontColor('#ff7587')
+          Text(item.kind).fontSize(9).fontColor(TC.accentSoft())
           if (item.extra) {
-            Text(item.extra).fontSize(9).fontColor('#65656d')
+            Text(item.extra).fontSize(9).fontColor(TC.textQuaternary())
           }
         }
         Text(item.title).width('100%').fontSize(14).fontWeight(FontWeight.Medium)
-          .fontColor('#ededf0').maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
+          .fontColor(TC.textBody()).maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
         if (item.subtitle) {
-          Text(item.subtitle).width('100%').fontSize(11).fontColor('#77777f')
+          Text(item.subtitle).width('100%').fontSize(11).fontColor(TC.textTertiary())
             .maxLines(item.kind === '歌词' ? 2 : 1).textOverflow({ overflow: TextOverflow.Ellipsis })
         }
       }
       .layoutWeight(1).alignItems(HorizontalAlign.Start)
       if (item.songIndex >= 0) {
-        SymbolGlyph($r('sys.symbol.play_circle')).fontSize(23).fontColor(['#8a8a92'])
+        SymbolGlyph($r('sys.symbol.play_circle')).fontSize(23).fontColor([TC.textSecondary()])
       } else if (item.playlist || item.uid) {
-        SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(15).fontColor(['#66666e'])
+        SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(15).fontColor([TC.textQuaternary()])
       }
     }
     .width('100%').padding({ left: 14, right: 16, top: 8, bottom: 8 })
@@ -677,15 +679,15 @@ export struct SearchPage {
     Column() {
       if (this.defaultKeyword.length > 0) {
         Column({ space: 9 }) {
-          Text('搜索发现').width('100%').fontSize(17).fontWeight(FontWeight.Bold).fontColor('#ffffff')
+          Text('搜索发现').width('100%').fontSize(17).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary())
           Row({ space: 8 }) {
-            SymbolGlyph($r('sys.symbol.magnifyingglass')).fontSize(15).fontColor(['#ef4058'])
-            Text(this.defaultKeyword).layoutWeight(1).fontSize(13).fontColor('#e2e2e6').maxLines(1)
+            SymbolGlyph($r('sys.symbol.magnifyingglass')).fontSize(15).fontColor([TC.accentSoft()])
+            Text(this.defaultKeyword).layoutWeight(1).fontSize(13).fontColor(TC.textBody()).maxLines(1)
               .textOverflow({ overflow: TextOverflow.Ellipsis })
-            SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(13).fontColor(['#66666e'])
+            SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(13).fontColor([TC.textQuaternary()])
           }
           .width('100%').height(46).padding({ left: 13, right: 13 })
-          .backgroundColor('#202026').borderRadius(14)
+          .backgroundColor(TC.surfaceCardAlt()).borderRadius(14)
           .onClick(() => this.runKeyword(this.defaultKeyword))
         }
         .width('100%').padding({ left: 16, right: 16, top: 12, bottom: 16 })
@@ -693,21 +695,21 @@ export struct SearchPage {
       }
 
       Row() {
-        Text('当前热搜').layoutWeight(1).fontSize(18).fontWeight(FontWeight.Bold).fontColor('#ffffff')
-        Text(`${this.hotSearches.length} 条`).fontSize(10).fontColor('#66666e')
+        Text('当前热搜').layoutWeight(1).fontSize(18).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary())
+        Text(`${this.hotSearches.length} 条`).fontSize(10).fontColor(TC.textQuaternary())
       }
       .width('100%').height(44).padding({ left: 16, right: 16 })
 
       if (this.discoveryLoading) {
         Column({ space: 10 }) {
-          LoadingProgress().width(28).height(28).color('#ef233c')
-          Text('正在获取热搜').fontSize(11).fontColor('#77777f')
+          LoadingProgress().width(28).height(28).color(TC.accent())
+          Text('正在获取热搜').fontSize(11).fontColor(TC.textTertiary())
         }
         .layoutWeight(1).justifyContent(FlexAlign.Center)
       } else if (this.hotSearches.length === 0) {
         Column({ space: 10 }) {
-          SymbolGlyph($r('sys.symbol.magnifyingglass')).fontSize(34).fontColor(['#55555d'])
-          Text('暂无热搜内容').fontSize(12).fontColor('#77777f')
+          SymbolGlyph($r('sys.symbol.magnifyingglass')).fontSize(34).fontColor([TC.textQuaternary()])
+          Text('暂无热搜内容').fontSize(12).fontColor(TC.textTertiary())
         }
         .layoutWeight(1).justifyContent(FlexAlign.Center)
       } else {
@@ -717,26 +719,26 @@ export struct SearchPage {
               Row({ space: 12 }) {
                 Text((index + 1).toString()).width(27).fontSize(index < 3 ? 18 : 13)
                   .fontWeight(index < 3 ? FontWeight.Bold : FontWeight.Regular)
-                  .fontColor(index < 3 ? '#ef4058' : '#77777f').textAlign(TextAlign.Center)
+                  .fontColor(index < 3 ? TC.accent() : TC.textTertiary()).textAlign(TextAlign.Center)
                 Column({ space: 5 }) {
                   Row({ space: 7 }) {
                     Text(item.searchWord).fontSize(14).fontWeight(index < 3 ? FontWeight.Bold : FontWeight.Medium)
-                      .fontColor('#ededf0').maxLines(1)
+                      .fontColor(TC.textBody()).maxLines(1)
                     if (item.iconUrl && item.iconUrl.length > 0) {
                       Image(item.iconUrl).height(13).width(28).objectFit(ImageFit.Contain)
                     } else if (item.iconType === 1) {
-                      Text('HOT').fontSize(8).fontColor('#ef4058')
+                      Text('HOT').fontSize(8).fontColor(TC.accentSoft())
                     }
                   }
                   if (item.content && item.content.length > 0) {
-                    Text(item.content).fontSize(10).fontColor('#77777f').maxLines(1)
+                    Text(item.content).fontSize(10).fontColor(TC.textTertiary()).maxLines(1)
                   }
                 }
                 .layoutWeight(1).alignItems(HorizontalAlign.Start)
                 if (item.score && item.score > 0) {
-                  Text(item.score.toString()).fontSize(9).fontColor('#55555d')
+                  Text(item.score.toString()).fontSize(9).fontColor(TC.textQuaternary())
                 }
-                SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(13).fontColor(['#55555d'])
+                SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(13).fontColor([TC.textQuaternary()])
               }
               .height(62).padding({ left: 12, right: 16 })
               .onClick(() => this.runKeyword(item.searchWord))
@@ -753,16 +755,16 @@ export struct SearchPage {
   private SuggestionPanel() {
     Column() {
       Row() {
-        Text('搜索建议').layoutWeight(1).fontSize(17).fontWeight(FontWeight.Bold).fontColor('#ffffff')
-        Text(this.keyword.trim()).fontSize(11).fontColor('#ef6577').maxLines(1)
+        Text('搜索建议').layoutWeight(1).fontSize(17).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary())
+        Text(this.keyword.trim()).fontSize(11).fontColor(TC.accentSoft()).maxLines(1)
       }
       .width('100%').height(48).padding({ left: 16, right: 16 })
       if (this.suggestionLoading) {
-        LoadingProgress().layoutWeight(1).width(38).color('#ef233c')
+        LoadingProgress().layoutWeight(1).width(38).color(TC.accent())
       } else if (this.suggestionItems.length === 0) {
         Column({ space: 10 }) {
-          SymbolGlyph($r('sys.symbol.magnifyingglass')).fontSize(36).fontColor(['#55555d'])
-          Text('暂无搜索建议，按回车直接搜索').fontSize(12).fontColor('#77777f')
+          SymbolGlyph($r('sys.symbol.magnifyingglass')).fontSize(36).fontColor([TC.textQuaternary()])
+          Text('暂无搜索建议，按回车直接搜索').fontSize(12).fontColor(TC.textTertiary())
         }
         .layoutWeight(1).justifyContent(FlexAlign.Center)
       } else {
@@ -775,22 +777,22 @@ export struct SearchPage {
                 } else {
                   Stack() {
                     SymbolGlyph($r('sys.symbol.music'))
-                      .fontSize(21).fontColor(['#8a8a92'])
+                      .fontSize(21).fontColor([TC.textSecondary()])
                   }
-                  .width(50).height(50).borderRadius(10).backgroundColor('#292930')
+                  .width(50).height(50).borderRadius(10).backgroundColor(TC.chipBackground())
                 }
                 Column({ space: 5 }) {
                   Row({ space: 6 }) {
-                    Text(item.kind).fontSize(9).fontColor('#ef6577')
-                    Text(item.title).layoutWeight(1).fontSize(14).fontColor('#ededf0').maxLines(1)
+                    Text(item.kind).fontSize(9).fontColor(TC.accentSoft())
+                    Text(item.title).layoutWeight(1).fontSize(14).fontColor(TC.textBody()).maxLines(1)
                       .textOverflow({ overflow: TextOverflow.Ellipsis })
                   }
-                  Text(item.subtitle).width('100%').fontSize(10).fontColor('#77777f').maxLines(1)
+                  Text(item.subtitle).width('100%').fontSize(10).fontColor(TC.textTertiary()).maxLines(1)
                     .textOverflow({ overflow: TextOverflow.Ellipsis })
                 }
                 .layoutWeight(1).alignItems(HorizontalAlign.Start)
                 SymbolGlyph(item.songIndex >= 0 ? $r('sys.symbol.play_circle') : $r('sys.symbol.chevron_right'))
-                  .fontSize(20).fontColor(['#77777f'])
+                  .fontSize(20).fontColor([TC.textTertiary()])
               }
               .height(66).padding({ left: 14, right: 16 }).onClick(() => this.openSuggestion(item))
             }
@@ -807,26 +809,26 @@ export struct SearchPage {
       Column() {
         Column().width('100%').height(this.topAvoidHeight)
         Row({ space: 10 }) {
-          SymbolGlyph($r('sys.symbol.chevron_left')).fontSize(24).fontColor(['#ffffff'])
+          SymbolGlyph($r('sys.symbol.chevron_left')).fontSize(24).fontColor([TC.textPrimary()])
             .onClick(() => this.pageStack.pop())
           Row({ space: 8 }) {
-            SymbolGlyph($r('sys.symbol.magnifyingglass')).fontSize(18).fontColor(['#77777f'])
+            SymbolGlyph($r('sys.symbol.magnifyingglass')).fontSize(18).fontColor([TC.textTertiary()])
             TextInput({ text: this.keyword,
               placeholder: this.defaultKeyword || '歌曲、专辑、歌手、歌单、用户' })
-              .layoutWeight(1).fontColor('#ffffff').placeholderColor('#66666e')
+              .layoutWeight(1).fontColor(TC.textPrimary()).placeholderColor(TC.textQuaternary())
               .backgroundColor(Color.Transparent)
               .onChange((value: string) => this.onKeywordChange(value))
               .onSubmit(() => this.search())
             if (this.keyword) {
-              SymbolGlyph($r('sys.symbol.xmark_circle_fill')).fontSize(18).fontColor(['#66666e'])
+              SymbolGlyph($r('sys.symbol.xmark_circle_fill')).fontSize(18).fontColor([TC.textQuaternary()])
                 .onClick(() => {
                   this.onKeywordChange('')
                 })
             }
           }
           .layoutWeight(1).height(42).padding({ left: 12, right: 12 })
-          .backgroundColor('#202026').borderRadius(14)
-          Button('搜索').fontSize(13).fontColor('#ff6577').backgroundColor(Color.Transparent)
+          .backgroundColor(TC.surfaceCardAlt()).borderRadius(14)
+          Button('搜索').fontSize(13).fontColor(TC.accentSoft()).backgroundColor(Color.Transparent)
             .onClick(() => this.search())
         }
         .width('100%').height(62).padding({ left: 14, right: 12 })
@@ -837,10 +839,10 @@ export struct SearchPage {
               ForEach(this.searchTabs, (tab: SearchTabItem) => {
                 Text(tab.title)
                   .fontSize(11)
-                  .fontColor(this.activeType === tab.type ? '#ffffff' : '#77777f')
+                  .fontColor(this.activeType === tab.type ? TC.textOnAccent() : TC.textTertiary())
                   .fontWeight(this.activeType === tab.type ? FontWeight.Bold : FontWeight.Regular)
                   .padding({ left: 13, right: 13, top: 8, bottom: 8 })
-                  .backgroundColor(this.activeType === tab.type ? '#ef233c' : '#222228')
+                  .backgroundColor(this.activeType === tab.type ? TC.accent() : TC.surfaceInset())
                   .borderRadius(16)
                   .onClick(() => this.selectType(tab.type))
               })
@@ -855,11 +857,11 @@ export struct SearchPage {
         } else if (this.searchedKeyword.length === 0) {
           this.SuggestionPanel()
         } else if (this.loading) {
-          LoadingProgress().layoutWeight(1).width(46).color('#ef233c')
+          LoadingProgress().layoutWeight(1).width(46).color(TC.accent())
         } else if (this.sections.length === 0) {
           Column({ space: 12 }) {
-            SymbolGlyph($r('sys.symbol.magnifyingglass')).fontSize(44).fontColor(['#55555d'])
-            Text(this.message).fontSize(13).fontColor('#77777f')
+            SymbolGlyph($r('sys.symbol.magnifyingglass')).fontSize(44).fontColor([TC.textQuaternary()])
+            Text(this.message).fontSize(13).fontColor(TC.textTertiary())
           }
           .layoutWeight(1).justifyContent(FlexAlign.Center)
         } else {
@@ -868,8 +870,8 @@ export struct SearchPage {
               ListItem() {
                 Column() {
                   Row() {
-                    Text(section.title).layoutWeight(1).fontSize(16).fontWeight(FontWeight.Bold).fontColor('#ffffff')
-                    Text(`${section.items.length} 项`).fontSize(10).fontColor('#66666e')
+                    Text(section.title).layoutWeight(1).fontSize(16).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary())
+                    Text(`${section.items.length} 项`).fontSize(10).fontColor(TC.textQuaternary())
                   }
                   .height(44).padding({ left: 14, right: 16 })
                   ForEach(section.items, (item: SearchDisplayItem) => {
@@ -883,7 +885,7 @@ export struct SearchPage {
           .layoutWeight(1)
         }
       }
-      .width('100%').height('100%').backgroundColor('#121215')
+      .width('100%').height('100%').backgroundColor(TC.pageBackground())
     }
     .hideTitleBar(true)
   }

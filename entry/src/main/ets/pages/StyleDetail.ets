@@ -27,6 +27,7 @@ import { SystemShareService } from '../services/SystemShareService'
 import { BubbleTip } from '../services/BubbleTip'
 import { resizeImageUrl } from '../services/ImageUrl'
 import { playerController } from '../services/PlayerController'
+import { TC } from '../services/ThemeColors'
 
 class StyleResourceState {
   cursor: string = '0'
@@ -47,6 +48,7 @@ function createStyleResources(): Record<string, StyleResourceState> {
 
 @Component
 export struct StyleDetailPage {
+  @StorageProp('skinVersion') skinVersionObs: number = 0
   @Consume('pageStack') pageStack: NavPathStack
   @Consume('topAvoidHeight') topAvoidHeight: number
   pageParam: StyleDetailPageParam = { tagId: 0, name: '' }
@@ -433,23 +435,23 @@ export struct StyleDetailPage {
       Image(this.cover()).width('100%').height('100%')
         .objectFit(ImageFit.Cover).blur(28).opacity(0.62)
       Column().width('100%').height('100%')
-        .linearGradient({ angle: 180, colors: [['rgba(10,10,14,0.12)', 0], ['#121215', 1]] })
+        .linearGradient({ angle: 180, colors: [[TC.headerScrimTop(), 0], [TC.pageBackground(), 1]] })
       Column({ space: 8 }) {
         Image(this.cover()).width(116).height(116)
           .borderRadius(22).objectFit(ImageFit.Cover)
-          .backgroundColor('#202026').onClick(() => this.previewCover())
-        Text('点击封面查看曲风介绍').fontSize(10).fontColor('#9999a3').onClick(() => this.previewCover())
-        Text(this.name()).fontSize(25).fontWeight(FontWeight.Bold).fontColor('#ffffff')
+          .backgroundColor(TC.surfaceCardAlt()).onClick(() => this.previewCover())
+        Text('点击封面查看曲风介绍').fontSize(10).fontColor(TC.textSecondary()).onClick(() => this.previewCover())
+        Text(this.name()).fontSize(25).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary())
         if (this.detail?.enName) {
-          Text(this.detail.enName).fontSize(11).fontColor('#b0b0b7')
+          Text(this.detail.enName).fontSize(11).fontColor(TC.textBody())
         }
         Row({ space: 15 }) {
-          Text(`${this.detail?.songNum || '-'} 首歌曲`).fontSize(10).fontColor('#bdbdc4')
-          Text(`${this.detail?.artistNum || '-'} 位歌手`).fontSize(10).fontColor('#bdbdc4')
+          Text(`${this.detail?.songNum || '-'} 首歌曲`).fontSize(10).fontColor(TC.textBody())
+          Text(`${this.detail?.artistNum || '-'} 位歌手`).fontSize(10).fontColor(TC.textBody())
         }
       }.width('100%').padding({ bottom: 20 })
     }.width('100%').height(300 + this.topAvoidHeight + 54)
-      .backgroundColor('#202026')
+      .backgroundColor(TC.surfaceCardAlt())
   }
 
   @Builder
@@ -457,22 +459,22 @@ export struct StyleDetailPage {
     Column() {
       Column().width('100%').height(this.topAvoidHeight)
       Row({ space: 6 }) {
-        SymbolGlyph($r('sys.symbol.chevron_left')).fontSize(24).fontColor(['#ffffff'])
+        SymbolGlyph($r('sys.symbol.chevron_left')).fontSize(24).fontColor([TC.textPrimary()])
           .width(44).height(44).onClick(() => this.pageStack.pop())
         Column({ space: 2 }) {
           if (this.parentName()) {
-            Text(this.parentName()).fontSize(10).fontColor('#c0c0c8').maxLines(1)
+            Text(this.parentName()).fontSize(10).fontColor(TC.textBody()).maxLines(1)
           }
           Row({ space: 7 }) {
-            Text(this.name()).fontSize(17).fontWeight(FontWeight.Bold).fontColor('#ffffff')
+            Text(this.name()).fontSize(17).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary())
               .maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis }).constraintSize({ maxWidth: '80%' })
-            SymbolGlyph($r('sys.symbol.chevron_down')).fontSize(12).fontColor(['#eeeeee'])
+            SymbolGlyph($r('sys.symbol.chevron_down')).fontSize(12).fontColor([TC.textBody()])
           }.justifyContent(FlexAlign.Center)
         }.layoutWeight(1).onClick(() => this.openPicker())
-        SymbolGlyph($r('sys.symbol.share')).fontSize(23).fontColor(['#ffffff'])
+        SymbolGlyph($r('sys.symbol.share')).fontSize(23).fontColor([TC.textPrimary()])
           .width(44).height(44).enabled(!this.preparingShare && !!this.detail).onClick(() => this.shareStyle())
       }.height(54).width('100%').padding({ left: 6, right: 6 })
-    }.width('100%').backgroundColor(this.headerCollapsed ? '#121215' : Color.Transparent)
+    }.width('100%').backgroundColor(this.headerCollapsed ? TC.pageBackground() : Color.Transparent)
       .linearGradient({ angle: 180, colors: [['rgba(0,0,0,0.45)', 0], ['rgba(0,0,0,0)', 1]] })
   }
 
@@ -481,15 +483,15 @@ export struct StyleDetailPage {
     Row({ space: 8 }) {
       Text(tag.tagName).fontSize(depth === 0 ? 17 : 14)
         .fontWeight(depth === 0 ? FontWeight.Bold : FontWeight.Regular)
-        .fontColor(this.draftTagId === tag.tagId ? '#ff6577' : '#eeeeee')
+        .fontColor(this.draftTagId === tag.tagId ? TC.accentSoft() : TC.textPrimary())
         .layoutWeight(1).padding({ top: 15, bottom: 15 })
         .onClick(() => this.draftTagId = tag.tagId)
       if (this.draftTagId === tag.tagId) {
-        SymbolGlyph($r('sys.symbol.checkmark')).fontSize(17).fontColor(['#ef233c'])
+        SymbolGlyph($r('sys.symbol.checkmark')).fontSize(17).fontColor([TC.accent()])
       }
       if ((tag.childrenTags || []).length > 0) {
         SymbolGlyph(this.expanded(tag) ? $r('sys.symbol.chevron_down') : $r('sys.symbol.chevron_right'))
-          .fontSize(14).fontColor(['#9898a2']).width(40).height(46)
+          .fontSize(14).fontColor([TC.textSecondary()]).width(40).height(46)
           .onClick(() => this.toggleExpanded(tag.tagId))
       }
     }.width('100%').padding({ left: depth === 0 ? 0 : 16 })
@@ -499,20 +501,20 @@ export struct StyleDetailPage {
   private StylePicker() {
     Column({ space: 10 }) {
       Row() {
-        Text('取消').fontSize(15).fontColor('#9999a3').width(52).onClick(() => this.pickerVisible = false)
-        Text('选择曲风').fontSize(19).fontWeight(FontWeight.Bold).fontColor('#ffffff')
+        Text('取消').fontSize(15).fontColor(TC.textSecondary()).width(52).onClick(() => this.pickerVisible = false)
+        Text('选择曲风').fontSize(19).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary())
           .layoutWeight(1).textAlign(TextAlign.Center)
-        Text('完成').fontSize(15).fontWeight(FontWeight.Bold).fontColor('#ff6577').width(52).textAlign(TextAlign.End)
+        Text('完成').fontSize(15).fontWeight(FontWeight.Bold).fontColor(TC.accentSoft()).width(52).textAlign(TextAlign.End)
           .enabled(stylePath(this.tree, this.draftTagId).length > 0).onClick(() => this.confirmStyle())
       }.width('100%').height(44)
       Search({ value: this.pickerQuery, placeholder: '搜索曲风名称' })
-        .fontColor('#eeeeee').placeholderColor('#888892').backgroundColor('#27272e')
+        .fontColor(TC.textBody()).placeholderColor(TC.textTertiary()).backgroundColor(TC.surfaceInset())
         .onChange((value: string) => this.pickerQuery = value)
       if (this.treeLoading) {
-        LoadingProgress().width(32).height(32).color('#ef233c').margin(20)
+        LoadingProgress().width(32).height(32).color(TC.accent()).margin(20)
       } else if (this.treeMessage) {
-        Text(this.treeMessage).fontSize(13).fontColor('#ff6577').padding(18)
-        Button('重试').backgroundColor('#303038').onClick(() => this.loadTree())
+        Text(this.treeMessage).fontSize(13).fontColor(TC.accentSoft()).padding(18)
+        Button('重试').backgroundColor(TC.surfaceRaised()).onClick(() => this.loadTree())
       } else {
         List() {
           ForEach(filterStyleTree(this.tree, this.pickerQuery), (root: StyleTag) => {
@@ -526,8 +528,8 @@ export struct StyleDetailPage {
                       Flex({ wrap: FlexWrap.Wrap }) {
                         ForEach(child.childrenTags || [], (leaf: StyleTag) => {
                           Text(leaf.tagName).fontSize(12)
-                            .fontColor(this.draftTagId === leaf.tagId ? '#ff6577' : '#b4b4be')
-                            .backgroundColor(this.draftTagId === leaf.tagId ? '#3b2028' : '#26262d')
+                            .fontColor(this.draftTagId === leaf.tagId ? TC.accentSoft() : TC.textSecondary())
+                            .backgroundColor(this.draftTagId === leaf.tagId ? TC.accentContainer() : TC.surfaceInset())
                             .padding({ left: 13, right: 13, top: 9, bottom: 9 }).borderRadius(18)
                             .margin({ right: 8, bottom: 9 }).onClick(() => this.draftTagId = leaf.tagId)
                         }, (leaf: StyleTag) => String(leaf.tagId))
@@ -540,7 +542,7 @@ export struct StyleDetailPage {
           }, (root: StyleTag) => String(root.tagId) + ':' + this.pickerQuery.trim().toLowerCase())
           if (filterStyleTree(this.tree, this.pickerQuery).length === 0) {
             ListItem() {
-              Text('未找到匹配的曲风').fontSize(13).fontColor('#8b8b95').width('100%').padding(32)
+              Text('未找到匹配的曲风').fontSize(13).fontColor(TC.textSecondary()).width('100%').padding(32)
                 .textAlign(TextAlign.Center)
             }
           }
@@ -554,21 +556,21 @@ export struct StyleDetailPage {
     Column({ space: 13 }) {
       Row() {
         Text(kind === 'review' ? '专业点评' : '用户画像').fontSize(17).fontWeight(FontWeight.Medium)
-          .fontColor('#eeeeF2').layoutWeight(1)
+          .fontColor(TC.textBody()).layoutWeight(1)
         Row({ space: 4 }) {
-          Text('展开').fontSize(12).fontColor('#92929c')
-          SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(11).fontColor(['#92929c'])
+          Text('展开').fontSize(12).fontColor(TC.textSecondary())
+          SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(11).fontColor([TC.textSecondary()])
         }
       }.width('100%')
-      Text(this.reviewText(kind)).width('100%').fontSize(14).lineHeight(23).fontColor('#bcbcc6')
+      Text(this.reviewText(kind)).width('100%').fontSize(14).lineHeight(23).fontColor(TC.textBody())
         .maxLines(3).textOverflow({ overflow: TextOverflow.Ellipsis })
       Blank()
       if (this.reviewTip(kind)) {
-        Text(this.reviewTip(kind)).fontSize(10).fontColor('#787883').maxLines(1)
+        Text(this.reviewTip(kind)).fontSize(10).fontColor(TC.textTertiary()).maxLines(1)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
       }
     }.width(this.reviewCardWidth).height(166).padding(17).alignItems(HorizontalAlign.Start)
-      .backgroundColor('#202027').borderRadius(16).onClick(() => this.openReview(kind))
+      .backgroundColor(TC.surfaceCard()).borderRadius(16).onClick(() => this.openReview(kind))
   }
 
   @Builder
@@ -576,14 +578,14 @@ export struct StyleDetailPage {
     Column({ space: 16 }) {
       Row() {
         Text(this.reviewKind === 'review' ? '专业点评' : '用户画像').fontSize(20)
-          .fontWeight(FontWeight.Bold).fontColor('#ffffff').layoutWeight(1)
-        Text('收起').fontSize(14).fontColor('#aaaaB5').padding(8).onClick(() => this.reviewVisible = false)
+          .fontWeight(FontWeight.Bold).fontColor(TC.textPrimary()).layoutWeight(1)
+        Text('收起').fontSize(14).fontColor(TC.textQuaternary()).padding(8).onClick(() => this.reviewVisible = false)
       }.width('100%')
       Scroll() {
         Column({ space: 20 }) {
-          Text(this.reviewText(this.reviewKind)).width('100%').fontSize(16).lineHeight(28).fontColor('#d0d0d8')
+          Text(this.reviewText(this.reviewKind)).width('100%').fontSize(16).lineHeight(28).fontColor(TC.textBody())
           if (this.reviewTip(this.reviewKind)) {
-            Text(this.reviewTip(this.reviewKind)).width('100%').fontSize(12).lineHeight(20).fontColor('#85858f')
+            Text(this.reviewTip(this.reviewKind)).width('100%').fontSize(12).lineHeight(20).fontColor(TC.textTertiary())
           }
         }.width('100%').alignItems(HorizontalAlign.Start).padding({ bottom: 24 })
       }.width('100%').layoutWeight(1).scrollBar(BarState.Off)
@@ -604,7 +606,7 @@ export struct StyleDetailPage {
           this.reviewCardWidth = Math.max(220, Math.min(420, Number(area.width) - 48))
         })
         .bindSheet(this.reviewVisible, this.ReviewDetails(), {
-          height: '70%', backgroundColor: '#19191f', showClose: false, dragBar: true,
+          height: '70%', backgroundColor: TC.sheetBackground(), showClose: false, dragBar: true,
           onDisappear: () => this.reviewVisible = false
         })
     }
@@ -612,14 +614,14 @@ export struct StyleDetailPage {
       Row({ space: 11 }) {
         Image(resizeImageUrl(this.detail.favouriteSong.favouriteSong.al?.picUrl || '', 140, 140))
           .width(58).height(58).borderRadius(11)
-          .objectFit(ImageFit.Cover).backgroundColor('#202026')
+          .objectFit(ImageFit.Cover).backgroundColor(TC.surfaceCardAlt())
         Column({ space: 4 }) {
-          Text('你最喜欢的该曲风歌曲').fontSize(9).fontColor('#ff6577')
-          Text(this.detail.favouriteSong.favouriteSong.name).fontSize(13).fontColor('#ffffff').maxLines(1)
+          Text('你最喜欢的该曲风歌曲').fontSize(9).fontColor(TC.accentSoft())
+          Text(this.detail.favouriteSong.favouriteSong.name).fontSize(13).fontColor(TC.textPrimary()).maxLines(1)
           Text((this.detail.favouriteSong.favouriteSong.ar || []).map((item: ApiArtist) => item.name).join(' / '))
-            .fontSize(10).fontColor('#77777f').maxLines(1)
+            .fontSize(10).fontColor(TC.textTertiary()).maxLines(1)
         }.layoutWeight(1).alignItems(HorizontalAlign.Start)
-      }.width('94%').padding(11).backgroundColor('#1d1d22').borderRadius(14)
+      }.width('94%').padding(11).backgroundColor(TC.surfaceCardAlt()).borderRadius(14)
         .margin({ left: 16, right: 16, bottom: 13 })
         .onClick(() => {
           const song = this.detail?.favouriteSong?.favouriteSong
@@ -635,8 +637,8 @@ export struct StyleDetailPage {
         Column({ space: 7 }) {
           Text(tab === 'songs' ? '歌曲' : tab === 'albums' ? '专辑' : tab === 'playlists' ? '歌单' : '歌手')
             .fontSize(13).fontWeight(this.currentTab === tab ? FontWeight.Bold : FontWeight.Regular)
-            .fontColor(this.currentTab === tab ? '#ffffff' : '#717179')
-          Column().width(this.currentTab === tab ? 24 : 0).height(3).borderRadius(2).backgroundColor('#ef233c')
+            .fontColor(this.currentTab === tab ? TC.textPrimary() : TC.textTertiary())
+          Column().width(this.currentTab === tab ? 24 : 0).height(3).borderRadius(2).backgroundColor(TC.accent())
         }.layoutWeight(1).height(48).justifyContent(FlexAlign.Center).onClick(() => this.switchTab(tab))
       })
     }.width('100%')
@@ -648,17 +650,17 @@ export struct StyleDetailPage {
       Row({ space: 12 }) {
         if (this.currentTab === 'songs') {
           Row({ space: 7 }) {
-            SymbolGlyph($r('sys.symbol.play_fill')).fontSize(18).fontColor(['#ffffff'])
-            Text('播放全部').fontSize(14).fontWeight(FontWeight.Medium).fontColor('#ffffff')
-            Text('(' + this.songs.length + ')').fontSize(11).fontColor('#898994')
+            SymbolGlyph($r('sys.symbol.play_fill')).fontSize(18).fontColor([TC.textPrimary()])
+            Text('播放全部').fontSize(14).fontWeight(FontWeight.Medium).fontColor(TC.textPrimary())
+            Text('(' + this.songs.length + ')').fontSize(11).fontColor(TC.textTertiary())
           }.enabled(this.songs.length > 0).onClick(() => this.playSong(0))
         } else {
-          Text('专辑').fontSize(14).fontColor('#ffffff')
+          Text('专辑').fontSize(14).fontColor(TC.textPrimary())
         }
         Blank()
         ForEach([0, 1], (sort: number) => {
           Text(sort === 0 ? '最热' : '最新').fontSize(12)
-            .fontColor(this.sortKey === sort ? '#ff6577' : '#85858f')
+            .fontColor(this.sortKey === sort ? TC.accentSoft() : TC.textTertiary())
             .fontWeight(this.sortKey === sort ? FontWeight.Bold : FontWeight.Regular)
             .padding({ top: 12, bottom: 12 }).onClick(() => this.changeSort(sort))
         })
@@ -670,17 +672,17 @@ export struct StyleDetailPage {
   private SongsContent() {
     ForEach(this.songs, (song: songItemType, index: number) => {
       Row({ space: 11 }) {
-        Text(`${index + 1}`).width(25).fontSize(12).fontColor(index < 3 ? '#ef4058' : '#6f6f77')
+        Text(`${index + 1}`).width(25).fontSize(12).fontColor(index < 3 ? TC.accent() : TC.textTertiary())
           .textAlign(TextAlign.Center)
         Image(resizeImageUrl(song.img, 120, 120)).width(52).height(52)
-          .borderRadius(10).objectFit(ImageFit.Cover).backgroundColor('#202026')
+          .borderRadius(10).objectFit(ImageFit.Cover).backgroundColor(TC.surfaceCardAlt())
         Column({ space: 4 }) {
-          Text(song.name).width('100%').fontSize(14).fontColor('#ededf0').maxLines(1)
+          Text(song.name).width('100%').fontSize(14).fontColor(TC.textBody()).maxLines(1)
             .textOverflow({ overflow: TextOverflow.Ellipsis })
           Text(`${song.author}${song.album ? ` · ${song.album}` : ''}`).width('100%').fontSize(10)
-            .fontColor('#77777f').maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
+            .fontColor(TC.textTertiary()).maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
         }.layoutWeight(1).alignItems(HorizontalAlign.Start)
-        SymbolGlyph($r('sys.symbol.play_circle')).fontSize(22).fontColor(['#85858e'])
+        SymbolGlyph($r('sys.symbol.play_circle')).fontSize(22).fontColor([TC.textTertiary()])
       }.height(66).padding({ left: 12, right: 16 }).onClick(() => this.playSong(index))
     })
   }
@@ -690,11 +692,11 @@ export struct StyleDetailPage {
     ForEach(this.albums, (album: ApiAlbum) => {
       Row({ space: 12 }) {
         Image(resizeImageUrl(album.picUrl, 150, 150)).width(64).height(64)
-          .borderRadius(12).objectFit(ImageFit.Cover).backgroundColor('#202026')
+          .borderRadius(12).objectFit(ImageFit.Cover).backgroundColor(TC.surfaceCardAlt())
         Column({ space: 5 }) {
-          Text(album.name).width('100%').fontSize(14).fontColor('#ededf0').maxLines(1)
+          Text(album.name).width('100%').fontSize(14).fontColor(TC.textBody()).maxLines(1)
           Text(`${album.artist?.name || ''}${album.publishTime ? ` · ${new Date(album.publishTime).getFullYear()}` : ''}`)
-            .fontSize(10).fontColor('#77777f')
+            .fontSize(10).fontColor(TC.textTertiary())
         }.layoutWeight(1).alignItems(HorizontalAlign.Start)
       }.height(78).padding({ left: 16, right: 16 }).onClick(() => this.openAlbum(album))
     })
@@ -705,11 +707,11 @@ export struct StyleDetailPage {
     ForEach(this.playlists, (item: StylePlaylistItem) => {
       Row({ space: 12 }) {
         Image(resizeImageUrl(item.cover, 150, 150)).width(64).height(64)
-          .borderRadius(12).objectFit(ImageFit.Cover).backgroundColor('#202026')
+          .borderRadius(12).objectFit(ImageFit.Cover).backgroundColor(TC.surfaceCardAlt())
         Column({ space: 5 }) {
-          Text(item.name).width('100%').fontSize(14).fontColor('#ededf0').maxLines(1)
+          Text(item.name).width('100%').fontSize(14).fontColor(TC.textBody()).maxLines(1)
           Text(`${item.songCount} 首 · ${item.userName} · ${this.formatCount(item.playCount)} 次播放`)
-            .width('100%').fontSize(10).fontColor('#77777f').maxLines(1)
+            .width('100%').fontSize(10).fontColor(TC.textTertiary()).maxLines(1)
         }.layoutWeight(1).alignItems(HorizontalAlign.Start)
       }.height(78).padding({ left: 16, right: 16 }).onClick(() => this.openPlaylist(item))
     })
@@ -722,11 +724,11 @@ export struct StyleDetailPage {
         Image(resizeImageUrl(item.picUrl || item.img1v1Url || '', 150, 150)).width(64).height(64)
           .borderRadius(32).objectFit(ImageFit.Cover)
         Column({ space: 5 }) {
-          Text(item.name).fontSize(14).fontColor('#ededf0')
+          Text(item.name).fontSize(14).fontColor(TC.textBody())
           Text(`${item.musicSize || 0} 首歌曲 · ${this.formatCount(item.fansCount || 0)} 粉丝`)
-            .fontSize(10).fontColor('#77777f')
+            .fontSize(10).fontColor(TC.textTertiary())
         }.layoutWeight(1).alignItems(HorizontalAlign.Start)
-        SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(14).fontColor(['#686870'])
+        SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(14).fontColor([TC.textQuaternary()])
       }.height(78).padding({ left: 16, right: 16 }).onClick(() => this.openArtist(item))
     })
   }
@@ -738,10 +740,10 @@ export struct StyleDetailPage {
           Column() {
             this.Header()
             if (this.loading) {
-              LoadingProgress().width(44).height(44).color('#ef233c').margin(40)
+              LoadingProgress().width(44).height(44).color(TC.accent()).margin(40)
             } else if (!this.detail) {
-              Text(this.message || '曲风详情加载失败').fontSize(13).fontColor('#9999a3').padding(25)
-              Button('重试').backgroundColor('#303038').onClick(() => this.loadPage())
+              Text(this.message || '曲风详情加载失败').fontSize(13).fontColor(TC.textSecondary()).padding(25)
+              Button('重试').backgroundColor(TC.surfaceRaised()).onClick(() => this.loadPage())
             } else {
               this.Description()
               this.ResourceTabs()
@@ -756,15 +758,15 @@ export struct StyleDetailPage {
                 this.ArtistsContent()
               }
               if (this.resourceLoading) {
-                LoadingProgress().width(25).height(25).color('#ef233c').margin(18)
+                LoadingProgress().width(25).height(25).color(TC.accent()).margin(18)
               } else if (this.resourceMessage) {
-                Text(this.resourceMessage).width('100%').fontSize(12).fontColor('#ff6577').textAlign(TextAlign.Center).padding(20)
-                Button('重试').backgroundColor('#303038').onClick(() => this.loadCurrentResources(!this.resourceMore))
+                Text(this.resourceMessage).width('100%').fontSize(12).fontColor(TC.accentSoft()).textAlign(TextAlign.Center).padding(20)
+                Button('重试').backgroundColor(TC.surfaceRaised()).onClick(() => this.loadCurrentResources(!this.resourceMore))
               } else if (!this.tabHasData(this.currentTab)) {
-                Text('暂无内容').width('100%').height(160).fontSize(12).fontColor('#77777f').textAlign(TextAlign.Center)
+                Text('暂无内容').width('100%').height(160).fontSize(12).fontColor(TC.textTertiary()).textAlign(TextAlign.Center)
               } else {
                 Text(this.resourceMore ? '加载更多' : '已经到底了').width('100%').height(52)
-                  .fontSize(11).fontColor('#888892').textAlign(TextAlign.Center)
+                  .fontSize(11).fontColor(TC.textTertiary()).textAlign(TextAlign.Center)
                   .onClick(() => this.loadCurrentResources())
               }
             }
@@ -774,10 +776,10 @@ export struct StyleDetailPage {
           .onReachEnd(() => this.loadCurrentResources())
           .onDidScroll(() => this.headerCollapsed = this.scroller.currentOffset().yOffset > 220)
         this.NavigationBar()
-      }.width('100%').height('100%').backgroundColor('#121215')
+      }.width('100%').height('100%').backgroundColor(TC.pageBackground())
         .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP])
         .bindSheet(this.pickerVisible, this.StylePicker(), {
-          height: '78%', backgroundColor: '#19191f', showClose: false, dragBar: true,
+          height: '78%', backgroundColor: TC.sheetBackground(), showClose: false, dragBar: true,
           onDisappear: () => this.pickerVisible = false
         })
     }.hideTitleBar(true)

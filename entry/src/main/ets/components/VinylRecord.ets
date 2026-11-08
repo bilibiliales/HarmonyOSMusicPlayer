@@ -1,5 +1,7 @@
+import { TC } from '../services/ThemeColors'
 @Component
 export struct VinylRecord {
+  @StorageProp('skinVersion') skinVersionObs: number = 0
   @Prop @Watch('syncRotation') isPlaying: boolean = false
   @Prop coverUrl: string = ''
   @Prop diameter: number = 44
@@ -52,7 +54,7 @@ export struct VinylRecord {
           .objectFit(ImageFit.Cover).borderRadius('50%').clip(true)
       } else {
         SymbolGlyph($r('sys.symbol.music'))
-          .fontSize(this.diameter * 0.3).fontColor(['#ffffff'])
+          .fontSize(this.diameter * 0.3).fontColor([TC.textOnMedia()])
       }
     }
     .width(this.diameter).height(this.diameter)

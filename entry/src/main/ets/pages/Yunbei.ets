@@ -3,9 +3,11 @@ import { AuthStore } from '../stores/AuthStore'
 import { BubbleTip } from '../services/BubbleTip'
 import { ApiClient } from '../services/ApiClient'
 import { YunbeiService, YunbeiEntry, YunbeiOverview } from '../services/YunbeiService'
+import { TC } from '../services/ThemeColors'
 
 @Component
 export struct YunbeiPage {
+  @StorageProp('skinVersion') skinVersionObs: number = 0
   @Consume('pageStack') pageStack: NavPathStack
   @Consume('topAvoidHeight') topAvoidHeight: number
   @Consume('authStore') authStore: AuthStore
@@ -126,36 +128,36 @@ export struct YunbeiPage {
     NavDestination() {
       Column({ space: 16 }) {
         Row({ space: 14 }) {
-          SymbolGlyph($r('sys.symbol.chevron_left')).fontSize(22).fontColor(['#ffffff'])
+          SymbolGlyph($r('sys.symbol.chevron_left')).fontSize(22).fontColor([TC.textPrimary()])
             .onClick(() => this.pageStack.pop())
-          Text('云贝中心').fontSize(22).fontWeight(FontWeight.Bold).fontColor('#ffffff').layoutWeight(1)
-          SymbolGlyph($r('sys.symbol.arrow_clockwise')).fontSize(20).fontColor(['#ffffff'])
+          Text('云贝中心').fontSize(22).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary()).layoutWeight(1)
+          SymbolGlyph($r('sys.symbol.arrow_clockwise')).fontSize(20).fontColor([TC.textPrimary()])
             .onClick(() => { this.refreshOverview(); this.load() })
         }.width('100%')
         if (!this.authStore.loggedIn) {
-          Text('登录后查看云贝余额、任务和收支记录').fontColor('#a0a0aa')
+          Text('登录后查看云贝余额、任务和收支记录').fontColor(TC.textQuaternary())
           Button('登录').onClick(() => this.pageStack.pushPathByName('LoginPage', null))
         } else {
           Column({ space: 10 }) {
             Row({ space: 14 }) {
               Column({ space: 4 }) {
-                Text('我的云贝').fontSize(12).fontColor('#9999a4')
+                Text('我的云贝').fontSize(12).fontColor(TC.textSecondary())
                 Text(this.overview.balance === undefined ? '暂不可用' : this.overview.balance.toString())
-                  .fontSize(36).fontColor('#ef4058').fontWeight(FontWeight.Bold)
+                  .fontSize(36).fontColor(TC.accentSoft()).fontWeight(FontWeight.Bold)
               }.layoutWeight(1).alignItems(HorizontalAlign.Start)
               Button(this.signing ? '签到中…' : this.overview.signed === true ? '已签到' : '签到')
                 .height(36).fontSize(14).borderRadius(18).padding({ left: 22, right: 22 })
-                .enabled(!this.signing && this.overview.signed !== true).backgroundColor('#ef233c').onClick(() => this.sign())
+                .enabled(!this.signing && this.overview.signed !== true).backgroundColor(TC.accent()).onClick(() => this.sign())
             }.width('100%')
-            if (this.overview.signDays !== undefined) { Text('连续签到 ' + this.overview.signDays + ' 天').fontColor('#9999a4').fontSize(12) }
-            if (this.overview.todayAmount !== undefined) { Text('今日签到获得 ' + this.overview.todayAmount + ' 云贝').fontColor('#9999a4').fontSize(12) }
-            if (this.signMessage) { Text(this.signMessage).fontSize(12).fontColor('#bbbbc5') }
-            ForEach(this.overview.warnings, (warning: string) => { Text(warning).fontSize(11).fontColor('#c39999') })
+            if (this.overview.signDays !== undefined) { Text('连续签到 ' + this.overview.signDays + ' 天').fontColor(TC.textTertiary()).fontSize(12) }
+            if (this.overview.todayAmount !== undefined) { Text('今日签到获得 ' + this.overview.todayAmount + ' 云贝').fontColor(TC.textTertiary()).fontSize(12) }
+            if (this.signMessage) { Text(this.signMessage).fontSize(12).fontColor(TC.textBody()) }
+            ForEach(this.overview.warnings, (warning: string) => { Text(warning).fontSize(11).fontColor(TC.textTertiary()) })
           }.width('100%').padding({ top: 12, bottom: 12 }).alignItems(HorizontalAlign.Start)
           Scroll() {
             Row({ space: 22 }) {
               ForEach(this.titles, (title: string, index: number) => {
-                Text(title).fontSize(14).fontColor(this.tab === index ? '#ffffff' : '#85858f')
+                Text(title).fontSize(14).fontColor(this.tab === index ? TC.textPrimary() : TC.textTertiary())
                   .fontWeight(this.tab === index ? FontWeight.Bold : FontWeight.Normal)
                   .onClick(() => { if (this.tab !== index) { this.tab = index; this.load() } })
               })
@@ -168,43 +170,43 @@ export struct YunbeiPage {
                   if (row.taskId) {
                     Stack() {
                       Circle().width(46).height(46).fill('rgba(239,35,60,0.10)')
-                      SymbolGlyph(this.taskIcon(row)).fontSize(24).fontColor(['#ef4058'])
+                      SymbolGlyph(this.taskIcon(row)).fontSize(24).fontColor([TC.accentSoft()])
                     }.width(46).height(46)
                   }
                   Column({ space: 6 }) {
                     Row({ space: 6 }) {
-                      Text(row.title).fontSize(15).fontColor('#eeeeef').maxLines(2).layoutWeight(1)
+                      Text(row.title).fontSize(15).fontColor(TC.textBody()).maxLines(2).layoutWeight(1)
                       if (row.taskId && row.amount !== undefined) {
-                        Text('+' + row.amount).fontSize(14).fontColor('#ef4058')
+                        Text('+' + row.amount).fontSize(14).fontColor(TC.accent())
                       }
                     }.width('100%')
-                    if (row.description) { Text(row.description).fontSize(12).fontColor('#9999a4') }
-                    if (row.time) { Text(row.time).fontSize(11).fontColor('#777780') }
+                    if (row.description) { Text(row.description).fontSize(12).fontColor(TC.textSecondary()) }
+                    if (row.time) { Text(row.time).fontSize(11).fontColor(TC.textTertiary()) }
                   }.layoutWeight(1).alignItems(HorizontalAlign.Start)
                   if (row.taskId) {
                     Button(row.completed ? '已完成' : this.pendingTaskId === row.taskId ? '检查完成' : row.linkText || '去完成')
-                      .height(30).fontSize(12).fontColor('#ef4058').backgroundColor(Color.Transparent)
+                      .height(30).fontSize(12).fontColor(TC.accentSoft()).backgroundColor(Color.Transparent)
                       .border({ width: 1, color: 'rgba(239,64,88,0.45)' }).borderRadius(16)
                       .padding({ left: 12, right: 12 }).enabled(!row.completed && !this.taskBusy)
                       .opacity(row.completed ? 0.4 : 1).onClick(() => this.taskAction(row))
-                  } else if (row.amount !== undefined) { Text(row.amount.toString()).fontSize(18).fontColor('#ef4058') }
+                  } else if (row.amount !== undefined) { Text(row.amount.toString()).fontSize(18).fontColor(TC.accentSoft()) }
                 }.width('100%').padding({ top: 10, bottom: 10 })
               }
             })
             ListItem() {
               Column({ space: 12 }) {
-                if (this.loading) { LoadingProgress().width(32).height(32).color('#ffffff') }
+                if (this.loading) { LoadingProgress().width(32).height(32).color(TC.textPrimary()) }
                 else if (this.message) {
-                  Text(this.message).fontSize(13).fontColor('#c39999')
+                  Text(this.message).fontSize(13).fontColor(TC.textTertiary())
                   Button('重试').onClick(() => this.load(this.rows.length === 0))
-                } else if (this.rows.length === 0) { Text('暂无记录').fontColor('#888892') }
+                } else if (this.rows.length === 0) { Text('暂无记录').fontColor(TC.textTertiary()) }
                 else if (this.more) { Button('加载更多').onClick(() => this.load(false)) }
               }.width('100%')
             }
           }.layoutWeight(1).width('100%').scrollBar(BarState.Off)
         }
       }.width('100%').height('100%').padding({ top: this.topAvoidHeight + 12, left: 20, right: 20, bottom: 20 })
-        .backgroundColor('#121215')
+        .backgroundColor(TC.pageBackground())
     }.hideTitleBar(true).onShown(() => { this.refreshOverview(); this.load() })
       .onHidden(() => { this.token++; this.overviewToken++ })
   }

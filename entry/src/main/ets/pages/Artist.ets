@@ -21,9 +21,11 @@ import { resizeImageUrl } from '../services/ImageUrl'
 import { common } from '@kit.AbilityKit'
 import { SystemShareService, ShareLink, NearbyShareSession } from '../services/SystemShareService'
 import { BubbleTip } from '../services/BubbleTip'
+import { TC } from '../services/ThemeColors'
 
 @Component
 export struct ArtistPage {
+  @StorageProp('skinVersion') skinVersionObs: number = 0
   @Consume('pageStack') pageStack: NavPathStack
   @Consume('topAvoidHeight') topAvoidHeight: number
   pageParam: ArtistPageParam = { id: '' }
@@ -315,7 +317,7 @@ export struct ArtistPage {
         .width('100%').height('100%').sourceSize({ width: 720, height: 560 })
         .objectFit(ImageFit.Cover).blur(32).opacity(0.55)
       Column().width('100%').height('100%')
-        .linearGradient({ angle: 180, colors: [['rgba(10,10,14,0.12)', 0], ['#121215', 1]] })
+        .linearGradient({ angle: 180, colors: [[TC.headerScrimTop(), 0], [TC.pageBackground(), 1]] })
       Column({ space: 9 }) {
         Image(resizeImageUrl(
           this.artistDetail.avatar || this.artist.picUrl || this.artist.img1v1Url || this.headerImage(), 220, 220))
@@ -324,15 +326,15 @@ export struct ArtistPage {
           .border({ width: 2, color: 'rgba(255,255,255,0.78)' })
         Row({ space: 7 }) {
           Text(this.displayName())
-            .fontSize(23).fontWeight(FontWeight.Bold).fontColor('#ffffff')
-          Text('歌手').fontSize(9).fontColor('#ff6577')
+            .fontSize(23).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary())
+          Text('歌手').fontSize(9).fontColor(TC.accentSoft())
             .padding({ left: 6, right: 6, top: 2, bottom: 2 })
-            .border({ width: 1, color: '#ff6577' }).borderRadius(5)
+            .border({ width: 1, color: TC.accentSoft() }).borderRadius(5)
         }
         Text(`${this.artistDetail.musicSize || this.artist.musicSize || this.topSongs.length} 首单曲 · ${this.artistDetail.albumSize || this.artist.albumSize || this.albums.length} 张专辑 · ${this.artistDetail.mvSize || this.mvs.length} 个 MV`)
-          .fontSize(11).fontColor('#aaaab2')
+          .fontSize(11).fontColor(TC.textBody())
         if ((this.artistDetail.alias || []).length > 0) {
-          Text((this.artistDetail.alias || []).join(' / ')).width('82%').fontSize(11).fontColor('#92929a')
+          Text((this.artistDetail.alias || []).join(' / ')).width('82%').fontSize(11).fontColor(TC.textSecondary())
             .maxLines(1).textAlign(TextAlign.Center)
         }
       }
@@ -345,36 +347,36 @@ export struct ArtistPage {
   private SongsTab() {
     Column() {
       Row({ space: 8 }) {
-        SymbolGlyph($r('sys.symbol.play_fill')).fontSize(18).fontColor(['#ffffff'])
-        Text(`播放热门歌曲 (${this.topSongs.length})`).fontSize(14).fontWeight(FontWeight.Bold).fontColor('#ffffff')
+        SymbolGlyph($r('sys.symbol.play_fill')).fontSize(18).fontColor([TC.textPrimary()])
+        Text(`播放热门歌曲 (${this.topSongs.length})`).fontSize(14).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary())
       }
       .width('100%').height(50).padding({ left: 18 })
       .onClick(() => this.playSong(0))
       ForEach(this.topSongsExpanded ? this.topSongs : this.topSongs.slice(0, 10), (song: songItemType, index: number) => {
         Row({ space: 12 }) {
           Text((index + 1).toString()).width(28).fontSize(12)
-            .fontColor(index < 3 ? '#ff6577' : '#66666e').textAlign(TextAlign.Center)
+            .fontColor(index < 3 ? TC.accentSoft() : TC.textTertiary()).textAlign(TextAlign.Center)
           Column({ space: 4 }) {
             Row({ space: 6 }) {
-              Text(song.name).fontSize(14).fontColor('#ededf0').maxLines(1)
+              Text(song.name).fontSize(14).fontColor(TC.textBody()).maxLines(1)
                 .textOverflow({ overflow: TextOverflow.Ellipsis }).layoutWeight(1)
               if (song.fee === 1) {
-                Text('VIP').fontSize(8).fontColor('#ff4058')
+                Text('VIP').fontSize(8).fontColor(TC.accentSoft())
                   .padding({ left: 4, right: 4, top: 1, bottom: 1 })
-                  .border({ width: 1, color: '#ff4058' }).borderRadius(3)
+                  .border({ width: 1, color: TC.accentSoft() }).borderRadius(3)
               }
             }
-            Text(song.album || song.author).fontSize(11).fontColor('#77777f').maxLines(1)
+            Text(song.album || song.author).fontSize(11).fontColor(TC.textTertiary()).maxLines(1)
           }
           .layoutWeight(1).alignItems(HorizontalAlign.Start)
-          SymbolGlyph($r('sys.symbol.play_circle')).fontSize(21).fontColor(['#77777f'])
+          SymbolGlyph($r('sys.symbol.play_circle')).fontSize(21).fontColor([TC.textTertiary()])
         }
         .height(62).padding({ left: 12, right: 16 }).onClick(() => this.playSong(index))
       }, (song: songItemType) => song.id)
       if (this.topSongs.length > 10) {
         Text(this.topSongsExpanded ? '收起' : '查看更多')
           .width('100%').constraintSize({ minHeight: 44 })
-          .fontSize(13).fontColor('#9999a1').textAlign(TextAlign.Center)
+          .fontSize(13).fontColor(TC.textSecondary()).textAlign(TextAlign.Center)
           .onClick(() => this.topSongsExpanded = !this.topSongsExpanded)
       }
     }
@@ -385,9 +387,9 @@ export struct ArtistPage {
   private AlbumsTab() {
     Column({ space: 12 }) {
       if (this.allAlbums.length === 0 && this.allAlbumsLoading) {
-        LoadingProgress().width(38).height(38).color('#ef233c').margin({ top: 80 })
+        LoadingProgress().width(38).height(38).color(TC.accent()).margin({ top: 80 })
       } else if (this.allAlbums.length === 0) {
-        Text('暂无专辑').width('100%').height(180).fontSize(13).fontColor('#77777f')
+        Text('暂无专辑').width('100%').height(180).fontSize(13).fontColor(TC.textTertiary())
           .textAlign(TextAlign.Center)
       }
       ForEach(this.allAlbums, (album: ApiAlbum) => {
@@ -396,10 +398,10 @@ export struct ArtistPage {
             .sourceSize({ width: 160, height: 160 }).borderRadius(13).objectFit(ImageFit.Cover)
           Column({ space: 6 }) {
             Text(album.name).width('100%').fontSize(14).fontWeight(FontWeight.Medium)
-              .fontColor('#ededf0').maxLines(2).textOverflow({ overflow: TextOverflow.Ellipsis })
+              .fontColor(TC.textBody()).maxLines(2).textOverflow({ overflow: TextOverflow.Ellipsis })
             Text([this.albumYear(album), album.type || '', album.size ? `${album.size} 首` : '']
               .filter((value: string) => value.length > 0).join(' · '))
-              .fontSize(11).fontColor('#77777f')
+              .fontSize(11).fontColor(TC.textTertiary())
           }
           .layoutWeight(1).alignItems(HorizontalAlign.Start)
         }
@@ -409,9 +411,9 @@ export struct ArtistPage {
       if (this.allAlbums.length > 0) {
         Row() {
           if (this.allAlbumsLoading) {
-            LoadingProgress().width(24).height(24).color('#ef233c')
+            LoadingProgress().width(24).height(24).color(TC.accent())
           } else {
-            Text(this.allAlbumsMore ? '继续上滑加载更多' : '已经到底了').fontSize(11).fontColor('#66666e')
+            Text(this.allAlbumsMore ? '继续上滑加载更多' : '已经到底了').fontSize(11).fontColor(TC.textQuaternary())
           }
         }.width('100%').height(56).justifyContent(FlexAlign.Center)
       }
@@ -422,10 +424,10 @@ export struct ArtistPage {
   @Builder
   private SectionHeader(title: string, subtitle: string = '') {
     Row() {
-      Text(title).fontSize(19).fontWeight(FontWeight.Bold).fontColor('#f4f4f6')
+      Text(title).fontSize(19).fontWeight(FontWeight.Bold).fontColor(TC.textBody())
       Blank()
       if (subtitle.length > 0) {
-        Text(subtitle).fontSize(11).fontColor('#777780')
+        Text(subtitle).fontSize(11).fontColor(TC.textTertiary())
       }
     }
     .width('100%').padding({ left: 16, right: 16, top: 22, bottom: 13 })
@@ -438,9 +440,9 @@ export struct ArtistPage {
         Column({ space: 8 }) {
           Text(tab === 'music' ? '音乐' : '全部专辑').fontSize(15)
             .fontWeight(this.currentTab === tab ? FontWeight.Bold : FontWeight.Regular)
-            .fontColor(this.currentTab === tab ? '#ffffff' : '#77777f')
+            .fontColor(this.currentTab === tab ? TC.textPrimary() : TC.textTertiary())
           Column().width(this.currentTab === tab ? 28 : 0).height(3).borderRadius(2)
-            .backgroundColor('#ef233c')
+            .backgroundColor(TC.accent())
         }
         .layoutWeight(1).height(52).justifyContent(FlexAlign.Center)
         .onClick(() => this.switchTab(tab))
@@ -460,8 +462,8 @@ export struct ArtistPage {
               Image(resizeImageUrl(album.picUrl, 280, 280)).width(132).height(132)
                 .sourceSize({ width: 280, height: 280 }).borderRadius(14).objectFit(ImageFit.Cover)
               Text(album.name).width(132).fontSize(13).fontWeight(FontWeight.Medium)
-                .fontColor('#ededf0').maxLines(2).textOverflow({ overflow: TextOverflow.Ellipsis })
-              Text(this.albumYear(album)).width(132).fontSize(10).fontColor('#77777f')
+                .fontColor(TC.textBody()).maxLines(2).textOverflow({ overflow: TextOverflow.Ellipsis })
+              Text(this.albumYear(album)).width(132).fontSize(10).fontColor(TC.textTertiary())
             }
             .alignItems(HorizontalAlign.Start).onClick(() => this.openAlbum(album))
           })
@@ -484,16 +486,16 @@ export struct ArtistPage {
               Stack({ alignContent: Alignment.BottomEnd }) {
                 Image(resizeImageUrl(mv.imgurl16v9 || mv.imgurl || '', 480, 270)).width(218).height(123)
                   .sourceSize({ width: 480, height: 270 }).borderRadius(13).objectFit(ImageFit.Cover)
-                Text(this.formatDuration(mv.duration)).fontSize(9).fontColor('#ffffff')
+                Text(this.formatDuration(mv.duration)).fontSize(9).fontColor(TC.textPrimary())
                   .padding({ left: 6, right: 6, top: 3, bottom: 3 })
                   .margin({ right: 7, bottom: 7 }).borderRadius(5).backgroundColor('rgba(0,0,0,0.58)')
               }
-              Text(mv.name).width(218).fontSize(13).fontColor('#ededf0').maxLines(2)
+              Text(mv.name).width(218).fontSize(13).fontColor(TC.textBody()).maxLines(2)
                 .textOverflow({ overflow: TextOverflow.Ellipsis })
               Row({ space: 10 }) {
-                Text(`${this.formatCount(mv.playCount)} 次播放`).fontSize(10).fontColor('#77777f')
+                Text(`${this.formatCount(mv.playCount)} 次播放`).fontSize(10).fontColor(TC.textTertiary())
                 if (mv.publishTime) {
-                  Text(mv.publishTime).fontSize(10).fontColor('#77777f')
+                  Text(mv.publishTime).fontSize(10).fontColor(TC.textTertiary())
                 }
               }
             }
@@ -514,30 +516,30 @@ export struct ArtistPage {
       Column({ space: 13 }) {
         if ((this.artistDetail.identities || []).length > 0) {
           Text((this.artistDetail.identities || []).join(' · ')).width('100%')
-            .fontSize(12).fontColor('#ff7a8a')
+            .fontSize(12).fontColor(TC.accentSoft())
         }
         if (this.expertIdentities.length > 0) {
           Flex({ wrap: FlexWrap.Wrap }) {
             ForEach(this.expertIdentities, (identity: ArtistExpertIdentity) => {
               Text(`${identity.expertIdentiyName}${identity.expertIdentiyCount ? ` ${identity.expertIdentiyCount}` : ''}`)
-                .fontSize(10).fontColor('#b6b6be')
+                .fontSize(10).fontColor(TC.textBody())
                 .padding({ left: 9, right: 9, top: 5, bottom: 5 })
-                .margin({ right: 7, bottom: 7 }).borderRadius(12).backgroundColor('#222228')
+                .margin({ right: 7, bottom: 7 }).borderRadius(12).backgroundColor(TC.surfaceInset())
             })
           }
           .width('100%')
         }
-        Text(this.artistDetail.briefDesc || '').width('100%').fontSize(13).fontColor('#a4a4ad')
+        Text(this.artistDetail.briefDesc || '').width('100%').fontSize(13).fontColor(TC.textBody())
           .lineHeight(22).maxLines(this.bioExpanded ? 100 : 6)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
         if ((this.artistDetail.briefDesc || '').length > 160) {
-          Text(this.bioExpanded ? '收起' : '展开全部').fontSize(12).fontColor('#ff6577')
+          Text(this.bioExpanded ? '收起' : '展开全部').fontSize(12).fontColor(TC.accentSoft())
             .onClick(() => this.bioExpanded = !this.bioExpanded)
         }
       }
       .width('100%').alignItems(HorizontalAlign.Start)
       .padding({ left: 16, right: 16, top: 16, bottom: 17 })
-      .borderRadius(17).backgroundColor('#19191e')
+      .borderRadius(17).backgroundColor(TC.surfaceCard())
     }
     .width('100%').padding({ left: 12, right: 12 })
   }
@@ -552,10 +554,10 @@ export struct ArtistPage {
             Column({ space: 8 }) {
               Image(resizeImageUrl(artist.picUrl || artist.img1v1Url || '', 180, 180)).width(82).height(82)
                 .sourceSize({ width: 180, height: 180 }).borderRadius(41).objectFit(ImageFit.Cover)
-              Text(artist.name).width(88).fontSize(12).fontColor('#ededf0').maxLines(1)
+              Text(artist.name).width(88).fontSize(12).fontColor(TC.textBody()).maxLines(1)
                 .textAlign(TextAlign.Center).textOverflow({ overflow: TextOverflow.Ellipsis })
               if ((artist.fansCount || 0) > 0) {
-                Text(`${this.formatCount(artist.fansCount)} 粉丝`).fontSize(9).fontColor('#77777f')
+                Text(`${this.formatCount(artist.fansCount)} 粉丝`).fontSize(9).fontColor(TC.textTertiary())
               }
             }
             .onClick(() => this.openArtist(artist))
@@ -575,7 +577,7 @@ export struct ArtistPage {
             Column() {
               this.ArtistHeader()
               if (this.loading) {
-                LoadingProgress().width(46).height(46).color('#ef233c').margin({ top: 36 })
+                LoadingProgress().width(46).height(46).color(TC.accent()).margin({ top: 36 })
               } else {
               this.ArtistNavigation()
               if (this.currentTab === 'music') {
@@ -596,7 +598,7 @@ export struct ArtistPage {
                   this.SimilarArtistsSection()
                 }
                 if (!this.hasContent()) {
-                  Text(this.message).width('100%').height(180).fontSize(13).fontColor('#77777f')
+                  Text(this.message).width('100%').height(180).fontSize(13).fontColor(TC.textTertiary())
                     .textAlign(TextAlign.Center)
                 }
               } else {
@@ -615,11 +617,11 @@ export struct ArtistPage {
         Column() {
           Column().width('100%').height(this.topAvoidHeight)
           Row() {
-            SymbolGlyph($r('sys.symbol.chevron_left')).fontSize(24).fontColor(['#ffffff'])
+            SymbolGlyph($r('sys.symbol.chevron_left')).fontSize(24).fontColor([TC.textPrimary()])
               .width(44).height(44).onClick(() => this.pageStack.pop())
             Text('歌手主页').layoutWeight(1).fontSize(17).fontWeight(FontWeight.Bold)
-              .fontColor('#ffffff').textAlign(TextAlign.Center)
-            SymbolGlyph($r('sys.symbol.ellipsis_circle')).fontSize(22).fontColor(['#ffffff'])
+              .fontColor(TC.textPrimary()).textAlign(TextAlign.Center)
+            SymbolGlyph($r('sys.symbol.ellipsis_circle')).fontSize(22).fontColor([TC.textPrimary()])
               .width(44).height(44)
               .bindMenu([{
                 value: this.preparingShare ? '准备分享…' : '分享歌手',
@@ -630,7 +632,7 @@ export struct ArtistPage {
         .width('100%')
         .linearGradient({ angle: 180, colors: [['rgba(0,0,0,0.5)', 0], ['rgba(0,0,0,0)', 1]] })
       }
-      .width('100%').height('100%').backgroundColor('#121215')
+      .width('100%').height('100%').backgroundColor(TC.pageBackground())
       .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP])
     }
     .hideTitleBar(true)

@@ -7,6 +7,7 @@ import {
 } from '../models'
 import { ApiClient } from '../services/ApiClient'
 import { resizeImageUrl } from '../services/ImageUrl'
+import { TC } from '../services/ThemeColors'
 
 interface DigitalAlbumArea {
   code: string
@@ -15,6 +16,7 @@ interface DigitalAlbumArea {
 
 @Component
 export struct DigitalAlbumPage {
+  @StorageProp('skinVersion') skinVersionObs: number = 0
   @Consume('pageStack') pageStack: NavPathStack
   @Consume('topAvoidHeight') topAvoidHeight: number
   embedded: boolean = false
@@ -157,15 +159,15 @@ export struct DigitalAlbumPage {
   @Builder
   private PageHeader() {
     Row({ space: 12 }) {
-      SymbolGlyph($r('sys.symbol.chevron_left')).fontSize(24).fontColor(['#ffffff'])
+      SymbolGlyph($r('sys.symbol.chevron_left')).fontSize(24).fontColor([TC.textPrimary()])
         .onClick(() => this.pageStack.pop())
       Column({ space: 3 }) {
-        Text('数字专辑').fontSize(25).fontWeight(FontWeight.Bold).fontColor('#ffffff')
-        Text('发现新发行与畅销数字音乐').fontSize(11).fontColor('#6f6f77')
+        Text('数字专辑').fontSize(25).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary())
+        Text('发现新发行与畅销数字音乐').fontSize(11).fontColor(TC.textQuaternary())
       }.layoutWeight(1).alignItems(HorizontalAlign.Start)
       Stack() {
-        SymbolGlyph($r('sys.symbol.magnifyingglass')).fontSize(19).fontColor(['#ddddE2'])
-      }.width(42).height(42).borderRadius(14).backgroundColor('#1e1e24')
+        SymbolGlyph($r('sys.symbol.magnifyingglass')).fontSize(19).fontColor([TC.textBody()])
+      }.width(42).height(42).borderRadius(14).backgroundColor(TC.surfaceCardAlt())
         .onClick(() => this.pageStack.pushPathByName('SearchPage', null))
     }.width('100%').padding({ left: 16, right: 16, top: 14, bottom: 5 })
   }
@@ -174,21 +176,21 @@ export struct DigitalAlbumPage {
   private DiscoveryTabs() {
     Scroll() {
       Row({ space: 6 }) {
-        Text('发现').fontSize(13).fontColor('#85858e').padding({ left: 12, right: 12, top: 9, bottom: 9 })
-          .backgroundColor('#1d1d22').borderRadius(18).onClick(() => this.pageStack.pop())
-        Text('排行榜').fontSize(13).fontColor('#85858e')
-          .padding({ left: 12, right: 12, top: 9, bottom: 9 }).backgroundColor('#1d1d22').borderRadius(18)
+        Text('发现').fontSize(13).fontColor(TC.textTertiary()).padding({ left: 12, right: 12, top: 9, bottom: 9 })
+          .backgroundColor(TC.surfaceCardAlt()).borderRadius(18).onClick(() => this.pageStack.pop())
+        Text('排行榜').fontSize(13).fontColor(TC.textTertiary())
+          .padding({ left: 12, right: 12, top: 9, bottom: 9 }).backgroundColor(TC.surfaceCardAlt()).borderRadius(18)
           .onClick(() => this.pageStack.replacePathByName('RankingPage', null))
-        Text('曲风').fontSize(13).fontColor('#85858e').padding({ left: 12, right: 12, top: 9, bottom: 9 })
-          .backgroundColor('#1d1d22').borderRadius(18)
+        Text('曲风').fontSize(13).fontColor(TC.textTertiary()).padding({ left: 12, right: 12, top: 9, bottom: 9 })
+          .backgroundColor(TC.surfaceCardAlt()).borderRadius(18)
           .onClick(() => this.pageStack.replacePathByName('StylePage', null))
-        Text('电台').fontSize(13).fontColor('#85858e').padding({ left: 12, right: 12, top: 9, bottom: 9 })
-          .backgroundColor('#1d1d22').borderRadius(18)
+        Text('电台').fontSize(13).fontColor(TC.textTertiary()).padding({ left: 12, right: 12, top: 9, bottom: 9 })
+          .backgroundColor(TC.surfaceCardAlt()).borderRadius(18)
           .onClick(() => this.pageStack.replacePathByName('RadioPage', null))
-        Text('数字专辑').fontSize(13).fontWeight(FontWeight.Bold).fontColor('#ffffff')
-          .padding({ left: 12, right: 12, top: 9, bottom: 9 }).backgroundColor('#ef233c').borderRadius(18)
-        Text('助眠解压').fontSize(13).fontColor('#85858e')
-          .padding({ left: 12, right: 12, top: 9, bottom: 9 }).backgroundColor('#1d1d22').borderRadius(18)
+        Text('数字专辑').fontSize(13).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary())
+          .padding({ left: 12, right: 12, top: 9, bottom: 9 }).backgroundColor(TC.accent()).borderRadius(18)
+        Text('助眠解压').fontSize(13).fontColor(TC.textTertiary())
+          .padding({ left: 12, right: 12, top: 9, bottom: 9 }).backgroundColor(TC.surfaceCardAlt()).borderRadius(18)
           .onClick(() => this.pageStack.replacePathByName('SatiPage', null))
       }.padding({ left: 16, right: 16 })
     }.width('100%').scrollable(ScrollDirection.Horizontal).scrollBar(BarState.Off)
@@ -199,8 +201,8 @@ export struct DigitalAlbumPage {
   private SectionTitle(title: string, subtitle: string) {
     Row() {
       Column({ space: 3 }) {
-        Text(title).fontSize(19).fontWeight(FontWeight.Bold).fontColor('#f4f4f6')
-        Text(subtitle).fontSize(10).fontColor('#66666e')
+        Text(title).fontSize(19).fontWeight(FontWeight.Bold).fontColor(TC.textBody())
+        Text(subtitle).fontSize(10).fontColor(TC.textQuaternary())
       }.layoutWeight(1).alignItems(HorizontalAlign.Start)
     }.width('100%').padding({ left: 16, right: 16, top: 22, bottom: 11 })
   }
@@ -212,19 +214,19 @@ export struct DigitalAlbumPage {
         Image(resizeImageUrl(item.coverUrl, 280, 280)).width(126).height(126)
           .sourceSize({ width: 280, height: 280 }).borderRadius(15).objectFit(ImageFit.Cover)
         if (badge.length > 0) {
-          Text(badge).fontSize(10).fontWeight(FontWeight.Bold).fontColor('#ffffff')
-            .padding({ left: 8, right: 8, top: 5, bottom: 5 }).backgroundColor('#ef233c')
+          Text(badge).fontSize(10).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary())
+            .padding({ left: 8, right: 8, top: 5, bottom: 5 }).backgroundColor(TC.accent())
             .borderRadius({ topLeft: 15, bottomRight: 12 })
         }
       }
-      Text(item.albumName).width(126).fontSize(12).fontWeight(FontWeight.Medium).fontColor('#e8e8eb')
+      Text(item.albumName).width(126).fontSize(12).fontWeight(FontWeight.Medium).fontColor(TC.textBody())
         .maxLines(2).textOverflow({ overflow: TextOverflow.Ellipsis })
-      Text(item.artistName).width(126).fontSize(10).fontColor('#77777f').maxLines(1)
+      Text(item.artistName).width(126).fontSize(10).fontColor(TC.textTertiary()).maxLines(1)
         .textOverflow({ overflow: TextOverflow.Ellipsis })
       Row() {
-        Text(this.formatPrice(item.price)).fontSize(11).fontWeight(FontWeight.Bold).fontColor('#ef6577')
+        Text(this.formatPrice(item.price)).fontSize(11).fontWeight(FontWeight.Bold).fontColor(TC.accentSoft())
         Blank()
-        Text(`${this.formatCount(item.saleNum || item.sales)}人购买`).fontSize(8).fontColor('#62626a')
+        Text(`${this.formatCount(item.saleNum || item.sales)}人购买`).fontSize(8).fontColor(TC.textQuaternary())
       }.width(126)
     }.width(126).alignItems(HorizontalAlign.Start).onClick(() => this.openDetail(item))
   }
@@ -276,15 +278,15 @@ export struct DigitalAlbumPage {
       Row({ space: 8 }) {
         ForEach(this.areas, (area: DigitalAlbumArea) => {
           Text(area.name).fontSize(11).fontWeight(this.selectedArea === area.code ? FontWeight.Bold : FontWeight.Normal)
-            .fontColor(this.selectedArea === area.code ? '#ffffff' : '#85858e')
+            .fontColor(this.selectedArea === area.code ? TC.textOnAccent() : TC.textTertiary())
             .padding({ left: 16, right: 16, top: 8, bottom: 8 })
-            .backgroundColor(this.selectedArea === area.code ? '#ef233c' : '#202026').borderRadius(17)
+            .backgroundColor(this.selectedArea === area.code ? TC.accent() : TC.surfaceInset()).borderRadius(17)
             .onClick(() => this.selectArea(area.code))
         }, (area: DigitalAlbumArea) => area.code)
       }.padding({ left: 16, right: 16, bottom: 13 })
     }.width('100%').scrollable(ScrollDirection.Horizontal).scrollBar(BarState.Off)
     if (this.styleLoading) {
-      LoadingProgress().width(28).height(28).color('#ef233c').margin({ top: 35, bottom: 35 })
+      LoadingProgress().width(28).height(28).color(TC.accent()).margin({ top: 35, bottom: 35 })
     } else if (this.styleAlbums.length > 0) {
       Scroll() {
         Row({ space: 13 }) {
@@ -300,7 +302,7 @@ export struct DigitalAlbumPage {
           }
         })
     } else {
-      Text('该语种暂无数字专辑').width('100%').height(100).fontSize(11).fontColor('#66666e')
+      Text('该语种暂无数字专辑').width('100%').height(100).fontSize(11).fontColor(TC.textQuaternary())
         .textAlign(TextAlign.Center)
     }
   }
@@ -317,12 +319,12 @@ export struct DigitalAlbumPage {
           }
           if (this.loading) {
             Column({ space: 12 }) {
-              LoadingProgress().width(38).height(38).color('#ef233c')
-              Text('正在加载数字专辑').fontSize(11).fontColor('#77777f')
+              LoadingProgress().width(38).height(38).color(TC.accent())
+              Text('正在加载数字专辑').fontSize(11).fontColor(TC.textTertiary())
             }.width('100%').height(360).justifyContent(FlexAlign.Center)
           } else if (this.newAlbums.length === 0 && this.salesAlbums.length === 0 &&
             this.styleAlbums.length === 0) {
-            Text(this.message || '暂无数字专辑').width('100%').height(320).fontSize(12).fontColor('#77777f')
+            Text(this.message || '暂无数字专辑').width('100%').height(320).fontSize(12).fontColor(TC.textTertiary())
               .textAlign(TextAlign.Center)
           } else {
             this.NewAlbumsSection()
@@ -332,7 +334,7 @@ export struct DigitalAlbumPage {
           }
         }.width('100%')
       }.width('100%').height('100%').scrollBar(BarState.Off)
-    }.width('100%').height('100%').backgroundColor('#121215').onRefreshing(async () => {
+    }.width('100%').height('100%').backgroundColor(TC.pageBackground()).onRefreshing(async () => {
       this.refreshing = true
       await this.loadPage()
       this.refreshing = false
@@ -345,7 +347,7 @@ export struct DigitalAlbumPage {
     } else {
       NavDestination() {
         this.PageContent(true)
-      }.hideTitleBar(true).backgroundColor('#121215')
+      }.hideTitleBar(true).backgroundColor(TC.pageBackground())
     }
   }
 }

@@ -7,6 +7,7 @@ import {
 } from '../models'
 import { ApiClient } from '../services/ApiClient'
 import { styleRoots, styleImageUrl } from '../services/StylePresentation'
+import { TC } from '../services/ThemeColors'
 
 interface StyleTagRow {
   key: string
@@ -54,6 +55,7 @@ class StyleTagRowDataSource implements IDataSource {
 
 @Component
 export struct StylePage {
+  @StorageProp('skinVersion') skinVersionObs: number = 0
   @Consume('pageStack') pageStack: NavPathStack
   @Consume('topAvoidHeight') topAvoidHeight: number
   embedded: boolean = false
@@ -145,15 +147,15 @@ export struct StylePage {
   @Builder
   private PageHeader() {
     Row({ space: 12 }) {
-      SymbolGlyph($r('sys.symbol.chevron_left')).fontSize(24).fontColor(['#ffffff'])
+      SymbolGlyph($r('sys.symbol.chevron_left')).fontSize(24).fontColor([TC.textPrimary()])
         .onClick(() => this.pageStack.pop())
       Column({ space: 3 }) {
-        Text('曲风').fontSize(25).fontWeight(FontWeight.Bold).fontColor('#ffffff')
-        Text('从偏好出发探索音乐类型').fontSize(11).fontColor('#6f6f77')
+        Text('曲风').fontSize(25).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary())
+        Text('从偏好出发探索音乐类型').fontSize(11).fontColor(TC.textQuaternary())
       }.layoutWeight(1).alignItems(HorizontalAlign.Start)
       Stack() {
-        SymbolGlyph($r('sys.symbol.magnifyingglass')).fontSize(19).fontColor(['#ddddE2'])
-      }.width(42).height(42).borderRadius(14).backgroundColor('#1e1e24')
+        SymbolGlyph($r('sys.symbol.magnifyingglass')).fontSize(19).fontColor([TC.textBody()])
+      }.width(42).height(42).borderRadius(14).backgroundColor(TC.surfaceCardAlt())
         .onClick(() => this.pageStack.pushPathByName('SearchPage', null))
     }.width('100%').padding({ left: 16, right: 16, top: 14, bottom: 5 })
   }
@@ -162,21 +164,21 @@ export struct StylePage {
   private DiscoveryTabs() {
     Scroll() {
       Row({ space: 6 }) {
-      Text('发现').fontSize(13).fontColor('#85858e').padding({ left: 12, right: 12, top: 9, bottom: 9 })
-        .backgroundColor('#1d1d22').borderRadius(18).onClick(() => this.pageStack.pop())
-      Text('排行榜').fontSize(13).fontColor('#85858e').padding({ left: 12, right: 12, top: 9, bottom: 9 })
-        .backgroundColor('#1d1d22').borderRadius(18)
+      Text('发现').fontSize(13).fontColor(TC.textTertiary()).padding({ left: 12, right: 12, top: 9, bottom: 9 })
+        .backgroundColor(TC.surfaceCardAlt()).borderRadius(18).onClick(() => this.pageStack.pop())
+      Text('排行榜').fontSize(13).fontColor(TC.textTertiary()).padding({ left: 12, right: 12, top: 9, bottom: 9 })
+        .backgroundColor(TC.surfaceCardAlt()).borderRadius(18)
         .onClick(() => this.pageStack.replacePathByName('RankingPage', null))
-      Text('曲风').fontSize(13).fontWeight(FontWeight.Bold).fontColor('#ffffff')
-        .padding({ left: 12, right: 12, top: 9, bottom: 9 }).backgroundColor('#ef233c').borderRadius(18)
-      Text('电台').fontSize(13).fontColor('#85858e').padding({ left: 12, right: 12, top: 9, bottom: 9 })
-        .backgroundColor('#1d1d22').borderRadius(18)
+      Text('曲风').fontSize(13).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary())
+        .padding({ left: 12, right: 12, top: 9, bottom: 9 }).backgroundColor(TC.accent()).borderRadius(18)
+      Text('电台').fontSize(13).fontColor(TC.textTertiary()).padding({ left: 12, right: 12, top: 9, bottom: 9 })
+        .backgroundColor(TC.surfaceCardAlt()).borderRadius(18)
         .onClick(() => this.pageStack.replacePathByName('RadioPage', null))
-      Text('数字专辑').fontSize(13).fontColor('#85858e')
-        .padding({ left: 12, right: 12, top: 9, bottom: 9 }).backgroundColor('#1d1d22').borderRadius(18)
+      Text('数字专辑').fontSize(13).fontColor(TC.textTertiary())
+        .padding({ left: 12, right: 12, top: 9, bottom: 9 }).backgroundColor(TC.surfaceCardAlt()).borderRadius(18)
         .onClick(() => this.pageStack.replacePathByName('DigitalAlbumPage', null))
-      Text('助眠解压').fontSize(13).fontColor('#85858e')
-        .padding({ left: 12, right: 12, top: 9, bottom: 9 }).backgroundColor('#1d1d22').borderRadius(18)
+      Text('助眠解压').fontSize(13).fontColor(TC.textTertiary())
+        .padding({ left: 12, right: 12, top: 9, bottom: 9 }).backgroundColor(TC.surfaceCardAlt()).borderRadius(18)
         .onClick(() => this.pageStack.replacePathByName('SatiPage', null))
       }.padding({ left: 16, right: 16 })
     }.width('100%').scrollable(ScrollDirection.Horizontal).scrollBar(BarState.Off)
@@ -187,8 +189,8 @@ export struct StylePage {
   private PreferenceSection() {
     if (this.preferences.length > 0) {
       Row() {
-        Text('我的曲风偏好').layoutWeight(1).fontSize(19).fontWeight(FontWeight.Bold).fontColor('#ffffff')
-        Text('近 30 天').fontSize(10).fontColor('#707078')
+        Text('我的曲风偏好').layoutWeight(1).fontSize(19).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary())
+        Text('近 30 天').fontSize(10).fontColor(TC.textQuaternary())
       }.width('100%').padding({ left: 16, right: 16, top: 22, bottom: 11 })
       Scroll() {
         Row({ space: 12 }) {
@@ -196,12 +198,12 @@ export struct StylePage {
             Stack({ alignContent: Alignment.BottomStart }) {
               Image(item.picUrl).width(142).height(172)
                 .borderRadius(17).objectFit(ImageFit.Cover)
-                .backgroundColor('#202026')
+                .backgroundColor(TC.surfaceCardAlt())
               Column().width(142).height(92).borderRadius({ bottomLeft: 17, bottomRight: 17 })
                 .linearGradient({ angle: 180, colors: [['rgba(0,0,0,0)', 0], ['rgba(0,0,0,0.88)', 1]] })
               Column({ space: 3 }) {
-                Text(item.tagName).fontSize(17).fontWeight(FontWeight.Bold).fontColor('#ffffff')
-                Text(`偏好 ${item.ratio}%`).fontSize(10).fontColor('#e2e2e6')
+                Text(item.tagName).fontSize(17).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary())
+                Text(`偏好 ${item.ratio}%`).fontSize(10).fontColor(TC.textBody())
               }.margin({ left: 11, bottom: 11 }).alignItems(HorizontalAlign.Start)
             }.width(142).height(172).onClick(() => this.openPreference(item))
           }, (item: StyleTagPreference) => item.tagId.toString())
@@ -213,8 +215,8 @@ export struct StylePage {
   @Builder
   private AllStylesHeader() {
     Row() {
-      Text('全部曲风').layoutWeight(1).fontSize(19).fontWeight(FontWeight.Bold).fontColor('#ffffff')
-      Text(`${this.allTags.length} 个`).fontSize(10).fontColor('#707078')
+      Text('全部曲风').layoutWeight(1).fontSize(19).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary())
+      Text(`${this.allTags.length} 个`).fontSize(10).fontColor(TC.textQuaternary())
     }.width('100%').padding({ left: 16, right: 16, top: 24, bottom: 12 })
   }
 
@@ -224,15 +226,15 @@ export struct StylePage {
       Stack({ alignContent: Alignment.BottomStart }) {
         Image(styleImageUrl(tag.picUrl)).width('100%').height(112)
           .borderRadius(15).objectFit(ImageFit.Cover)
-          .backgroundColor('#202026')
+          .backgroundColor(TC.surfaceCardAlt())
         Column().width('100%').height(62).borderRadius({ bottomLeft: 15, bottomRight: 15 })
           .linearGradient({ angle: 180, colors: [['rgba(0,0,0,0)', 0], ['rgba(0,0,0,0.82)', 1]] })
         Column({ space: 2 }) {
-          Text(tag.tagName).fontSize(15).fontWeight(FontWeight.Bold).fontColor('#ffffff').maxLines(1)
-          Text(tag.enName || '').fontSize(9).fontColor('#d0d0d5').maxLines(1)
+          Text(tag.tagName).fontSize(15).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary()).maxLines(1)
+          Text(tag.enName || '').fontSize(9).fontColor(TC.textBody()).maxLines(1)
         }.margin({ left: 10, right: 8, bottom: 9 }).alignItems(HorizontalAlign.Start)
       }.width('100%').height(112)
-      Text(this.tagDescription(tag)).width('100%').fontSize(10).fontColor('#77777f').maxLines(1)
+      Text(this.tagDescription(tag)).width('100%').fontSize(10).fontColor(TC.textTertiary()).maxLines(1)
         .textOverflow({ overflow: TextOverflow.Ellipsis })
     }.width('48%').margin({ bottom: 16 }).alignItems(HorizontalAlign.Start).onClick(() => this.openStyle(tag))
   }
@@ -262,12 +264,12 @@ export struct StylePage {
         if (this.loading) {
           ListItem() {
             Column() {
-              LoadingProgress().width(42).height(42).color('#ef233c')
+              LoadingProgress().width(42).height(42).color(TC.accent())
             }.width('100%').height(300).justifyContent(FlexAlign.Center)
           }
         } else if (this.allTags.length === 0) {
           ListItem() {
-            Text(this.message || '暂无曲风').width('100%').height(300).fontSize(13).fontColor('#77777f')
+            Text(this.message || '暂无曲风').width('100%').height(300).fontSize(13).fontColor(TC.textTertiary())
               .textAlign(TextAlign.Center)
           }
         } else {
@@ -289,7 +291,7 @@ export struct StylePage {
           }
         }
       }.width('100%').height('100%').scrollBar(BarState.Off)
-    }.width('100%').height('100%').backgroundColor('#121215').onRefreshing(async () => {
+    }.width('100%').height('100%').backgroundColor(TC.pageBackground()).onRefreshing(async () => {
       this.refreshing = true
       await this.loadData()
       this.refreshing = false
@@ -302,7 +304,7 @@ export struct StylePage {
     } else {
       NavDestination() {
         this.PageContent(true)
-      }.hideTitleBar(true).backgroundColor('#121215')
+      }.hideTitleBar(true).backgroundColor(TC.pageBackground())
     }
   }
 }

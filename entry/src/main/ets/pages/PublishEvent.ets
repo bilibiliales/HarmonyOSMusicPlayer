@@ -2,6 +2,7 @@ import { ApiParam, ApiSong, mapApiSong, SearchResponse, ShareResourceResponse } 
 import { songItemType } from '../models/music'
 import { ApiClient } from '../services/ApiClient'
 import { AuthStore } from '../stores/AuthStore'
+import { TC } from '../services/ThemeColors'
 
 export interface PublishEventPageParam {
   onPublished?: () => void
@@ -9,6 +10,7 @@ export interface PublishEventPageParam {
 
 @Component
 export struct PublishEventPage {
+  @StorageProp('skinVersion') skinVersionObs: number = 0
   @Consume('pageStack') pageStack: NavPathStack
   @Consume('topAvoidHeight') topAvoidHeight: number
   @Consume('authStore') authStore: AuthStore
@@ -116,29 +118,29 @@ export struct PublishEventPage {
   private SearchSongSheet() {
     Column({ space: 14 }) {
       Row() {
-        Text('添加歌曲').fontSize(18).fontWeight(FontWeight.Bold).fontColor('#ffffff')
+        Text('添加歌曲').fontSize(18).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary())
         Blank()
-        SymbolGlyph($r('sys.symbol.xmark_circle_fill')).fontSize(25).fontColor(['#6f6f77'])
+        SymbolGlyph($r('sys.symbol.xmark_circle_fill')).fontSize(25).fontColor([TC.textQuaternary()])
           .onClick(() => this.searchSheetVisible = false)
       }.width('100%')
 
       Row({ space: 9 }) {
         TextInput({ text: this.searchKeyword, placeholder: '搜索歌曲名或歌手' })
-          .layoutWeight(1).height(44).fontColor('#ffffff').placeholderColor('#66666e')
-          .backgroundColor('#25252b').borderRadius(13).enterKeyType(EnterKeyType.Search)
+          .layoutWeight(1).height(44).fontColor(TC.textPrimary()).placeholderColor(TC.textQuaternary())
+          .backgroundColor(TC.surfaceRaised()).borderRadius(13).enterKeyType(EnterKeyType.Search)
           .onChange((value: string) => this.searchKeyword = value)
           .onSubmit(() => this.searchSongs())
-        Button('搜索').height(44).fontSize(12).fontColor('#ffffff').backgroundColor('#ef233c')
+        Button('搜索').height(44).fontSize(12).fontColor(TC.textPrimary()).backgroundColor(TC.accent())
           .borderRadius(13).enabled(!this.searchLoading).onClick(() => this.searchSongs())
       }.width('100%')
 
       if (this.searchLoading) {
         Row({ space: 8 }) {
-          LoadingProgress().width(24).height(24).color('#ef233c')
-          Text('正在搜索单曲…').fontSize(12).fontColor('#85858e')
+          LoadingProgress().width(24).height(24).color(TC.accent())
+          Text('正在搜索单曲…').fontSize(12).fontColor(TC.textTertiary())
         }.layoutWeight(1).justifyContent(FlexAlign.Center)
       } else if (this.searchMessage) {
-        Text(this.searchMessage).layoutWeight(1).width('100%').fontSize(12).fontColor('#85858e')
+        Text(this.searchMessage).layoutWeight(1).width('100%').fontSize(12).fontColor(TC.textTertiary())
           .textAlign(TextAlign.Center)
       } else if (this.searchResults.length > 0) {
         List({ space: 7 }) {
@@ -148,25 +150,25 @@ export struct PublishEventPage {
                 Image(song.img).width(50).height(50).borderRadius(10).objectFit(ImageFit.Cover)
                 Column({ space: 4 }) {
                   Text(song.name).width('100%').fontSize(13).fontWeight(FontWeight.Medium)
-                    .fontColor('#f1f1f3').maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
+                    .fontColor(TC.textBody()).maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
                   Text(`${song.author}${song.album ? ` · ${song.album}` : ''}`).width('100%').fontSize(10)
-                    .fontColor('#77777f').maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
+                    .fontColor(TC.textTertiary()).maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
                 }.layoutWeight(1).alignItems(HorizontalAlign.Start)
                 if (this.selectedSongId === song.id) {
-                  SymbolGlyph($r('sys.symbol.checkmark_circle_fill')).fontSize(22).fontColor(['#ef233c'])
+                  SymbolGlyph($r('sys.symbol.checkmark_circle_fill')).fontSize(22).fontColor([TC.accent()])
                 } else {
-                  Text('添加').fontSize(11).fontColor('#ff6577')
+                  Text('添加').fontSize(11).fontColor(TC.accentSoft())
                 }
               }
-              .width('100%').padding(9).backgroundColor('#232329').borderRadius(13)
+              .width('100%').padding(9).backgroundColor(TC.surfaceInset()).borderRadius(13)
               .onClick(() => this.selectSong(song))
             }
           })
         }.layoutWeight(1).width('100%').scrollBar(BarState.Off)
       } else {
         Column({ space: 10 }) {
-          SymbolGlyph($r('sys.symbol.music_note_list')).fontSize(38).fontColor(['#55555d'])
-          Text('搜索并添加一首歌曲到笔记').fontSize(12).fontColor('#77777f')
+          SymbolGlyph($r('sys.symbol.music_note_list')).fontSize(38).fontColor([TC.textQuaternary()])
+          Text('搜索并添加一首歌曲到笔记').fontSize(12).fontColor(TC.textTertiary())
         }.layoutWeight(1).justifyContent(FlexAlign.Center)
       }
     }
@@ -178,21 +180,21 @@ export struct PublishEventPage {
       Column() {
         Column().width('100%').height(this.topAvoidHeight)
         Row({ space: 12 }) {
-          Text('取消').fontSize(14).fontColor('#a0a0a8').onClick(() => this.pageStack.pop())
+          Text('取消').fontSize(14).fontColor(TC.textQuaternary()).onClick(() => this.pageStack.pop())
           Text('发布笔记').layoutWeight(1).fontSize(18).fontWeight(FontWeight.Bold)
-            .fontColor('#ffffff').textAlign(TextAlign.Center)
-          Button(this.publishing ? '发布中' : '发布').height(36).fontSize(12).fontColor('#ffffff')
-            .backgroundColor(this.canPublish() ? '#ef233c' : '#38383f').borderRadius(18)
+            .fontColor(TC.textPrimary()).textAlign(TextAlign.Center)
+          Button(this.publishing ? '发布中' : '发布').height(36).fontSize(12).fontColor(TC.textPrimary())
+            .backgroundColor(this.canPublish() ? TC.accent() : TC.surfaceRaised()).borderRadius(18)
             .enabled(this.canPublish()).onClick(() => this.publish())
         }.width('100%').height(58).padding({ left: 17, right: 17 })
 
         Scroll() {
           Column({ space: 18 }) {
             TextArea({ text: this.content, placeholder: '分享此刻的音乐与心情…' })
-              .width('100%').height(220).fontSize(15).lineHeight(23).fontColor('#f1f1f3')
-              .placeholderColor('#66666e').backgroundColor('#1b1b20').borderRadius(18).padding(16)
+              .width('100%').height(220).fontSize(15).lineHeight(23).fontColor(TC.textBody())
+              .placeholderColor(TC.textQuaternary()).backgroundColor(TC.surfaceCard()).borderRadius(18).padding(16)
               .onChange((value: string) => this.content = value.substring(0, 1000))
-            Text(`${this.content.length}/1000`).width('100%').fontSize(10).fontColor('#5f5f67')
+            Text(`${this.content.length}/1000`).width('100%').fontSize(10).fontColor(TC.textQuaternary())
               .textAlign(TextAlign.End).margin({ top: -12 })
 
             if (this.selectedSongId) {
@@ -200,42 +202,42 @@ export struct PublishEventPage {
                 Image(this.selectedSongCover).width(58).height(58).borderRadius(11).objectFit(ImageFit.Cover)
                 Column({ space: 5 }) {
                   Text(this.selectedSongName).width('100%').fontSize(14).fontWeight(FontWeight.Medium)
-                    .fontColor('#f1f1f3').maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
-                  Text(this.selectedSongAuthor).width('100%').fontSize(11).fontColor('#77777f').maxLines(1)
+                    .fontColor(TC.textBody()).maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
+                  Text(this.selectedSongAuthor).width('100%').fontSize(11).fontColor(TC.textTertiary()).maxLines(1)
                 }.layoutWeight(1).alignItems(HorizontalAlign.Start)
-                SymbolGlyph($r('sys.symbol.xmark_circle_fill')).fontSize(23).fontColor(['#686870'])
+                SymbolGlyph($r('sys.symbol.xmark_circle_fill')).fontSize(23).fontColor([TC.textQuaternary()])
                   .onClick(() => this.clearSong())
-              }.width('100%').padding(12).backgroundColor('#24242a').borderRadius(16)
+              }.width('100%').padding(12).backgroundColor(TC.surfaceInset()).borderRadius(16)
             } else {
               Row({ space: 12 }) {
                 Stack() {
-                  SymbolGlyph($r('sys.symbol.music_note_list')).fontSize(23).fontColor(['#ffffff'])
-                }.width(48).height(48).borderRadius(14).backgroundColor('#ef233c')
+                  SymbolGlyph($r('sys.symbol.music_note_list')).fontSize(23).fontColor([TC.textPrimary()])
+                }.width(48).height(48).borderRadius(14).backgroundColor(TC.accent())
                 Column({ space: 4 }) {
-                  Text('添加歌曲').fontSize(14).fontWeight(FontWeight.Medium).fontColor('#f1f1f3')
-                  Text('搜索并选择一首歌曲随笔记发布').fontSize(10).fontColor('#77777f')
+                  Text('添加歌曲').fontSize(14).fontWeight(FontWeight.Medium).fontColor(TC.textBody())
+                  Text('搜索并选择一首歌曲随笔记发布').fontSize(10).fontColor(TC.textTertiary())
                 }.layoutWeight(1).alignItems(HorizontalAlign.Start)
-                SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(18).fontColor(['#686870'])
+                SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(18).fontColor([TC.textQuaternary()])
               }
-              .width('100%').padding(13).backgroundColor('#1b1b20').borderRadius(16)
+              .width('100%').padding(13).backgroundColor(TC.surfaceCard()).borderRadius(16)
               .onClick(() => this.searchSheetVisible = true)
             }
 
             if (this.message) {
               Text(this.message).width('100%').padding(12).fontSize(11).lineHeight(18)
-                .fontColor('#ff8b78').textAlign(TextAlign.Center).backgroundColor('#2b211f').borderRadius(13)
+                .fontColor(TC.accentSoft()).textAlign(TextAlign.Center).backgroundColor(TC.surfaceInset()).borderRadius(13)
             }
 
             Row({ space: 8 }) {
-              SymbolGlyph($r('sys.symbol.info_circle')).fontSize(16).fontColor(['#77777f'])
+              SymbolGlyph($r('sys.symbol.info_circle')).fontSize(16).fontColor([TC.textTertiary()])
               Text('可发布纯文字笔记，也可以附带一首歌曲。').layoutWeight(1).fontSize(11)
-                .lineHeight(18).fontColor('#77777f')
-            }.width('100%').padding(13).backgroundColor('#18181d').borderRadius(13)
+                .lineHeight(18).fontColor(TC.textTertiary())
+            }.width('100%').padding(13).backgroundColor(TC.surfaceCardAlt()).borderRadius(13)
           }.width('100%').padding({ left: 16, right: 16, top: 12, bottom: 36 })
         }.layoutWeight(1).scrollBar(BarState.Off)
-      }.width('100%').height('100%').backgroundColor('#121215')
+      }.width('100%').height('100%').backgroundColor(TC.pageBackground())
       .bindSheet(this.searchSheetVisible, this.SearchSongSheet(), {
-        height: '68%', backgroundColor: '#19191f', showClose: false, dragBar: true,
+        height: '68%', backgroundColor: TC.sheetBackground(), showClose: false, dragBar: true,
         onDisappear: () => this.searchSheetVisible = false
       })
     }.hideTitleBar(true)

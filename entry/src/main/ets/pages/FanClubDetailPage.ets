@@ -4,9 +4,11 @@ import { EventCard } from '../components/EventCard'
 import { EventPresentation } from '../services/EventPresentation'
 import { BubbleTip } from '../services/BubbleTip'
 import { AuthStore } from '../stores/AuthStore'
+import { TC } from '../services/ThemeColors'
 
 @Component
 export struct FanClubDetailPage {
+  @StorageProp('skinVersion') skinVersionObs: number = 0
   @Consume('pageStack') pageStack: NavPathStack
   @Consume('topAvoidHeight') topAvoidHeight: number
   @Consume('authStore') authStore: AuthStore
@@ -80,10 +82,10 @@ export struct FanClubDetailPage {
       Column() {
         Column().width('100%').height(this.topAvoidHeight)
         Row() {
-          SymbolGlyph($r('sys.symbol.chevron_left')).fontSize(24).fontColor(['#ffffff'])
+          SymbolGlyph($r('sys.symbol.chevron_left')).fontSize(24).fontColor([TC.textPrimary()])
             .onClick(() => this.pageStack.pop())
           Text(this.detail?.fansGroupName || '乐迷团').layoutWeight(1).fontSize(18).fontWeight(FontWeight.Bold)
-            .fontColor('#ffffff').textAlign(TextAlign.Center).maxLines(1)
+            .fontColor(TC.textPrimary()).textAlign(TextAlign.Center).maxLines(1)
           Column().width(24)
         }.height(56).constraintSize({ minHeight: 56 }).width('100%').padding({ left: 16, right: 16 })
 
@@ -94,35 +96,35 @@ export struct FanClubDetailPage {
                 Row({ space: 16 }) {
                   Image(this.detail.headAvatarUrl)
                     .width(96).height(96).borderRadius(20).objectFit(ImageFit.Cover)
-                    .backgroundColor('#29292f').onClick(() => this.openArtist())
+                    .backgroundColor(TC.chipBackground()).onClick(() => this.openArtist())
                   Column({ space: 6 }) {
-                    Text(this.detail.fansGroupName).fontSize(20).fontWeight(FontWeight.Bold).fontColor('#ffffff')
-                    Text(this.detail.artistName).fontSize(13).fontColor('#ff8291')
+                    Text(this.detail.fansGroupName).fontSize(20).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary())
+                    Text(this.detail.artistName).fontSize(13).fontColor(TC.accentSoft())
                     Text(`${this.detail.totalMembersCount} 位成员 · ${this.detail.activeMembersCount} 人在线`)
-                      .fontSize(12).fontColor('#92929a')
+                      .fontSize(12).fontColor(TC.textSecondary())
                   }.layoutWeight(1).alignItems(HorizontalAlign.Start)
                 }.width('100%')
                 if (this.detail.brief) {
-                  Text(this.detail.brief).width('100%').fontSize(13).lineHeight(20).fontColor('#b5b5bc')
+                  Text(this.detail.brief).width('100%').fontSize(13).lineHeight(20).fontColor(TC.textBody())
                 }
                 if (this.detail.headId) {
                   Row() {
-                    Text('歌手主页').fontSize(13).fontColor('#ffffff').layoutWeight(1)
-                    SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(18).fontColor(['#66666e'])
-                  }.width('100%').padding(14).backgroundColor('#1b1b20').borderRadius(14)
+                    Text('歌手主页').fontSize(13).fontColor(TC.textPrimary()).layoutWeight(1)
+                    SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(18).fontColor([TC.textQuaternary()])
+                  }.width('100%').padding(14).backgroundColor(TC.surfaceCard()).borderRadius(14)
                   .onClick(() => this.openArtist())
                 }
-              }.width('100%').padding(18).backgroundColor('#16161b').borderRadius(20)
+              }.width('100%').padding(18).backgroundColor(TC.surfaceCardAlt()).borderRadius(20)
             } else if (this.loading) {
-              LoadingProgress().width(32).height(32).color('#ef233c').alignSelf(ItemAlign.Center).padding({ top: 20 })
+              LoadingProgress().width(32).height(32).color(TC.accent()).alignSelf(ItemAlign.Center).padding({ top: 20 })
             }
 
             Column({ space: 10 }) {
-              Text('动态').width('100%').fontSize(16).fontWeight(FontWeight.Bold).fontColor('#ffffff')
+              Text('动态').width('100%').fontSize(16).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary())
               if (this.feedLoading && this.events.length === 0) {
-                LoadingProgress().width(28).height(28).color('#ef233c').alignSelf(ItemAlign.Center)
+                LoadingProgress().width(28).height(28).color(TC.accent()).alignSelf(ItemAlign.Center)
               } else if (this.events.length === 0) {
-                Text(this.message || '还没有动态').fontSize(12).fontColor('#92929a')
+                Text(this.message || '还没有动态').fontSize(12).fontColor(TC.textSecondary())
                   .alignSelf(ItemAlign.Center).padding({ top: 16, bottom: 16 })
               } else {
                 ForEach(this.events.filter((event: UserEventItem) => event.id > 0), (item: UserEventItem) => {
@@ -131,13 +133,13 @@ export struct FanClubDetailPage {
                 }, (item: UserEventItem) => item.id.toString())
                 if (this.more) {
                   Text(this.feedLoading ? '加载中…' : '加载更多').width('100%').height(44).fontSize(12)
-                    .fontColor('#77777f').textAlign(TextAlign.Center).onClick(() => this.loadMore())
+                    .fontColor(TC.textTertiary()).textAlign(TextAlign.Center).onClick(() => this.loadMore())
                 }
               }
-            }.width('100%').padding(18).backgroundColor('#1b1b20').borderRadius(20)
+            }.width('100%').padding(18).backgroundColor(TC.surfaceCard()).borderRadius(20)
           }.width('100%').padding({ left: 16, right: 16, top: 12, bottom: 32 })
         }.width('100%').layoutWeight(1).onReachEnd(() => this.loadMore())
-      }.width('100%').height('100%').backgroundColor('#121215')
+      }.width('100%').height('100%').backgroundColor(TC.pageBackground())
     }.hideTitleBar(true)
   }
 }

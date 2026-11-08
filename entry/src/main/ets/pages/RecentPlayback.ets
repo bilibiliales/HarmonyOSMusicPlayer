@@ -4,11 +4,13 @@ import { RecentPlaybackService, RecentEntry } from '../services/RecentPlaybackSe
 import { playerController } from '../services/PlayerController'
 import { AlbumPageParam, MvPlayerPageParam } from '../models/api'
 import { playlistType, songItemType } from '../models/music'
+import { TC } from '../services/ThemeColors'
 
 export interface RecentPlaybackParam { djId?: string; title?: string }
 
 @Component
 export struct RecentPlaybackPage {
+  @StorageProp('skinVersion') skinVersionObs: number = 0
   @Consume('pageStack') pageStack: NavPathStack
   @Consume('topAvoidHeight') topAvoidHeight: number
   @Consume('authStore') authStore: AuthStore
@@ -79,17 +81,17 @@ export struct RecentPlaybackPage {
     NavDestination() {
       Column() {
         Row({ space: 14 }) {
-          SymbolGlyph($r('sys.symbol.chevron_left')).fontSize(24).fontColor(['#ffffff']).onClick(() => this.pageStack.pop())
-          Text(this.pageParam.title || '最近播放').fontSize(20).fontWeight(FontWeight.Bold).fontColor('#ffffff')
+          SymbolGlyph($r('sys.symbol.chevron_left')).fontSize(24).fontColor([TC.textPrimary()]).onClick(() => this.pageStack.pop())
+          Text(this.pageParam.title || '最近播放').fontSize(20).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary())
         }.width('100%').height(56 + this.topAvoidHeight).padding({ left: 18, top: this.topAvoidHeight })
         if (!this.pageParam.djId) {
           Scroll() {
             Row({ space: 24 }) {
               ForEach(this.titles, (title: string, index: number) => {
                 Column({ space: 7 }) {
-                  Text(title).fontSize(14).fontColor(this.tab === index ? '#ffffff' : '#77777f')
+                  Text(title).fontSize(14).fontColor(this.tab === index ? TC.textPrimary() : TC.textTertiary())
                     .fontWeight(this.tab === index ? FontWeight.Bold : FontWeight.Regular)
-                  Column().width(24).height(3).borderRadius(2).backgroundColor(this.tab === index ? '#ef233c' : 'transparent')
+                  Column().width(24).height(3).borderRadius(2).backgroundColor(this.tab === index ? TC.accent() : 'transparent')
                 }.height(46).justifyContent(FlexAlign.Center).onClick(() => {
                   if (this.tab !== index) { this.tab = index; this.load() }
                 })
@@ -98,15 +100,15 @@ export struct RecentPlaybackPage {
           }.width('100%').height(46).scrollable(ScrollDirection.Horizontal).scrollBar(BarState.Off)
         }
         if (this.canPlayAll()) {
-          Button(`播放全部 ${this.songs.length}`).backgroundColor('#ef233c').fontColor('#ffffff')
+          Button(`播放全部 ${this.songs.length}`).backgroundColor(TC.accent()).fontColor(TC.textPrimary())
             .margin(12).enabled(!this.loading && this.songs.length > 0).onClick(() => this.play(0))
         }
         if (!this.authStore.loggedIn || this.owner !== this.authStore.userId) {
-          Text('请登录查看自己的最近播放').fontColor('#77777f')
+          Text('请登录查看自己的最近播放').fontColor(TC.textTertiary())
         } else if (this.loading) {
-          LoadingProgress().width(40).color('#ef233c')
+          LoadingProgress().width(40).color(TC.accent())
         } else if (this.message) {
-          Text(this.message).fontColor('#77777f')
+          Text(this.message).fontColor(TC.textTertiary())
           Button('重试').onClick(() => this.load())
         } else {
           List() {
@@ -116,8 +118,8 @@ export struct RecentPlaybackPage {
                   Row({ space: 12 }) {
                     Image(song.img).width(48).height(48).borderRadius(8)
                     Column({ space: 4 }) {
-                      Text(song.name).fontColor('#eeeeee').maxLines(1)
-                      Text(song.author).fontColor('#77777f').fontSize(12).maxLines(1)
+                      Text(song.name).fontColor(TC.textBody()).maxLines(1)
+                      Text(song.author).fontColor(TC.textTertiary()).fontSize(12).maxLines(1)
                     }.layoutWeight(1).alignItems(HorizontalAlign.Start)
                   }.height(68).padding({ left: 18, right: 18 }).onClick(() => this.play(index))
                 }
@@ -127,18 +129,18 @@ export struct RecentPlaybackPage {
                 ListItem() {
                   Row({ space: 12 }) {
                     Image(item.cover).width(48).height(48).borderRadius(8)
-                    Text(item.name).layoutWeight(1).fontColor('#eeeeee').maxLines(2)
-                    SymbolGlyph($r('sys.symbol.chevron_right')).fontColor(['#77777f']).fontSize(16)
+                    Text(item.name).layoutWeight(1).fontColor(TC.textBody()).maxLines(2)
+                    SymbolGlyph($r('sys.symbol.chevron_right')).fontColor([TC.textTertiary()]).fontSize(16)
                   }.height(68).padding({ left: 18, right: 18 }).onClick(() => this.open(item))
                 }
               })
             }
             if (this.songs.length === 0 && this.entries.length === 0) {
-              ListItem() { Text('暂无播放记录').width('100%').padding(24).fontColor('#77777f').textAlign(TextAlign.Center) }
+              ListItem() { Text('暂无播放记录').width('100%').padding(24).fontColor(TC.textTertiary()).textAlign(TextAlign.Center) }
             }
           }.layoutWeight(1)
         }
-      }.width('100%').height('100%').backgroundColor('#121215')
+      }.width('100%').height('100%').backgroundColor(TC.pageBackground())
     }.hideTitleBar(true)
   }
 }

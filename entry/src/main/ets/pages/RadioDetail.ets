@@ -8,9 +8,11 @@ import { RadioService } from '../services/RadioService'
 import { RadioPlayback } from '../services/RadioPlayback'
 import { BubbleTip } from '../services/BubbleTip'
 import { RadioProgramRow } from '../components/RadioCards'
+import { TC } from '../services/ThemeColors'
 
 @Component
 export struct RadioDetailPage {
+  @StorageProp('skinVersion') skinVersionObs: number = 0
   @Consume('pageStack') pageStack: NavPathStack
   @Consume('topAvoidHeight') topAvoidHeight: number
   pageParam: RadioPageParam = { id: '' }
@@ -81,27 +83,27 @@ export struct RadioDetailPage {
     Row({ space: 16 }) {
       Image(this.station?.picUrl || this.pageParam.cover || '').width(112).height(112).borderRadius(18).objectFit(ImageFit.Cover)
       Column({ space: 10 }) {
-        Text(this.station?.name || this.pageParam.name || '电台').fontSize(22).fontWeight(FontWeight.Bold).fontColor('#ffffff').maxLines(3)
-        Text(this.station?.dj?.nickname || '').fontSize(13).fontColor('#aaaab5')
+        Text(this.station?.name || this.pageParam.name || '电台').fontSize(22).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary()).maxLines(3)
+        Text(this.station?.dj?.nickname || '').fontSize(13).fontColor(TC.textQuaternary())
         Text(`${this.station?.programCount || 0} 期 · ${RadioService.count(this.station?.subCount)} 人订阅`)
-          .fontSize(11).fontColor('#85858f')
+          .fontSize(11).fontColor(TC.textTertiary())
       }.layoutWeight(1).alignItems(HorizontalAlign.Start)
     }.width('100%').padding({ left: 17, right: 17, top: 20, bottom: 18 })
     if (this.detailMessage) {
-      Text(this.detailMessage + ' · 点击重试').fontSize(12).fontColor('#ff6577').padding(17).onClick(() => this.loadDetail())
+      Text(this.detailMessage + ' · 点击重试').fontSize(12).fontColor(TC.accentSoft()).padding(17).onClick(() => this.loadDetail())
     }
     if (this.station?.desc) {
-      Text(this.station.desc).width('100%').fontSize(13).lineHeight(22).fontColor('#aaaab5')
+      Text(this.station.desc).width('100%').fontSize(13).lineHeight(22).fontColor(TC.textQuaternary())
         .maxLines(this.expanded ? 1000 : 3).textOverflow({ overflow: TextOverflow.Ellipsis })
         .padding({ left: 17, right: 17 }).onClick(() => this.expanded = !this.expanded)
-      Text(this.expanded ? '收起介绍' : '展开介绍').fontSize(11).fontColor('#ff6577').padding(12)
+      Text(this.expanded ? '收起介绍' : '展开介绍').fontSize(11).fontColor(TC.accentSoft()).padding(12)
         .onClick(() => this.expanded = !this.expanded)
     }
     this.CommentEntry()
     Row() {
-      Text(this.playing ? '准备播放…' : `播放全部 (${this.programs.length})`).fontSize(15).fontColor('#ffffff').layoutWeight(1)
+      Text(this.playing ? '准备播放…' : `播放全部 (${this.programs.length})`).fontSize(15).fontColor(TC.textPrimary()).layoutWeight(1)
         .enabled(!this.playing && this.programs.length > 0).onClick(() => this.play(0))
-      Text(this.asc ? '最早优先' : '最新优先').fontSize(12).fontColor('#ff6577')
+      Text(this.asc ? '最早优先' : '最新优先').fontSize(12).fontColor(TC.accentSoft())
         .onClick(() => { this.asc = !this.asc; this.loadPrograms(true) })
     }.width('100%').padding(17)
   }
@@ -130,10 +132,10 @@ export struct RadioDetailPage {
   @Builder
   private CommentEntry() {
     Row({ space: 8 }) {
-      SymbolGlyph($r('sys.symbol.ellipsis_bubble')).fontSize(19).fontColor(['#ffffff'])
-      Text(`评论 · ${this.commentCount}`).fontSize(14).fontColor('#ededf0')
+      SymbolGlyph($r('sys.symbol.ellipsis_bubble')).fontSize(19).fontColor([TC.textPrimary()])
+      Text(`评论 · ${this.commentCount}`).fontSize(14).fontColor(TC.textBody())
       Blank()
-      SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(14).fontColor(['#85858f'])
+      SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(14).fontColor([TC.textTertiary()])
     }.width('100%').height(46).padding({ left: 17, right: 17 })
       .onClick(() => this.commentsVisible = true)
   }
@@ -142,8 +144,8 @@ export struct RadioDetailPage {
     NavDestination() {
       Column() {
         Row({ space: 14 }) {
-          SymbolGlyph($r('sys.symbol.chevron_left')).fontSize(24).fontColor(['#ffffff']).onClick(() => this.pageStack.pop())
-          Text('电台详情').fontSize(18).fontColor('#ffffff')
+          SymbolGlyph($r('sys.symbol.chevron_left')).fontSize(24).fontColor([TC.textPrimary()]).onClick(() => this.pageStack.pop())
+          Text('电台详情').fontSize(18).fontColor(TC.textPrimary())
         }.width('100%').height(56 + this.topAvoidHeight).padding({ left: 17, top: this.topAvoidHeight })
         List() {
           ListItem() { Column() { this.Header() }.width('100%') }
@@ -152,20 +154,20 @@ export struct RadioDetailPage {
           }, (program: ProgramItem) => String(program.id))
           ListItem() {
             Column({ space: 12 }) {
-              if (this.loading) { LoadingProgress().width(30).height(30).color('#ef233c') }
+              if (this.loading) { LoadingProgress().width(30).height(30).color(TC.accent()) }
               else if (this.message) {
-                Text(this.message).fontColor('#ff6577').fontSize(13)
-                Button('重试').backgroundColor('#303038').onClick(() => { this.message = ''; this.loadPrograms() })
+                Text(this.message).fontColor(TC.accentSoft()).fontSize(13)
+                Button('重试').backgroundColor(TC.surfaceRaised()).onClick(() => { this.message = ''; this.loadPrograms() })
               } else {
                 Text(this.programs.length === 0 ? '暂无节目' : this.more ? '加载更多' : '已经到底了')
-                  .fontColor('#85858f').fontSize(12).onClick(() => this.loadPrograms())
+                  .fontColor(TC.textTertiary()).fontSize(12).onClick(() => this.loadPrograms())
               }
             }.width('100%').padding(28)
           }
         }.width('100%').layoutWeight(1).scrollBar(BarState.Off).onReachEnd(() => this.loadPrograms())
-      }.width('100%').height('100%').backgroundColor('#121215')
+      }.width('100%').height('100%').backgroundColor(TC.pageBackground())
         .bindSheet(this.commentsVisible, this.CommentsSheet(), {
-          height: '72%', backgroundColor: '#19191f', showClose: false, dragBar: true,
+          height: '72%', backgroundColor: TC.sheetBackground(), showClose: false, dragBar: true,
           onDisappear: () => this.commentsVisible = false
         })
     }.hideTitleBar(true)
@@ -174,6 +176,7 @@ export struct RadioDetailPage {
 
 @Component
 export struct RadioProgramPage {
+  @StorageProp('skinVersion') skinVersionObs: number = 0
   @Consume('pageStack') pageStack: NavPathStack
   @Consume('topAvoidHeight') topAvoidHeight: number
   pageParam: RadioPageParam = { id: '' }
@@ -235,10 +238,10 @@ export struct RadioProgramPage {
   @Builder
   private CommentEntry() {
     Row({ space: 8 }) {
-      SymbolGlyph($r('sys.symbol.ellipsis_bubble')).fontSize(19).fontColor(['#ffffff'])
-      Text(`评论 · ${this.commentCount}`).fontSize(14).fontColor('#ededf0')
+      SymbolGlyph($r('sys.symbol.ellipsis_bubble')).fontSize(19).fontColor([TC.textPrimary()])
+      Text(`评论 · ${this.commentCount}`).fontSize(14).fontColor(TC.textBody())
       Blank()
-      SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(14).fontColor(['#85858f'])
+      SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(14).fontColor([TC.textTertiary()])
     }.width('100%').height(46).padding({ left: 17, right: 17 })
       .onClick(() => this.commentsVisible = true)
   }
@@ -247,32 +250,32 @@ export struct RadioProgramPage {
     NavDestination() {
       Column() {
         Row({ space: 14 }) {
-          SymbolGlyph($r('sys.symbol.chevron_left')).fontSize(24).fontColor(['#ffffff']).onClick(() => this.pageStack.pop())
-          Text('节目详情').fontSize(18).fontColor('#ffffff')
+          SymbolGlyph($r('sys.symbol.chevron_left')).fontSize(24).fontColor([TC.textPrimary()]).onClick(() => this.pageStack.pop())
+          Text('节目详情').fontSize(18).fontColor(TC.textPrimary())
         }.width('100%').height(56 + this.topAvoidHeight).padding({ left: 17, top: this.topAvoidHeight })
         Scroll() {
           Column({ space: 20 }) {
             Image(this.program ? RadioService.cover(this.program) : this.pageParam.cover || '')
               .width(240).height(240).objectFit(ImageFit.Cover).borderRadius(20)
-            Text(this.program?.name || this.pageParam.name || '电台节目').fontSize(23).fontWeight(FontWeight.Bold).fontColor('#ffffff')
-            if (this.loading) { LoadingProgress().width(35).height(35).color('#ef233c') }
+            Text(this.program?.name || this.pageParam.name || '电台节目').fontSize(23).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary())
+            if (this.loading) { LoadingProgress().width(35).height(35).color(TC.accent()) }
             else if (this.message) {
-              Text(this.message).fontSize(13).fontColor('#ff6577')
-              Button('重试').backgroundColor('#303038').onClick(() => this.load())
+              Text(this.message).fontSize(13).fontColor(TC.accentSoft())
+              Button('重试').backgroundColor(TC.surfaceRaised()).onClick(() => this.load())
             } else if (this.program) {
-              Text(RadioService.author(this.program) + ' · ' + RadioService.duration(this.program.duration)).fontSize(13).fontColor('#9999a4')
-              Button(this.playing ? '准备播放…' : '播放节目').backgroundColor('#ef233c').enabled(!this.playing).onClick(() => this.play())
+              Text(RadioService.author(this.program) + ' · ' + RadioService.duration(this.program.duration)).fontSize(13).fontColor(TC.textTertiary())
+              Button(this.playing ? '准备播放…' : '播放节目').backgroundColor(TC.accent()).enabled(!this.playing).onClick(() => this.play())
               if (this.program.radio?.id) {
                 Text('查看电台：' + (this.program.radio.name || '') + ' ›').fontSize(14).fontColor('#ff6577').onClick(() => this.openRadio())
               }
               this.CommentEntry()
-              Text(this.program.description || '暂无节目介绍').width('100%').fontSize(15).lineHeight(26).fontColor('#bcbcc6')
+              Text(this.program.description || '暂无节目介绍').width('100%').fontSize(15).lineHeight(26).fontColor(TC.textBody())
             }
           }.width('100%').padding({ left: 22, right: 22, top: 20, bottom: 40 })
         }.width('100%').layoutWeight(1).scrollBar(BarState.Off)
-      }.width('100%').height('100%').backgroundColor('#121215')
+      }.width('100%').height('100%').backgroundColor(TC.pageBackground())
         .bindSheet(this.commentsVisible, this.CommentsSheet(), {
-          height: '72%', backgroundColor: '#19191f', showClose: false, dragBar: true,
+          height: '72%', backgroundColor: TC.sheetBackground(), showClose: false, dragBar: true,
           onDisappear: () => this.commentsVisible = false
         })
     }.hideTitleBar(true)

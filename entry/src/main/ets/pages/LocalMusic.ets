@@ -5,9 +5,11 @@ import { ApiClient } from '../services/ApiClient'
 import { mapApiSong, SearchResponse } from '../models/api'
 import { songItemType } from '../models/music'
 import { BubbleTip } from '../services/BubbleTip'
+import { TC } from '../services/ThemeColors'
 
 @Component
 export struct LocalMusicPage {
+  @StorageProp('skinVersion') skinVersionObs: number = 0
   @Consume('pageStack') pageStack: NavPathStack
   @Consume('topAvoidHeight') topAvoidHeight: number
   @State tracks: LocalTrack[] = []
@@ -171,28 +173,28 @@ export struct LocalMusicPage {
     Column({ space: 14 }) {
       Row() {
         Text(this.selectedMatch ? '确认关联歌曲' : '手动匹配歌曲').fontSize(19).fontWeight(FontWeight.Bold)
-          .fontColor('#ffffff').layoutWeight(1)
-        Text('关闭').fontSize(14).fontColor('#9999a1').enabled(!this.matching).onClick(() => this.closeMatch())
+          .fontColor(TC.textPrimary()).layoutWeight(1)
+        Text('关闭').fontSize(14).fontColor(TC.textSecondary()).enabled(!this.matching).onClick(() => this.closeMatch())
       }.width('100%')
-      if (this.matchMessage) { Text(this.matchMessage).fontSize(12).fontColor('#ff6577') }
+      if (this.matchMessage) { Text(this.matchMessage).fontSize(12).fontColor(TC.accentSoft()) }
       if (this.selectedMatch) {
-        Text('本地歌曲：' + (this.matchTarget?.name || '')).width('100%').fontSize(13).fontColor('#9999a1')
+        Text('本地歌曲：' + (this.matchTarget?.name || '')).width('100%').fontSize(13).fontColor(TC.textTertiary())
         Row({ space: 12 }) {
           Image(this.selectedMatch.img).width(64).height(64).objectFit(ImageFit.Cover).borderRadius(10)
           Column({ space: 6 }) {
-            Text(this.selectedMatch.name).fontSize(17).fontColor('#ffffff').maxLines(2)
-            Text(this.selectedMatch.author).fontSize(13).fontColor('#aaaaaf').maxLines(2)
-            Text(this.selectedMatch.album || '').fontSize(12).fontColor('#888891').maxLines(2)
+            Text(this.selectedMatch.name).fontSize(17).fontColor(TC.textPrimary()).maxLines(2)
+            Text(this.selectedMatch.author).fontSize(13).fontColor(TC.textBody()).maxLines(2)
+            Text(this.selectedMatch.album || '').fontSize(12).fontColor(TC.textTertiary()).maxLines(2)
           }.layoutWeight(1).alignItems(HorizontalAlign.Start)
-        }.width('100%').padding(14).backgroundColor('#24242a').borderRadius(16)
-        Text('关联信息保存到本机，继续播放原本的音频文件。').width('100%').fontSize(13).fontColor('#9999a1')
-        Button(this.matching ? '正在保存…' : '确认关联').width('100%').backgroundColor('#ef233c')
+        }.width('100%').padding(14).backgroundColor(TC.surfaceInset()).borderRadius(16)
+        Text('关联信息保存到本机，继续播放原本的音频文件。').width('100%').fontSize(13).fontColor(TC.textSecondary())
+        Button(this.matching ? '正在保存…' : '确认关联').width('100%').backgroundColor(TC.accent())
           .enabled(!this.matching).onClick(() => this.confirmMatch())
-        Button('重新选择').width('100%').backgroundColor('#303038').enabled(!this.matching)
+        Button('重新选择').width('100%').backgroundColor(TC.surfaceRaised()).enabled(!this.matching)
           .onClick(() => { this.selectedMatch = undefined; this.matchMessage = '' })
-        if (this.matching) { LoadingProgress().width(30).height(30).color('#ef233c') }
+        if (this.matching) { LoadingProgress().width(30).height(30).color(TC.accent()) }
       } else {
-        Text(this.matchTarget?.name || '').width('100%').fontSize(13).fontColor('#9999a1').maxLines(1)
+        Text(this.matchTarget?.name || '').width('100%').fontSize(13).fontColor(TC.textSecondary()).maxLines(1)
         Search({ value: this.matchQuery, placeholder: '搜索要关联的歌名或歌手' })
           .onChange((value: string) => this.changeMatchQuery(value)).onSubmit(() => this.searchMatches(true))
           .searchButton('搜索').enabled(!this.matching)
@@ -202,23 +204,23 @@ export struct LocalMusicPage {
               Row({ space: 12 }) {
                 Image(song.img).width(46).height(46).objectFit(ImageFit.Cover).borderRadius(8)
                 Column({ space: 5 }) {
-                  Text(song.name).fontSize(15).fontColor('#ffffff').maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
-                  Text(song.author + ' · ' + (song.album || '')).fontSize(12).fontColor('#9999a1').maxLines(1)
+                  Text(song.name).fontSize(15).fontColor(TC.textPrimary()).maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
+                  Text(song.author + ' · ' + (song.album || '')).fontSize(12).fontColor(TC.textTertiary()).maxLines(1)
                     .textOverflow({ overflow: TextOverflow.Ellipsis })
                 }.layoutWeight(1).alignItems(HorizontalAlign.Start)
-                SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(13).fontColor(['#777780'])
+                SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(13).fontColor([TC.textTertiary()])
               }.width('100%').padding({ top: 10, bottom: 10 }).enabled(!this.matching)
                 .onClick(() => { this.selectedMatch = song; this.matchMessage = ''; this.searchGeneration++; this.searching = false })
             }
           }, (song: songItemType) => song.id)
           ListItem() {
             Column() {
-              if (this.searching) { LoadingProgress().width(28).height(28).color('#ef233c') }
+              if (this.searching) { LoadingProgress().width(28).height(28).color(TC.accent()) }
               else if (this.matchMessage) {
-                Text('重新搜索').fontSize(13).fontColor('#ff6577').onClick(() => this.searchMatches(true))
+                Text('重新搜索').fontSize(13).fontColor(TC.accentSoft()).onClick(() => this.searchMatches(true))
               } else if (this.searchMore) {
-                Text('加载更多').fontSize(13).fontColor('#9999a1').onClick(() => this.searchMatches(false))
-              } else if (this.matches.length > 0) { Text('已显示全部结果').fontSize(12).fontColor('#777780') }
+                Text('加载更多').fontSize(13).fontColor(TC.textSecondary()).onClick(() => this.searchMatches(false))
+              } else if (this.matches.length > 0) { Text('已显示全部结果').fontSize(12).fontColor(TC.textTertiary()) }
             }.width('100%').padding(18)
           }
         }.width('100%').layoutWeight(1).scrollBar(BarState.Off).onReachEnd(() => this.searchMatches(false))
@@ -242,51 +244,51 @@ export struct LocalMusicPage {
     NavDestination() {
       Column({ space: 14 }) {
         Row({ space: 14 }) {
-          SymbolGlyph($r('sys.symbol.chevron_left')).fontSize(22).fontColor(['#ffffff']).onClick(() => this.pageStack.pop())
-          Text('本地与下载').fontSize(22).fontWeight(FontWeight.Bold).fontColor('#ffffff').layoutWeight(1)
-          Text('导入').fontSize(14).fontColor('#ef4058').onClick(() => this.importMusic())
+          SymbolGlyph($r('sys.symbol.chevron_left')).fontSize(22).fontColor([TC.textPrimary()]).onClick(() => this.pageStack.pop())
+          Text('本地与下载').fontSize(22).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary()).layoutWeight(1)
+          Text('导入').fontSize(14).fontColor(TC.accentSoft()).onClick(() => this.importMusic())
         }.width('100%')
         TextInput({ text: this.query, placeholder: '查找本地音乐' }).onChange((value: string) => this.query = value)
-          .fontColor('#ffffff').backgroundColor('#222228')
+          .fontColor(TC.textPrimary()).backgroundColor(TC.surfaceInset())
         Row({ space: 16 }) {
-          Text('播放全部 · ' + this.visibleTracks().length).fontSize(14).fontColor('#ffffff')
+          Text('播放全部 · ' + this.visibleTracks().length).fontSize(14).fontColor(TC.textPrimary())
             .layoutWeight(1).onClick(() => this.play(0))
-          Text(this.newest ? '最近添加' : '名称排序').fontSize(12).fontColor('#aaaaaf').onClick(() => this.newest = !this.newest)
-          Text(this.loading ? '扫描中' : '扫描').fontSize(12).fontColor('#ef4058').enabled(!this.loading).onClick(() => this.load())
+          Text(this.newest ? '最近添加' : '名称排序').fontSize(12).fontColor(TC.textBody()).onClick(() => this.newest = !this.newest)
+          Text(this.loading ? '扫描中' : '扫描').fontSize(12).fontColor(TC.accentSoft()).enabled(!this.loading).onClick(() => this.load())
         }.width('100%')
-        if (this.message) { Text(this.message).fontSize(12).fontColor('#ef8795') }
+        if (this.message) { Text(this.message).fontSize(12).fontColor(TC.accentSoft()) }
         List({ space: 8 }) {
           ForEach(this.visibleTracks(), (track: LocalTrack, index: number) => {
             ListItem() {
               Row({ space: 12 }) {
                 if (track.cover) { Image(track.cover).width(42).height(42).borderRadius(6).objectFit(ImageFit.Cover) }
-                else { SymbolGlyph($r('sys.symbol.music')).fontSize(24).fontColor(['#b8b8c0']) }
+                else { SymbolGlyph($r('sys.symbol.music')).fontSize(24).fontColor([TC.textBody()]) }
                 Column({ space: 5 }) {
-                  Text(track.name).fontSize(15).fontColor('#ffffff').maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
+                  Text(track.name).fontSize(15).fontColor(TC.textPrimary()).maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
                   Text(track.artist + ' · ' + track.format.toUpperCase() + ' · ' + (track.size / 1048576).toFixed(1) + ' MB')
-                    .fontSize(11).fontColor('#888891').maxLines(1)
+                    .fontSize(11).fontColor(TC.textTertiary()).maxLines(1)
                   if (!track.persistent) { Text('再次访问可能需要授权').fontSize(10).fontColor('#d59a74') }
                 }.layoutWeight(1).alignItems(HorizontalAlign.Start).onClick(() => this.play(index))
-                SymbolGlyph($r('sys.symbol.ellipsis_circle')).fontSize(21).fontColor(['#aaaaaf']).padding(8)
+                SymbolGlyph($r('sys.symbol.ellipsis_circle')).fontSize(21).fontColor([TC.textBody()]).padding(8)
                   .enabled(!this.matching).bindMenu(this.matchOptions(track))
                 if (!track.managed) {
-                  Text('授权').fontSize(12).fontColor('#aaaaaf').padding(10).onClick(() => this.authorize(track))
+                  Text('授权').fontSize(12).fontColor(TC.textBody()).padding(10).onClick(() => this.authorize(track))
                 }
               }.width('100%').padding({ top: 10, bottom: 10 })
             }
           }, (track: LocalTrack) => track.uri)
           if (!this.loading && this.tracks.length === 0) {
-            ListItem() { Text('下载歌曲或导入本地文件，即可离线播放').fontSize(13).fontColor('#888891').padding({ top: 40 }) }
+            ListItem() { Text('下载歌曲或导入本地文件，即可离线播放').fontSize(13).fontColor(TC.textTertiary()).padding({ top: 40 }) }
           }
         }.width('100%').layoutWeight(1).scrollBar(BarState.Off)
-        Text('重新选择下载目录').fontSize(12).fontColor('#9999a4').onClick(async () => {
+        Text('重新选择下载目录').fontSize(12).fontColor(TC.textSecondary()).onClick(async () => {
           try { await LocalLibrary.chooseDirectory(this.context()); await this.load() }
           catch (error) { this.message = error instanceof Error ? error.message : '目录授权失败' }
         })
       }.width('100%').height('100%').padding({ top: this.topAvoidHeight + 12, left: 20, right: 20, bottom: 24 })
-        .backgroundColor('#121215')
+        .backgroundColor(TC.pageBackground())
         .bindSheet(this.matchVisible, this.MatchSheet(), {
-          height: '74%', backgroundColor: '#19191f', showClose: false, dragBar: true,
+          height: '74%', backgroundColor: TC.sheetBackground(), showClose: false, dragBar: true,
           onDisappear: () => this.closeMatch()
         })
     }.hideTitleBar(true).onShown(() => this.load())

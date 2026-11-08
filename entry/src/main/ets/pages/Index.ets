@@ -65,10 +65,12 @@ import { playerController } from '../services/PlayerController'
 import { AppSettings } from '../services/AppSettings'
 import { common } from '@kit.AbilityKit'
 import { window } from '@kit.ArkUI'
+import { TC } from '../services/ThemeColors'
 
 @Entry
 @Component
 struct HomeIndex {
+  @StorageProp('skinVersion') skinVersionObs: number = 0
   @Provide('pageStack') pageStack: NavPathStack = new NavPathStack()
   @Provide('authStore') authStore: AuthStore = new AuthStore()
   @Provide('playerStore') playerStore: PlayerStore = new PlayerStore()
@@ -220,14 +222,14 @@ struct HomeIndex {
           Column()
             .width(30)
             .height(30)
-            .backgroundColor('#ef233c')
+            .backgroundColor(TC.accent())
             .borderRadius(15)
             .shadow({ radius: 10, color: 'rgba(239,35,60,0.28)', offsetY: 4 })
         }
         Image(item.icon)
           .width(21)
           .height(21)
-          .fillColor(item.name === this.currentName ? Color.White : '#77777f')
+          .fillColor(item.name === this.currentName ? TC.textOnAccent() : TC.textTertiary())
       }
       .width(36)
       .height(30)
@@ -235,7 +237,7 @@ struct HomeIndex {
 
       Text(item.title)
         .fontSize(10)
-        .fontColor(item.name === this.currentName ? '#ffffff' : '#77777f')
+        .fontColor(item.name === this.currentName ? TC.textPrimary() : TC.textTertiary())
         .fontWeight(item.name === this.currentName ? FontWeight.Medium : FontWeight.Regular)
     }
     .width('100%')
@@ -263,7 +265,7 @@ struct HomeIndex {
             }
             .tabBar(this.getTabBar(item))
             .padding({ top: item.name === 'mine' ? 0 : this.topAvoidHeight })
-            .backgroundColor('#121215')
+            .backgroundColor(TC.pageBackground())
           })
         }
         .barHeight(60)
@@ -289,7 +291,7 @@ struct HomeIndex {
       }
       .width('100%')
       .height('100%')
-      .backgroundColor('#121215')
+      .backgroundColor(TC.pageBackground())
     }
     .hideTitleBar(true)
     .mode(NavigationMode.Stack)

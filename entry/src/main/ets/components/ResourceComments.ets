@@ -3,6 +3,7 @@ import { UserProfilePageParam } from '../models/api'
 import { AuthStore } from '../stores/AuthStore'
 import { BubbleTip } from '../services/BubbleTip'
 import { CommentService } from '../services/CommentService'
+import { TC } from '../services/ThemeColors'
 
 interface CommentLocation {
   page: number
@@ -18,6 +19,7 @@ interface CommentCountGuard {
 
 @Component
 export struct ResourceComments {
+  @StorageProp('skinVersion') skinVersionObs: number = 0
   @Consume('authStore') authStore: AuthStore
   @Consume('pageStack') pageStack: NavPathStack
   @Prop @Watch('resourceChanged') resource: CommentResource = { id: '', type: 0 }
@@ -436,7 +438,7 @@ export struct ResourceComments {
     this.getUIContext().showAlertDialog({
       title: '删除评论', message: '确定删除这条评论？',
       primaryButton: { value: '取消', action: () => {} },
-      secondaryButton: { value: '删除', fontColor: '#ef233c', action: () => {
+      secondaryButton: { value: '删除', fontColor: TC.accent(), action: () => {
         if (this.stillCurrent(generation)) { this.remove(item) }
       } }
     })
@@ -497,9 +499,9 @@ export struct ResourceComments {
   @Builder
   private SortOption(label: string, sort: number) {
     Column({ space: 5 }) {
-      Text(label).fontSize(13).fontColor(this.sortType === sort ? '#ffffff' : '#85858f')
+      Text(label).fontSize(13).fontColor(this.sortType === sort ? TC.textPrimary() : TC.textTertiary())
         .fontWeight(this.sortType === sort ? FontWeight.Medium : FontWeight.Regular)
-      Column().width(20).height(2).borderRadius(1).backgroundColor(this.sortType === sort ? '#ef233c' : 'transparent')
+      Column().width(20).height(2).borderRadius(1).backgroundColor(this.sortType === sort ? TC.accent() : 'transparent')
     }.padding({ left: 14, right: 14, top: 5, bottom: 5 }).onClick(() => this.selectSort(sort))
   }
 
@@ -510,27 +512,27 @@ export struct ResourceComments {
         .onClick(() => this.openUser(item))
       Column({ space: 8 }) {
         Row({ space: 10 }) {
-          Text(item.user.nickname || '云音乐用户').fontSize(13).fontColor('#aaaab3').layoutWeight(1).maxLines(1)
+          Text(item.user.nickname || '云音乐用户').fontSize(13).fontColor(TC.textBody()).layoutWeight(1).maxLines(1)
           if (this.owned(item)) {
-            SymbolGlyph($r('sys.symbol.trash')).fontSize(16).fontColor(['#777781'])
+            SymbolGlyph($r('sys.symbol.trash')).fontSize(16).fontColor([TC.textTertiary()])
               .padding(4).enabled(!this.deleting && !this.submitting).onClick(() => this.confirmDelete(item))
           }
           Row({ space: 4 }) {
             SymbolGlyph(item.liked ? $r('sys.symbol.heart_fill') : $r('sys.symbol.heart'))
-              .fontSize(17).fontColor([item.liked ? '#ef233c' : '#777781'])
-            Text((item.likedCount || 0).toString()).fontSize(11).fontColor(item.liked ? '#ef233c' : '#777781')
+              .fontSize(17).fontColor([item.liked ? TC.accent() : TC.textTertiary()])
+            Text((item.likedCount || 0).toString()).fontSize(11).fontColor(item.liked ? TC.accent() : TC.textTertiary())
           }.padding(4).enabled(!this.liking.includes(item.commentId)).onClick(() => this.toggleLike(item))
         }.width('100%')
-        Text(item.content || '').width('100%').fontSize(14).fontColor('#eeeeF2').lineHeight(22)
+        Text(item.content || '').width('100%').fontSize(14).fontColor(TC.textBody()).lineHeight(22)
           .onClick(() => this.startReply(item))
         if ((item.beReplied || []).length > 0 && item.beReplied![0].content) {
           Text(`回复 ${item.beReplied![0].user?.nickname || '用户'}：${item.beReplied![0].content || ''}`)
-            .width('100%').fontSize(12).fontColor('#93939d').lineHeight(19).maxLines(3)
-            .padding(10).backgroundColor('#24242b').borderRadius(8)
+            .width('100%').fontSize(12).fontColor(TC.textSecondary()).lineHeight(19).maxLines(3)
+            .padding(10).backgroundColor(TC.surfaceInset()).borderRadius(8)
         }
         Row({ space: 14 }) {
-          Text(this.formatTime(item)).fontSize(10).fontColor('#666670').layoutWeight(1)
-          Text('回复').fontSize(12).fontColor('#9999a3').onClick(() => this.startReply(item))
+          Text(this.formatTime(item)).fontSize(10).fontColor(TC.textTertiary()).layoutWeight(1)
+          Text('回复').fontSize(12).fontColor(TC.textSecondary()).onClick(() => this.startReply(item))
           if (!root && !this.floorRoot) {
             Text(this.replies(item) > 0 ? `${this.replies(item)} 条回复 ›` : '查看回复')
               .fontSize(12).fontColor('#97b9e5').onClick(() => this.openFloor(item))
@@ -555,12 +557,12 @@ export struct ResourceComments {
     // Read observable fields here; primitive @Builder parameters retain their initial values.
     if (this.floorRoot ? this.floorLoading : this.loading) {
       Row({ space: 8 }) {
-        LoadingProgress().width(20).height(20).color('#ef233c')
-        Text('加载中…').fontSize(12).fontColor('#777781')
+        LoadingProgress().width(20).height(20).color(TC.accent())
+        Text('加载中…').fontSize(12).fontColor(TC.textTertiary())
       }.width('100%').height(52).justifyContent(FlexAlign.Center)
     } else if (this.floorRoot ? this.floorError.length > 0 : this.error.length > 0) {
       Text((this.floorRoot ? this.floorError : this.error) + ' · 点击重试')
-        .fontSize(12).fontColor('#777781').width('100%').textAlign(TextAlign.Center)
+        .fontSize(12).fontColor(TC.textTertiary()).width('100%').textAlign(TextAlign.Center)
         .padding({ left: 16, right: 16, top: 18, bottom: 18 })
         .onClick(() => {
           if (this.floorRoot) { this.loadFloor(this.floorComments.length === 0) }
@@ -569,11 +571,11 @@ export struct ResourceComments {
     } else if (this.floorRoot ? this.floorComments.length === 0 : this.comments.length === 0) {
       if (!this.sentEcho) {
         Text(this.floorRoot ? '还没有回复，来说两句吧' : '还没有评论，来说两句吧')
-          .fontSize(13).fontColor('#777781').width('100%').textAlign(TextAlign.Center).padding(30)
+          .fontSize(13).fontColor(TC.textTertiary()).width('100%').textAlign(TextAlign.Center).padding(30)
       }
     } else {
       Text((this.floorRoot ? this.floorMore : this.more) ? '继续加载' : '没有更多评论了')
-        .fontSize(12).fontColor('#777781').width('100%').height(52).textAlign(TextAlign.Center)
+        .fontSize(12).fontColor(TC.textTertiary()).width('100%').height(52).textAlign(TextAlign.Center)
         .onClick(() => { if (this.floorRoot) { this.loadFloor() } else { this.load() } })
     }
   }
@@ -582,17 +584,17 @@ export struct ResourceComments {
     Column() {
       Row({ space: 10 }) {
         if (this.floorRoot) {
-          SymbolGlyph($r('sys.symbol.chevron_left')).fontSize(20).fontColor(['#ffffff']).padding(4)
+          SymbolGlyph($r('sys.symbol.chevron_left')).fontSize(20).fontColor([TC.textPrimary()]).padding(4)
             .onClick(() => this.closeFloor())
         }
         Column({ space: 4 }) {
           Text(this.floorRoot ? `回复 (${this.floorTotal})` : `评论 (${this.total})`)
-            .fontSize(18).fontWeight(FontWeight.Bold).fontColor('#ffffff')
+            .fontSize(18).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary())
           if (!this.floorRoot && this.resource.title) {
-            Text(this.resource.title || '').fontSize(11).fontColor('#777781').maxLines(1)
+            Text(this.resource.title || '').fontSize(11).fontColor(TC.textTertiary()).maxLines(1)
           }
         }.layoutWeight(1).alignItems(HorizontalAlign.Start)
-        SymbolGlyph($r('sys.symbol.xmark')).fontSize(20).fontColor(['#aaaaB2']).padding(8).onClick(() => this.onClose())
+        SymbolGlyph($r('sys.symbol.xmark')).fontSize(20).fontColor([TC.textBody()]).padding(8).onClick(() => this.onClose())
       }.width('100%').padding({ left: 16, right: 12, top: 10, bottom: 8 })
       if (!this.floorRoot) {
         Row() {
@@ -607,13 +609,13 @@ export struct ResourceComments {
           ForEach([this.floorRoot], (item: ResourceComment) => {
             ListItem() { this.CommentRow(item, true) }
           }, (item: ResourceComment) => 'root:' + this.commentRowKey(item))
-          ListItem() { Divider().color('#303039').margin({ left: 16, right: 16 }) }
+          ListItem() { Divider().color(TC.textQuaternary()).margin({ left: 16, right: 16 }) }
         }
         if (this.sentEcho) {
           ListItem() {
             Column({ space: 6 }) {
-              Text('刚刚发布').fontSize(11).fontColor('#9999a3')
-              Text(this.sentEcho).fontSize(14).fontColor('#eeeeF2').width('100%')
+              Text('刚刚发布').fontSize(11).fontColor(TC.textSecondary())
+              Text(this.sentEcho).fontSize(14).fontColor(TC.textBody()).width('100%')
             }.width('100%').alignItems(HorizontalAlign.Start).padding(16)
           }
         }
@@ -632,21 +634,21 @@ export struct ResourceComments {
       Column({ space: 7 }) {
         if (this.replyTo) {
           Row() {
-            Text(`回复 ${this.replyTo.user.nickname || '用户'}`).fontSize(11).fontColor('#9999a3').layoutWeight(1)
+            Text(`回复 ${this.replyTo.user.nickname || '用户'}`).fontSize(11).fontColor(TC.textSecondary()).layoutWeight(1)
             if (this.replyTo.commentId !== this.floorRoot?.commentId) {
-              Text('取消').fontSize(11).fontColor('#9999a3').onClick(() => this.replyTo = this.floorRoot)
+              Text('取消').fontSize(11).fontColor(TC.textSecondary()).onClick(() => this.replyTo = this.floorRoot)
             }
           }.width('100%')
         }
         Row({ space: 10 }) {
           TextInput({ text: this.input, placeholder: this.replyTo ? '写下你的回复…' : '写下你的评论…' })
-            .layoutWeight(1).height(42).fontSize(14).fontColor('#ffffff').placeholderColor('#777781')
-            .backgroundColor('#292930').borderRadius(21).maxLength(1400)
+            .layoutWeight(1).height(42).fontSize(14).fontColor(TC.textPrimary()).placeholderColor(TC.textTertiary())
+            .backgroundColor(TC.chipBackground()).borderRadius(21).maxLength(1400)
             .onChange((value: string) => this.input = value).onSubmit(() => this.submit())
-          Button(this.submitting ? '发送中' : '发送').height(38).fontSize(13).backgroundColor('#ef233c')
+          Button(this.submitting ? '发送中' : '发送').height(38).fontSize(13).backgroundColor(TC.accent())
             .enabled(!this.submitting && !this.deleting && this.input.trim().length > 0).onClick(() => this.submit())
         }.width('100%')
       }.width('100%').padding({ left: 16, right: 16, top: 16, bottom: 16 })
-    }.width('100%').height('100%').backgroundColor('#1b1b20')
+    }.width('100%').height('100%').backgroundColor(TC.surfaceCard())
   }
 }

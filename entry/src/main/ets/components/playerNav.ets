@@ -1,6 +1,9 @@
 import { songs } from '../constants/MusicConstants'
+import { TC } from '../services/ThemeColors'
+
 @Component
 struct PlayerNav {
+  @StorageProp('skinVersion') skinVersionObs: number = 0
   build() {
     Row() {
       Row({space:10}) {
@@ -9,10 +12,10 @@ struct PlayerNav {
           .aspectRatio(1)
         Column() {
           Text(songs[0].name)
-            .fontColor('#fff')
+            .fontColor(TC.textPrimary())
           Text(songs[0].author)
             .fontSize(12)
-            .fontColor('#ccc')
+            .fontColor(TC.textSecondary())
         }.alignItems(HorizontalAlign.Start)
       }.height('100%')
       .alignItems(VerticalAlign.Center)

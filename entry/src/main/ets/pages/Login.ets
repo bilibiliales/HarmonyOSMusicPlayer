@@ -2,6 +2,7 @@ import { ApiClient } from '../services/ApiClient'
 import { AppSettings } from '../services/AppSettings'
 import { AuthStore } from '../stores/AuthStore'
 import { CellphoneExistenceResponse, LoginResponse, LoginStatusResponse, QrCheckResponse, QrKeyResponse } from '../models/api'
+import { TC } from '../services/ThemeColors'
 
 interface LoginMethodItem {
   key: string
@@ -10,6 +11,7 @@ interface LoginMethodItem {
 
 @Component
 export struct Login {
+  @StorageProp('skinVersion') skinVersionObs: number = 0
   @Consume('pageStack') pageStack: NavPathStack
   @Consume('topAvoidHeight') topAvoidHeight: number
   @Consume('authStore') authStore: AuthStore
@@ -284,12 +286,12 @@ export struct Login {
       Text(item.title)
         .fontSize(14)
         .fontWeight(this.currentMethod === item.key ? FontWeight.Bold : FontWeight.Regular)
-        .fontColor(this.currentMethod === item.key ? '#ffffff' : '#77777f')
+        .fontColor(this.currentMethod === item.key ? TC.textPrimary() : TC.textTertiary())
       Column()
         .width(this.currentMethod === item.key ? 24 : 0)
         .height(3)
         .borderRadius(2)
-        .backgroundColor('#ff3b4f')
+        .backgroundColor(TC.accent())
         .animation({ duration: 180, curve: Curve.EaseOut })
     }
     .layoutWeight(1)
@@ -309,9 +311,9 @@ export struct Login {
     TextInput({ text: value, placeholder: placeholder })
       .type(type)
       .height(52)
-      .fontColor('#ffffff')
-      .placeholderColor('#696972')
-      .backgroundColor('#202026')
+      .fontColor(TC.textPrimary())
+      .placeholderColor(TC.textQuaternary())
+      .backgroundColor(TC.surfaceCardAlt())
       .borderRadius(14)
       .padding({ left: 16, right: 16 })
       .onChange(onChange)
@@ -324,17 +326,17 @@ export struct Login {
         .type(InputType.Number)
         .layoutWeight(1)
         .height(52)
-        .fontColor('#ffffff')
-        .placeholderColor('#696972')
-        .backgroundColor('#202026')
+        .fontColor(TC.textPrimary())
+        .placeholderColor(TC.textQuaternary())
+        .backgroundColor(TC.surfaceCardAlt())
         .borderRadius(14)
         .padding({ left: 16, right: 16 })
         .onChange((value: string) => this.captcha = value)
       Button(this.countdown > 0 ? `${this.countdown}s` : '获取验证码')
         .height(52)
         .fontSize(13)
-        .fontColor('#ff6577')
-        .backgroundColor('#2b2024')
+        .fontColor(TC.accentSoft())
+        .backgroundColor(TC.accentContainer())
         .borderRadius(14)
         .enabled(this.countdown <= 0)
         .onClick(() => this.sendCaptcha(!this.registrationMode))
@@ -348,13 +350,13 @@ export struct Login {
         Row() {
           SymbolGlyph($r('sys.symbol.chevron_left'))
             .fontSize(24)
-            .fontColor(['#ffffff'])
+            .fontColor([TC.textPrimary()])
             .onClick(() => this.pageStack.pop())
           Text(this.registrationMode ? '完善账号信息' : '手机号登录')
             .layoutWeight(1)
             .fontSize(18)
             .fontWeight(FontWeight.Bold)
-            .fontColor('#ffffff')
+            .fontColor(TC.textPrimary())
             .textAlign(TextAlign.Center)
           Column().width(24)
         }
@@ -368,12 +370,12 @@ export struct Login {
               Stack() {
                 Image($r('app.media.ic_logo')).width(38).height(38).fillColor('#ffffff')
               }
-              .width(72).height(72).borderRadius(22).backgroundColor('#ef233c')
+              .width(72).height(72).borderRadius(22).backgroundColor(TC.accent())
               .shadow({ radius: 18, color: 'rgba(239,35,60,0.32)', offsetY: 8 })
               Text(this.registrationMode ? '注册「网易云音乐」账号' : '登录「网易云音乐」账号')
-                .fontSize(22).fontWeight(FontWeight.Bold).fontColor('#ffffff')
+                .fontSize(22).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary())
               Text(this.registrationMode ? '验证码通过后会直接创建账号并登录' : '仅支持中国大陆手机号登录')
-                .fontSize(12).fontColor('#85858e').textAlign(TextAlign.Center)
+                .fontSize(12).fontColor(TC.textTertiary()).textAlign(TextAlign.Center)
             }
             .width('100%')
 
@@ -381,15 +383,15 @@ export struct Login {
               Row() {
                 ForEach(this.methods, (item: LoginMethodItem) => this.MethodTab(item))
               }
-              .width('100%').backgroundColor('#18181d').borderRadius(14)
+              .width('100%').backgroundColor(TC.surfaceCardAlt()).borderRadius(14)
             }
 
             if (this.registrationMode) {
               Column({ space: 12 }) {
                 Row() {
-                  Text(this.phone).fontSize(16).fontWeight(FontWeight.Bold).fontColor('#ffffff')
+                  Text(this.phone).fontSize(16).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary())
                   Text('更换手机号')
-                    .layoutWeight(1).fontSize(12).fontColor('#ff6577').textAlign(TextAlign.End)
+                    .layoutWeight(1).fontSize(12).fontColor(TC.accentSoft()).textAlign(TextAlign.End)
                     .onClick(() => {
                       this.registrationMode = false
                       this.phone = ''
@@ -397,13 +399,13 @@ export struct Login {
                       this.message = ''
                     })
                 }
-                .width('100%').padding(16).backgroundColor('#202026').borderRadius(14)
+                .width('100%').padding(16).backgroundColor(TC.surfaceCardAlt()).borderRadius(14)
                 this.CaptchaField()
                 this.Field(this.nickname, '设置昵称', InputType.Normal, (value: string) => this.nickname = value)
                 this.Field(this.password, '设置密码（至少 6 位）', InputType.Password,
                   (value: string) => this.password = value)
                 Button(this.loading ? '创建中…' : '完成并登录')
-                  .width('100%').height(50).borderRadius(25).backgroundColor('#ef233c')
+                  .width('100%').height(50).borderRadius(25).backgroundColor(TC.accent())
                   .enabled(!this.loading).onClick(() => this.completeRegistration())
               }
             } else if (this.currentMethod === 'password') {
@@ -411,7 +413,7 @@ export struct Login {
                 this.Field(this.phone, '手机号码', InputType.PhoneNumber, (value: string) => this.phone = value)
                 this.Field(this.password, '密码', InputType.Password, (value: string) => this.password = value)
                 Button(this.loading ? '登录中…' : '登录')
-                  .width('100%').height(50).borderRadius(25).backgroundColor('#ef233c')
+                  .width('100%').height(50).borderRadius(25).backgroundColor(TC.accent())
                   .enabled(!this.loading).onClick(() => this.passwordLogin())
               }
             } else if (this.currentMethod === 'captcha') {
@@ -419,7 +421,7 @@ export struct Login {
                 this.Field(this.phone, '手机号码', InputType.PhoneNumber, (value: string) => this.phone = value)
                 this.CaptchaField()
                 Button(this.loading ? '登录中…' : '验证码登录')
-                  .width('100%').height(50).borderRadius(25).backgroundColor('#ef233c')
+                  .width('100%').height(50).borderRadius(25).backgroundColor(TC.accent())
                   .enabled(!this.loading).onClick(() => this.captchaLogin())
               }
             } else {
@@ -427,10 +429,10 @@ export struct Login {
                 if (this.qrUrl) {
                   QRCode(this.qrUrl).width(210).height(210).color('#121215').backgroundColor('#ffffff')
                 } else {
-                  LoadingProgress().width(48).height(48).color('#ef233c')
+                  LoadingProgress().width(48).height(48).color(TC.accent())
                 }
-                Text(this.qrStatus).fontSize(13).fontColor('#a1a1a8')
-                Button('刷新二维码').fontColor('#ff6577').backgroundColor('#2b2024')
+                Text(this.qrStatus).fontSize(13).fontColor(TC.textBody())
+                Button('刷新二维码').fontColor(TC.accentSoft()).backgroundColor(TC.accentContainer())
                   .onClick(() => this.createQrCode())
               }
               .width('100%').height(310).justifyContent(FlexAlign.Center)
@@ -438,17 +440,17 @@ export struct Login {
 
             if (this.message) {
               Text(this.message)
-                .width('100%').fontSize(12).fontColor('#ff6577').textAlign(TextAlign.Center)
+                .width('100%').fontSize(12).fontColor(TC.accentSoft()).textAlign(TextAlign.Center)
             }
 
             Text('服务地址请在侧边栏的“设置”页面中修改')
-              .width('100%').fontSize(11).fontColor('#55555d').textAlign(TextAlign.Center)
+              .width('100%').fontSize(11).fontColor(TC.textQuaternary()).textAlign(TextAlign.Center)
           }
           .padding({ left: 24, right: 24, top: 12, bottom: 36 })
         }
         .layoutWeight(1)
       }
-      .width('100%').height('100%').backgroundColor('#121215')
+      .width('100%').height('100%').backgroundColor(TC.pageBackground())
     }
     .hideTitleBar(true)
   }

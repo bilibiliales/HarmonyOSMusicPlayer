@@ -1,9 +1,11 @@
 import { LyricPreferences } from '../models/lyricPreferences'
 import { AppSettings } from '../services/AppSettings'
 import { BubbleTip } from '../services/BubbleTip'
+import { TC } from '../services/ThemeColors'
 
 @Component
 export struct LyricSettingsSheet {
+  @StorageProp('skinVersion') skinVersionObs: number = 0
   value: LyricPreferences = new LyricPreferences()
   onPreview: (value: LyricPreferences) => void = () => {}
   onClose: () => void = () => {}
@@ -41,7 +43,7 @@ export struct LyricSettingsSheet {
       title: '恢复默认设置',
       message: '确定将歌词显示设置恢复为默认值？',
       primaryButton: { value: '取消', action: () => {} },
-      secondaryButton: { value: '恢复', fontColor: '#ef233c', action: () => { this.restoreDefaults() } }
+      secondaryButton: { value: '恢复', fontColor: TC.accent(), action: () => { this.restoreDefaults() } }
     })
   }
 
@@ -61,7 +63,7 @@ export struct LyricSettingsSheet {
   private Control(title: string, value: number, min: number, max: number, step: number,
     change: (value: number) => void) {
     Column() {
-      Text(title).width('100%').fontSize(13).fontColor('#d9d9df')
+      Text(title).width('100%').fontSize(13).fontColor(TC.textBody())
       Slider({ value: value, min: min, max: max, step: step })
         .selectedColor(this.color).onChange((value: number) => { change(value); this.onPreview(this.current()) })
     }.width('100%')
@@ -70,11 +72,11 @@ export struct LyricSettingsSheet {
   build() {
     Column({ space: 12 }) {
       Row() {
-        Text('歌词显示设置').fontSize(20).fontWeight(FontWeight.Bold).fontColor('#ffffff')
+        Text('歌词显示设置').fontSize(20).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary())
         Blank()
         SymbolGlyph($r('sys.symbol.arrow_counterclockwise'))
           .fontSize(22)
-          .fontColor(['#9a9aa2'])
+          .fontColor([TC.textSecondary()])
           .padding({ left: 14, right: 2, top: 6, bottom: 6 })
           .onClick(() => this.confirmRestore())
       }.width('100%')
@@ -86,8 +88,8 @@ export struct LyricSettingsSheet {
           this.Control('动画幅度 · ' + this.amplitude.toFixed(1), this.amplitude, 0, 2, 0.1, (v: number) => this.amplitude = v)
           this.Control('时间偏移 · ' + this.timeOffset.toFixed(1) + ' 秒', this.timeOffset, -4, 4, 0.1,
             (v: number) => this.timeOffset = Math.round(v * 10) / 10)
-          Text('正值提前显示歌词，负值延后显示').fontSize(11).fontColor('#96969f')
-          Text('高亮颜色').width('100%').fontSize(13).fontColor('#d9d9df')
+          Text('正值提前显示歌词，负值延后显示').fontSize(11).fontColor(TC.textSecondary())
+          Text('高亮颜色').width('100%').fontSize(13).fontColor(TC.textBody())
           Row({ space: 16 }) {
             ForEach(['#ef233c', '#ffffff', '#ffd166', '#66ddaa', '#69b9ff', '#cda0ff'], (color: string) => {
               Circle().width(30).height(30).fill(color).stroke(this.color === color ? '#ffffff' : '#55555d')
@@ -98,7 +100,7 @@ export struct LyricSettingsSheet {
         }.width('100%')
       }.layoutWeight(1)
       Button(this.saving ? '保存中…' : '保存').width('100%').enabled(!this.saving)
-        .backgroundColor('#ef233c').onClick(() => this.save())
+        .backgroundColor(TC.accent()).onClick(() => this.save())
     }.width('100%').height('100%').padding(20)
   }
 }

@@ -4,6 +4,7 @@ import { photoAccessHelper } from '@kit.MediaLibraryKit'
 import { http } from '@kit.NetworkKit'
 import { playlistType } from '../models/music'
 import { BubbleTip } from '../services/BubbleTip'
+import { TC } from '../services/ThemeColors'
 
 export interface PlaylistCoverPreviewPageParam {
   playlist: playlistType;
@@ -19,6 +20,7 @@ export interface PlaylistCoverPreviewPageParam {
 
 @Component
 export struct PlaylistCoverPreview {
+  @StorageProp('skinVersion') skinVersionObs: number = 0
   @Consume('pageStack') pageStack: NavPathStack
   @Consume('topAvoidHeight') topAvoidHeight: number
   @State playlist: playlistType = { id: '', name: '', cover: '', count: 0, creator: '' }
@@ -121,18 +123,18 @@ export struct PlaylistCoverPreview {
         // 背景图像
         Image(this.playlist.cover).width('100%').height('100%').objectFit(ImageFit.Cover).blur(48).opacity(0.55)
         Column().width('100%').height('100%')
-          .linearGradient({ angle: 180, colors: [['rgba(15,15,20,0.22)', 0], ['#121215', 1]] })
+          .linearGradient({ angle: 180, colors: [[TC.headerScrimTop(), 0], [TC.pageBackground(), 1]] })
 
         Column() {
           Column().width('100%').height(this.topAvoidHeight)
           // 顶部导航栏
           Row() {
-            SymbolGlyph($r('sys.symbol.chevron_left')).fontSize(24).fontColor(['#ffffff'])
+            SymbolGlyph($r('sys.symbol.chevron_left')).fontSize(24).fontColor([TC.textPrimary()])
               .onClick(() => this.pageStack.pop())
             Text(this.pageParam.contentType === 'style' ? '曲风介绍' : '封面预览').layoutWeight(1).fontSize(17).fontWeight(FontWeight.Bold)
-              .fontColor('#ffffff').textAlign(TextAlign.Center)
+              .fontColor(TC.textPrimary()).textAlign(TextAlign.Center)
             // 添加更多选项按钮（留空占位）
-            SymbolGlyph($r('sys.symbol.ellipsis_circle')).fontSize(22).fontColor(['#ffffff']).visibility(Visibility.Hidden)
+            SymbolGlyph($r('sys.symbol.ellipsis_circle')).fontSize(22).fontColor([TC.textPrimary()]).visibility(Visibility.Hidden)
           }
           .width('100%').height(56)
 
@@ -144,34 +146,34 @@ export struct PlaylistCoverPreview {
                 .shadow({ radius: 18, color: 'rgba(0,0,0,0.32)', offsetY: 8 })
 
               // 大标题
-              Text(this.playlist.name).fontSize(24).fontWeight(FontWeight.Bold).fontColor('#ffffff').maxLines(3)
+              Text(this.playlist.name).fontSize(24).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary()).maxLines(3)
                 .margin({ top: 24 })
 
               // 统计信息
               if (this.pageParam.contentType === 'style') {
                 Row({ space: 20 }) {
                   if (this.pageParam.songCountText) {
-                    Text(this.pageParam.songCountText + ' 首歌曲').fontSize(12).fontColor('#d0d0d5')
+                    Text(this.pageParam.songCountText + ' 首歌曲').fontSize(12).fontColor(TC.textBody())
                   }
                   if (this.pageParam.artistCountText) {
-                    Text(this.pageParam.artistCountText + ' 位歌手').fontSize(12).fontColor('#d0d0d5')
+                    Text(this.pageParam.artistCountText + ' 位歌手').fontSize(12).fontColor(TC.textBody())
                   }
                 }.margin({ top: 12 })
               } else {
                 Row({ space: 20 }) {
                   if (this.pageParam.contentType !== 'album') {
                   Row({ space: 6 }) {
-                    SymbolGlyph($r('sys.symbol.play_fill')).fontSize(16).fontColor(['#d0d0d5'])
-                    Text(`${this.formatCount(this.playCount)} 播放`).fontSize(12).fontColor('#d0d0d5')
+                    SymbolGlyph($r('sys.symbol.play_fill')).fontSize(16).fontColor([TC.textBody()])
+                    Text(`${this.formatCount(this.playCount)} 播放`).fontSize(12).fontColor(TC.textBody())
                   }
                   }
                   Row({ space: 6 }) {
-                    SymbolGlyph($r('sys.symbol.heart')).fontSize(16).fontColor(['#d0d0d5'])
-                    Text(`${this.formatCount(this.collectCount)} 收藏`).fontSize(12).fontColor('#d0d0d5')
+                    SymbolGlyph($r('sys.symbol.heart')).fontSize(16).fontColor([TC.textBody()])
+                    Text(`${this.formatCount(this.collectCount)} 收藏`).fontSize(12).fontColor(TC.textBody())
                   }
                   Row({ space: 6 }) {
-                    SymbolGlyph($r('sys.symbol.ellipsis_bubble')).fontSize(16).fontColor(['#d0d0d5'])
-                    Text(`${this.formatCount(this.commentCount)} 评论`).fontSize(12).fontColor('#d0d0d5')
+                    SymbolGlyph($r('sys.symbol.ellipsis_bubble')).fontSize(16).fontColor([TC.textBody()])
+                    Text(`${this.formatCount(this.commentCount)} 评论`).fontSize(12).fontColor(TC.textBody())
                   }
                 }
                 .margin({ top: 12 })
@@ -182,9 +184,9 @@ export struct PlaylistCoverPreview {
                 Flex({ direction: FlexDirection.Row, wrap: FlexWrap.Wrap, justifyContent: FlexAlign.Start,
                   alignItems: ItemAlign.Center }) {
                   ForEach(this.tags, (tag: string, index: number) => {
-                    Text(tag).fontSize(12).fontColor('#ffffff')
+                    Text(tag).fontSize(12).fontColor(TC.textPrimary())
                       .padding({ left: 12, right: 12, top: 6, bottom: 6 })
-                      .backgroundColor('#333339').borderRadius(16)
+                      .backgroundColor(TC.surfaceRaised()).borderRadius(16)
                       .margin(4)
                   })
                 }
@@ -194,22 +196,22 @@ export struct PlaylistCoverPreview {
 
               // 描述文字
               if (this.description && this.description.length > 0) {
-                Text(this.description).width('100%').fontSize(14).lineHeight(24).fontColor('#a9a9b0')
+                Text(this.description).width('100%').fontSize(14).lineHeight(24).fontColor(TC.textQuaternary())
                   .padding({ top: 16, left: 6, right: 6 })
               }
 
               Button() {
                 Row({ space: 8 }) {
                   if (this.coverSaving) {
-                    LoadingProgress().width(18).height(18).color('#ffffff')
+                    LoadingProgress().width(18).height(18).color(TC.textPrimary())
                   } else {
-                    SymbolGlyph($r('sys.symbol.arrow_down_circle')).fontSize(18).fontColor(['#ffffff'])
+                    SymbolGlyph($r('sys.symbol.arrow_down_circle')).fontSize(18).fontColor([TC.textPrimary()])
                   }
                   Text(this.coverSaving ? '正在保存…' : '保存封面')
-                    .fontColor('#ffffff').fontSize(16).fontWeight(FontWeight.Medium)
+                    .fontColor(TC.textPrimary()).fontSize(16).fontWeight(FontWeight.Medium)
                 }
               }
-              .width(200).height(44).backgroundColor('#ef233c').borderRadius(22)
+              .width(200).height(44).backgroundColor(TC.accent()).borderRadius(22)
               .margin({ top: 32 }).enabled(!this.coverSaving && this.playlist.cover.length > 0)
               .onClick(() => this.saveCoverToGallery())
             }
@@ -218,7 +220,7 @@ export struct PlaylistCoverPreview {
         }
         .width('100%').height('100%').padding({ left: 18, right: 18 })
       }
-      .width('100%').height('100%').backgroundColor('#121215')
+      .width('100%').height('100%').backgroundColor(TC.pageBackground())
     }
     .hideTitleBar(true)
   }

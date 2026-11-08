@@ -3,9 +3,11 @@ import { deviceInfo } from '@kit.BasicServicesKit'
 import { PlayerStore } from '../stores/PlayerStore'
 import { playerController } from '../services/PlayerController'
 import { VinylRecord } from './VinylRecord'
+import { TC } from '../services/ThemeColors'
 
 @Component
 export struct FloatingMusicCard {
+  @StorageProp('skinVersion') skinVersionObs: number = 0
   @Consume('playerStore') playerStore: PlayerStore
   onOpen: () => void = () => {}
 
@@ -15,17 +17,17 @@ export struct FloatingMusicCard {
         Stack() {
           SymbolGlyph($r('sys.symbol.music'))
             .fontSize(20)
-            .fontColor(['#73737c'])
+            .fontColor([TC.textTertiary()])
         }
-        .width(48).height(48).borderRadius(24).backgroundColor('#23232a')
+        .width(48).height(48).borderRadius(24).backgroundColor(TC.surfaceInset())
         Column({ space: 3 }) {
-          Text('暂无播放歌曲').fontSize(14).fontWeight(FontWeight.Medium).fontColor('#8a8a92')
-          Text('播放列表为空').fontSize(11).fontColor('#62626a')
+          Text('暂无播放歌曲').fontSize(14).fontWeight(FontWeight.Medium).fontColor(TC.textOnMediaSecondary())
+          Text('播放列表为空').fontSize(11).fontColor(TC.textQuaternary())
         }
         .layoutWeight(1).alignItems(HorizontalAlign.Start)
-        SymbolGlyph($r('sys.symbol.backward_end_fill')).fontSize(21).fontColor(['#4d4d55'])
-        SymbolGlyph($r('sys.symbol.play_circle_fill')).fontSize(30).fontColor(['#55555d'])
-        SymbolGlyph($r('sys.symbol.forward_end_fill')).fontSize(21).fontColor(['#4d4d55']).margin({ right: 4 })
+        SymbolGlyph($r('sys.symbol.backward_end_fill')).fontSize(21).fontColor([TC.textQuaternary()])
+        SymbolGlyph($r('sys.symbol.play_circle_fill')).fontSize(30).fontColor([TC.textQuaternary()])
+        SymbolGlyph($r('sys.symbol.forward_end_fill')).fontSize(21).fontColor([TC.textQuaternary()]).margin({ right: 4 })
       }
       .width('91.47%').height(58).padding({ left: 8, right: 10, top: 5, bottom: 5 })
       .borderRadius(40).backgroundColor('rgba(28,28,34,0.78)').opacity(0.82)
@@ -42,23 +44,23 @@ export struct FloatingMusicCard {
 
         Column({ space: 3 }) {
           Text(this.playerStore.currentSong.name).fontSize(14).fontWeight(FontWeight.Medium)
-            .fontColor('#ffffff').maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
-          Text(this.playerStore.currentSong.author).fontSize(11).fontColor('#92929a').maxLines(1)
+            .fontColor(TC.textOnMedia()).maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
+          Text(this.playerStore.currentSong.author).fontSize(11).fontColor(TC.textOnMediaSecondary()).maxLines(1)
             .textOverflow({ overflow: TextOverflow.Ellipsis })
         }
         .layoutWeight(1).alignItems(HorizontalAlign.Start).onClick(() => this.onOpen())
 
-        SymbolGlyph($r('sys.symbol.backward_end_fill')).fontSize(21).fontColor(['#d3d3d8'])
+        SymbolGlyph($r('sys.symbol.backward_end_fill')).fontSize(21).fontColor([TC.textOnMedia()])
           .onClick(() => playerController.previous())
         if (this.playerStore.isLoading) {
-          LoadingProgress().width(26).height(26).color('#ffffff')
+          LoadingProgress().width(26).height(26).color(TC.textOnMedia())
         } else {
           SymbolGlyph(this.playerStore.isPlaying ? $r('sys.symbol.pause_circle_fill') :
             $r('sys.symbol.play_circle_fill'))
-            .fontSize(30).fontColor(['#ffffff']).onClick(() => playerController.toggle())
+            .fontSize(30).fontColor([TC.textOnMedia()]).onClick(() => playerController.toggle())
         }
 
-        SymbolGlyph($r('sys.symbol.forward_end_fill')).fontSize(21).fontColor(['#d3d3d8'])
+        SymbolGlyph($r('sys.symbol.forward_end_fill')).fontSize(21).fontColor([TC.textOnMedia()])
           .margin({ right: 4 }).onClick(() => playerController.next())
       }
       .width('91.47%').height(58).padding({ left: 8, right: 10, top: 5, bottom: 5 })

@@ -1,7 +1,10 @@
 import { favoriteList } from '../constants'
 import { songItemType } from '../models'
+import { TC } from '../services/ThemeColors'
+
 @Component
 struct SongList {
+  @StorageProp('skinVersion') skinVersionObs: number = 0
   build() {
     Column() {
       // 播放页
@@ -200,7 +203,7 @@ struct SongList {
     }
     .width('100%')
     .height('100%')
-    .backgroundColor('#121215')
+    .backgroundColor(TC.pageBackground())
   }
 }
 

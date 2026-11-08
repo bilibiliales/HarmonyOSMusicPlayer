@@ -14,9 +14,11 @@ import { ApiClient } from '../services/ApiClient'
 import { resizeImageUrl } from '../services/ImageUrl'
 import { playerController } from '../services/PlayerController'
 import { AuthStore } from '../stores/AuthStore'
+import { TC } from '../services/ThemeColors'
 
 @Component
 export struct SatiPage {
+  @StorageProp('skinVersion') skinVersionObs: number = 0
   @Consume('pageStack') pageStack: NavPathStack
   @Consume('topAvoidHeight') topAvoidHeight: number
   @Consume('authStore') authStore: AuthStore
@@ -221,16 +223,16 @@ export struct SatiPage {
   @Builder
   private PageHeader() {
     Row({ space: 12 }) {
-      SymbolGlyph($r('sys.symbol.chevron_left')).fontSize(24).fontColor(['#ffffff'])
+      SymbolGlyph($r('sys.symbol.chevron_left')).fontSize(24).fontColor([TC.textPrimary()])
         .onClick(() => this.pageStack.pop())
       Column({ space: 3 }) {
-        Text('助眠解压').fontSize(25).fontWeight(FontWeight.Bold).fontColor('#ffffff')
-        Text('让自然与轻柔声音安抚此刻').fontSize(11).fontColor('#6f6f77')
+        Text('助眠解压').fontSize(25).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary())
+        Text('让自然与轻柔声音安抚此刻').fontSize(11).fontColor(TC.textQuaternary())
       }.layoutWeight(1).alignItems(HorizontalAlign.Start)
       Stack() {
         SymbolGlyph($r('sys.symbol.heart_fill')).fontSize(19)
-          .fontColor([this.favoritesMode ? '#ef233c' : '#ddddE2'])
-      }.width(42).height(42).borderRadius(14).backgroundColor('#1e1e24')
+          .fontColor([this.favoritesMode ? TC.accent() : TC.textPrimary()])
+      }.width(42).height(42).borderRadius(14).backgroundColor(TC.surfaceCardAlt())
         .onClick(() => this.showFavorites())
     }.width('100%').padding({ left: 16, right: 16, top: 14, bottom: 5 })
   }
@@ -239,22 +241,22 @@ export struct SatiPage {
   private DiscoveryTabs() {
     Scroll() {
       Row({ space: 6 }) {
-        Text('发现').fontSize(13).fontColor('#85858e').padding({ left: 12, right: 12, top: 9, bottom: 9 })
-          .backgroundColor('#1d1d22').borderRadius(18).onClick(() => this.pageStack.pop())
-        Text('排行榜').fontSize(13).fontColor('#85858e')
-          .padding({ left: 12, right: 12, top: 9, bottom: 9 }).backgroundColor('#1d1d22').borderRadius(18)
+        Text('发现').fontSize(13).fontColor(TC.textTertiary()).padding({ left: 12, right: 12, top: 9, bottom: 9 })
+          .backgroundColor(TC.surfaceCardAlt()).borderRadius(18).onClick(() => this.pageStack.pop())
+        Text('排行榜').fontSize(13).fontColor(TC.textTertiary())
+          .padding({ left: 12, right: 12, top: 9, bottom: 9 }).backgroundColor(TC.surfaceCardAlt()).borderRadius(18)
           .onClick(() => this.pageStack.replacePathByName('RankingPage', null))
-        Text('曲风').fontSize(13).fontColor('#85858e').padding({ left: 12, right: 12, top: 9, bottom: 9 })
-          .backgroundColor('#1d1d22').borderRadius(18)
+        Text('曲风').fontSize(13).fontColor(TC.textTertiary()).padding({ left: 12, right: 12, top: 9, bottom: 9 })
+          .backgroundColor(TC.surfaceCardAlt()).borderRadius(18)
           .onClick(() => this.pageStack.replacePathByName('StylePage', null))
-        Text('电台').fontSize(13).fontColor('#85858e').padding({ left: 12, right: 12, top: 9, bottom: 9 })
-          .backgroundColor('#1d1d22').borderRadius(18)
+        Text('电台').fontSize(13).fontColor(TC.textTertiary()).padding({ left: 12, right: 12, top: 9, bottom: 9 })
+          .backgroundColor(TC.surfaceCardAlt()).borderRadius(18)
           .onClick(() => this.pageStack.replacePathByName('RadioPage', null))
-        Text('数字专辑').fontSize(13).fontColor('#85858e')
-          .padding({ left: 12, right: 12, top: 9, bottom: 9 }).backgroundColor('#1d1d22').borderRadius(18)
+        Text('数字专辑').fontSize(13).fontColor(TC.textTertiary())
+          .padding({ left: 12, right: 12, top: 9, bottom: 9 }).backgroundColor(TC.surfaceCardAlt()).borderRadius(18)
           .onClick(() => this.pageStack.replacePathByName('DigitalAlbumPage', null))
-        Text('助眠解压').fontSize(13).fontWeight(FontWeight.Bold).fontColor('#ffffff')
-          .padding({ left: 12, right: 12, top: 9, bottom: 9 }).backgroundColor('#ef233c').borderRadius(18)
+        Text('助眠解压').fontSize(13).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary())
+          .padding({ left: 12, right: 12, top: 9, bottom: 9 }).backgroundColor(TC.accent()).borderRadius(18)
       }.padding({ left: 16, right: 16 })
     }.width('100%').scrollable(ScrollDirection.Horizontal).scrollBar(BarState.Off)
       .margin({ top: 10, bottom: 4 })
@@ -266,8 +268,8 @@ export struct SatiPage {
       Column({ space: 12 }) {
         Column({ space: 4 }) {
           Text(this.scene.text || '此刻推荐').width('100%').fontSize(20).fontWeight(FontWeight.Bold)
-            .fontColor('#ffffff')
-          Text('根据当前时段为你准备').width('100%').fontSize(10).fontColor('#77777f')
+            .fontColor(TC.textPrimary())
+          Text('根据当前时段为你准备').width('100%').fontSize(10).fontColor(TC.textTertiary())
         }.width('100%').alignItems(HorizontalAlign.Start)
         Scroll() {
           Row({ space: 12 }) {
@@ -278,9 +280,9 @@ export struct SatiPage {
                 Column().width(220).height(78).borderRadius({ bottomLeft: 19, bottomRight: 19 })
                   .linearGradient({ angle: 180, colors: [['rgba(0,0,0,0)', 0], ['rgba(0,0,0,0.84)', 1]] })
                 Row({ space: 7 }) {
-                  Text(item.name).layoutWeight(1).fontSize(14).fontWeight(FontWeight.Bold).fontColor('#ffffff')
+                  Text(item.name).layoutWeight(1).fontSize(14).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary())
                     .maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
-                  SymbolGlyph($r('sys.symbol.play_circle_fill')).fontSize(25).fontColor(['#ffffff'])
+                  SymbolGlyph($r('sys.symbol.play_circle_fill')).fontSize(25).fontColor([TC.textPrimary()])
                 }.width(202).margin({ left: 9, bottom: 10 })
               }.width(220).height(138).onClick(() => this.playResource(item, this.sceneResources))
             }, (item: SatiResource) => item.id.toString())
@@ -293,14 +295,14 @@ export struct SatiPage {
   @Builder
   private TagSection() {
     Text(this.favoritesMode ? '我的收藏' : '声音分类').width('100%').fontSize(19).fontWeight(FontWeight.Bold)
-      .fontColor('#ffffff').padding({ left: 16, right: 16, top: 24, bottom: 11 })
+      .fontColor(TC.textPrimary()).padding({ left: 16, right: 16, top: 24, bottom: 11 })
     Scroll() {
       Row({ space: 8 }) {
         ForEach(this.tags, (tag: SatiTag) => {
           Text(tag.tagDesc).fontSize(11).fontWeight(this.selectedTag === tag.tag ? FontWeight.Bold : FontWeight.Normal)
-            .fontColor(this.selectedTag === tag.tag ? '#ffffff' : '#85858e')
+            .fontColor(this.selectedTag === tag.tag ? TC.textOnAccent() : TC.textTertiary())
             .padding({ left: 15, right: 15, top: 8, bottom: 8 })
-            .backgroundColor(this.selectedTag === tag.tag ? '#ef233c' : '#202026').borderRadius(17)
+            .backgroundColor(this.selectedTag === tag.tag ? TC.accent() : TC.surfaceInset()).borderRadius(17)
             .onClick(() => this.selectTag(tag))
         }, (tag: SatiTag) => tag.tag)
       }.padding({ left: 16, right: 16 })
@@ -315,21 +317,21 @@ export struct SatiPage {
           .sourceSize({ width: 340, height: 340 }).borderRadius(17).objectFit(ImageFit.Cover)
         Stack() {
           SymbolGlyph(this.isSubscribed(item) ? $r('sys.symbol.heart_fill') : $r('sys.symbol.heart'))
-            .fontSize(18).fontColor([this.isSubscribed(item) ? '#ef233c' : '#ffffff'])
+            .fontSize(18).fontColor([this.isSubscribed(item) ? TC.accent() : TC.textOnAccent()])
         }.width(34).height(34).borderRadius(17).backgroundColor('rgba(0,0,0,0.48)').margin(7)
           .onClick(() => this.toggleSubscription(item))
         Stack({ alignContent: Alignment.Center }) {
-          SymbolGlyph($r('sys.symbol.play_fill')).fontSize(20).fontColor(['#ffffff'])
+          SymbolGlyph($r('sys.symbol.play_fill')).fontSize(20).fontColor([TC.textPrimary()])
         }.width(34).height(34).borderRadius(22).backgroundColor('rgba(239,35,60,0.9)').margin(7)
           .align(Alignment.Center).onClick(() => this.playResource(item, source))
       }.width('100%').aspectRatio(1)
       Row({ space: 6 }) {
         Column({ space: 3 }) {
-          Text(item.name).width('100%').fontSize(12).fontWeight(FontWeight.Medium).fontColor('#e8e8eb')
+          Text(item.name).width('100%').fontSize(12).fontWeight(FontWeight.Medium).fontColor(TC.textBody())
             .maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
-          Text(this.tagName(item.category || this.selectedTag)).fontSize(9).fontColor('#686870')
+          Text(this.tagName(item.category || this.selectedTag)).fontSize(9).fontColor(TC.textQuaternary())
         }.layoutWeight(1).alignItems(HorizontalAlign.Start)
-        SymbolGlyph($r('sys.symbol.ellipsis_circle')).fontSize(18).fontColor(['#77777f'])
+        SymbolGlyph($r('sys.symbol.ellipsis_circle')).fontSize(18).fontColor([TC.textTertiary()])
           .onClick(() => this.loadSimilar(item))
       }.width('100%')
     }.width('48%').margin({ bottom: 17 }).alignItems(HorizontalAlign.Start)
@@ -338,10 +340,10 @@ export struct SatiPage {
   @Builder
   private ResourcesSection() {
     if (this.resourceLoading) {
-      LoadingProgress().width(32).height(32).color('#ef233c').margin({ top: 60, bottom: 60 })
+      LoadingProgress().width(32).height(32).color(TC.accent()).margin({ top: 60, bottom: 60 })
     } else if (this.resources.length === 0) {
       Text(this.favoritesMode ? '还没有收藏助眠声音' : '该分类暂无声音').width('100%').height(180)
-        .fontSize(11).fontColor('#686870').textAlign(TextAlign.Center)
+        .fontSize(11).fontColor(TC.textQuaternary()).textAlign(TextAlign.Center)
     } else {
       Flex({ wrap: FlexWrap.Wrap, justifyContent: FlexAlign.SpaceBetween }) {
         ForEach(this.resources.slice(0, this.visibleResourceCount),
@@ -358,12 +360,12 @@ export struct SatiPage {
       Column({ space: 12 }) {
         Row() {
           Text(this.similarTitle || '同类推荐').layoutWeight(1).fontSize(18).fontWeight(FontWeight.Bold)
-            .fontColor('#ffffff')
-          SymbolGlyph($r('sys.symbol.xmark_circle_fill')).fontSize(22).fontColor(['#66666e'])
+            .fontColor(TC.textPrimary())
+          SymbolGlyph($r('sys.symbol.xmark_circle_fill')).fontSize(22).fontColor([TC.textQuaternary()])
             .onClick(() => this.similarVisible = false)
         }.width('100%')
         if (this.similarResources.length === 0) {
-          LoadingProgress().width(27).height(27).color('#ef233c').margin({ top: 25, bottom: 25 })
+          LoadingProgress().width(27).height(27).color(TC.accent()).margin({ top: 25, bottom: 25 })
         } else {
           Scroll() {
             Row({ space: 12 }) {
@@ -372,9 +374,9 @@ export struct SatiPage {
                   Stack({ alignContent: Alignment.Center }) {
                     Image(resizeImageUrl(item.pic, 260, 260)).width(112).height(112)
                       .sourceSize({ width: 260, height: 260 }).borderRadius(16).objectFit(ImageFit.Cover)
-                    SymbolGlyph($r('sys.symbol.play_circle_fill')).fontSize(29).fontColor(['#ffffff'])
+                    SymbolGlyph($r('sys.symbol.play_circle_fill')).fontSize(29).fontColor([TC.textPrimary()])
                   }
-                  Text(item.name).width(112).fontSize(10).fontColor('#d7d7dc').maxLines(1)
+                  Text(item.name).width(112).fontSize(10).fontColor(TC.textBody()).maxLines(1)
                     .textOverflow({ overflow: TextOverflow.Ellipsis })
                 }.width(112).onClick(() => this.playResource(item, this.similarResources))
               }, (item: SatiResource) => item.id.toString())
@@ -397,8 +399,8 @@ export struct SatiPage {
           }
           if (this.loading) {
             Column({ space: 12 }) {
-              LoadingProgress().width(38).height(38).color('#ef233c')
-              Text('正在准备舒缓声音').fontSize(11).fontColor('#77777f')
+              LoadingProgress().width(38).height(38).color(TC.accent())
+              Text('正在准备舒缓声音').fontSize(11).fontColor(TC.textTertiary())
             }.width('100%').height(360).justifyContent(FlexAlign.Center)
           } else {
             this.SceneSection()
@@ -406,14 +408,14 @@ export struct SatiPage {
             this.ResourcesSection()
             this.SimilarSection()
             if (this.actionMessage) {
-              Text(this.actionMessage).width('100%').fontSize(10).fontColor('#ef6577')
+              Text(this.actionMessage).width('100%').fontSize(10).fontColor(TC.accentSoft())
                 .textAlign(TextAlign.Center).padding(14)
             }
             Blank().height(this.embedded ? 145 : 55)
           }
         }.width('100%')
       }.width('100%').height('100%').scrollBar(BarState.Off).onReachEnd(() => this.revealMoreResources())
-    }.width('100%').height('100%').backgroundColor('#121215').onRefreshing(async () => {
+    }.width('100%').height('100%').backgroundColor(TC.pageBackground()).onRefreshing(async () => {
       this.refreshing = true
       await this.loadPage()
       this.refreshing = false
@@ -426,7 +428,7 @@ export struct SatiPage {
     } else {
       NavDestination() {
         this.PageContent(true)
-      }.hideTitleBar(true).backgroundColor('#121215')
+      }.hideTitleBar(true).backgroundColor(TC.pageBackground())
     }
   }
 }

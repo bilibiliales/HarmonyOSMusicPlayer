@@ -11,6 +11,7 @@ import { songItemType } from '../models/music'
 import { ApiClient } from '../services/ApiClient'
 import { AppSettings } from '../services/AppSettings'
 import { AuthStore } from '../stores/AuthStore'
+import { TC } from '../services/ThemeColors'
 
 interface AiMessage {
   role: string
@@ -44,6 +45,7 @@ interface AiError {
 
 @Component
 export struct AiSongStudioPage {
+  @StorageProp('skinVersion') skinVersionObs: number = 0
   @Consume('pageStack') pageStack: NavPathStack
   @Consume('topAvoidHeight') topAvoidHeight: number
   @Consume('authStore') authStore: AuthStore
@@ -279,8 +281,8 @@ export struct AiSongStudioPage {
       ForEach(['adapt', 'lyrics', 'idea'], (item: string) => {
         Text(item === 'adapt' ? '风格改编' : item === 'lyrics' ? 'AI 作词' : '一句话写歌')
           .layoutWeight(1).height(38).fontSize(12).fontWeight(FontWeight.Medium)
-          .fontColor(this.mode === item ? '#ffffff' : '#85858e').textAlign(TextAlign.Center)
-          .backgroundColor(this.mode === item ? '#ef233c' : '#232329').borderRadius(13)
+          .fontColor(this.mode === item ? TC.textOnAccent() : TC.textTertiary()).textAlign(TextAlign.Center)
+          .backgroundColor(this.mode === item ? TC.accent() : TC.surfaceInset()).borderRadius(13)
           .onClick(() => this.mode = item)
       })
     }
@@ -291,22 +293,22 @@ export struct AiSongStudioPage {
   private SongPicker() {
     Column({ space: 11 }) {
       Row() {
-        Text('选择喜欢的歌曲').fontSize(15).fontWeight(FontWeight.Bold).fontColor('#ffffff')
+        Text('选择喜欢的歌曲').fontSize(15).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary())
         Blank()
         if (this.likedLoading) {
-          LoadingProgress().width(20).height(20).color('#ef233c')
+          LoadingProgress().width(20).height(20).color(TC.accent())
         }
       }
       Scroll() {
         Row({ space: 10 }) {
           Column({ space: 6 }) {
             Column({ space: 8 }) {
-              SymbolGlyph($r('sys.symbol.magnifyingglass')).fontSize(28).fontColor(['#ffffff'])
-              Text('搜索单曲').fontSize(11).fontWeight(FontWeight.Medium).fontColor('#ffffff')
+              SymbolGlyph($r('sys.symbol.magnifyingglass')).fontSize(28).fontColor([TC.textPrimary()])
+              Text('搜索单曲').fontSize(11).fontWeight(FontWeight.Medium).fontColor(TC.textPrimary())
             }
             .width(88).height(88).justifyContent(FlexAlign.Center)
-            .backgroundColor('#ef233c').borderRadius(13)
-            Text('更多歌曲').width(88).fontSize(11).fontColor('#ededf0').textAlign(TextAlign.Center)
+            .backgroundColor(TC.accent()).borderRadius(13)
+            Text('更多歌曲').width(88).fontSize(11).fontColor(TC.textBody()).textAlign(TextAlign.Center)
           }
           .onClick(() => {
             this.searchSheetVisible = true
@@ -318,11 +320,11 @@ export struct AiSongStudioPage {
                 Stack({ alignContent: Alignment.BottomEnd }) {
                   Image(song.img).width(88).height(88).borderRadius(13).objectFit(ImageFit.Cover)
                   if (this.selectedSongId === song.id) {
-                    SymbolGlyph($r('sys.symbol.checkmark_circle_fill')).fontSize(23).fontColor(['#ef233c'])
+                    SymbolGlyph($r('sys.symbol.checkmark_circle_fill')).fontSize(23).fontColor([TC.accent()])
                       .margin({ right: 6, bottom: 6 })
                   }
                 }
-                Text(song.name).width(88).fontSize(11).fontColor('#ededf0').maxLines(1)
+                Text(song.name).width(88).fontSize(11).fontColor(TC.textBody()).maxLines(1)
                   .textOverflow({ overflow: TextOverflow.Ellipsis })
               }
               .alignItems(HorizontalAlign.Start).onClick(() => this.selectSong(song))
@@ -332,10 +334,10 @@ export struct AiSongStudioPage {
       }
       .width('100%').scrollable(ScrollDirection.Horizontal).scrollBar(BarState.Off)
       if (!this.authStore.loggedIn) {
-        Text('未登录时仍可搜索单曲；登录后还会显示“我喜欢的音乐”').fontSize(11).fontColor('#77777f')
+        Text('未登录时仍可搜索单曲；登录后还会显示“我喜欢的音乐”').fontSize(11).fontColor(TC.textTertiary())
       }
     }
-    .width('100%').padding(15).backgroundColor('#1b1b20').borderRadius(17)
+    .width('100%').padding(15).backgroundColor(TC.surfaceCard()).borderRadius(17)
   }
 
   @Builder
@@ -346,30 +348,30 @@ export struct AiSongStudioPage {
           Image(this.selectedSong()?.img || '').width(46).height(46).borderRadius(9).objectFit(ImageFit.Cover)
           Column({ space: 3 }) {
             Text(this.selectedSong()?.name || '').width('100%').fontSize(14).fontWeight(FontWeight.Medium)
-              .fontColor('#ffffff').maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
-            Text(this.selectedSong()?.author || '').width('100%').fontSize(11).fontColor('#85858e')
+              .fontColor(TC.textPrimary()).maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
+            Text(this.selectedSong()?.author || '').width('100%').fontSize(11).fontColor(TC.textTertiary())
               .maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
           }.layoutWeight(1).alignItems(HorizontalAlign.Start)
           if (this.lyricLoading) {
-            LoadingProgress().width(22).height(22).color('#ef233c')
+            LoadingProgress().width(22).height(22).color(TC.accent())
           }
         }
-        Text('原歌词预览').width('100%').fontSize(13).fontWeight(FontWeight.Bold).fontColor('#ffffff')
+        Text('原歌词预览').width('100%').fontSize(13).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary())
         if (this.lyricLoading) {
-          Text('正在检查歌曲歌词…').width('100%').fontSize(11).fontColor('#85858e')
+          Text('正在检查歌曲歌词…').width('100%').fontSize(11).fontColor(TC.textTertiary())
         } else if (this.sourceLyrics) {
           Scroll() {
-            Text(this.sourceLyrics).width('100%').fontSize(12).lineHeight(20).fontColor('#c9c9cf')
+            Text(this.sourceLyrics).width('100%').fontSize(12).lineHeight(20).fontColor(TC.textBody())
           }.width('100%').height(180).scrollBar(BarState.Off)
         } else {
           Row({ space: 8 }) {
-            SymbolGlyph($r('sys.symbol.exclamationmark_triangle_fill')).fontSize(19).fontColor(['#ff9c57'])
+            SymbolGlyph($r('sys.symbol.exclamationmark_triangle_fill')).fontSize(19).fontColor([TC.accentSoft()])
             Text(this.sourceLyricsMessage || '该歌曲暂无有效歌词，请更换其他歌曲')
-              .layoutWeight(1).fontSize(11).lineHeight(18).fontColor('#ffb47c')
-          }.width('100%').padding(12).backgroundColor('#2d241f').borderRadius(12)
+              .layoutWeight(1).fontSize(11).lineHeight(18).fontColor(TC.accentSoft())
+          }.width('100%').padding(12).backgroundColor(TC.accentContainer()).borderRadius(12)
         }
       }
-      .width('100%').padding(15).backgroundColor('#1b1b20').borderRadius(17)
+      .width('100%').padding(15).backgroundColor(TC.surfaceCard()).borderRadius(17)
     }
   }
 
@@ -377,28 +379,28 @@ export struct AiSongStudioPage {
   private SearchSongSheet() {
     Column({ space: 12 }) {
       Row() {
-        Text('搜索参考单曲').fontSize(17).fontWeight(FontWeight.Bold).fontColor('#ffffff')
+        Text('搜索参考单曲').fontSize(17).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary())
         Blank()
-        SymbolGlyph($r('sys.symbol.xmark_circle_fill')).fontSize(24).fontColor(['#77777f'])
+        SymbolGlyph($r('sys.symbol.xmark_circle_fill')).fontSize(24).fontColor([TC.textTertiary()])
           .onClick(() => this.searchSheetVisible = false)
       }.width('100%')
       Row({ space: 8 }) {
         TextInput({ text: this.searchKeyword, placeholder: '输入歌曲名或歌手名' })
-          .layoutWeight(1).height(44).fontColor('#ffffff').placeholderColor('#66666e')
-          .backgroundColor('#25252b').borderRadius(13)
+          .layoutWeight(1).height(44).fontColor(TC.textPrimary()).placeholderColor(TC.textQuaternary())
+          .backgroundColor(TC.surfaceRaised()).borderRadius(13)
           .enterKeyType(EnterKeyType.Search)
           .onChange((value: string) => this.searchKeyword = value)
           .onSubmit(() => this.searchSongs())
-        Button('搜索').height(44).fontSize(12).fontColor('#ffffff').backgroundColor('#ef233c')
+        Button('搜索').height(44).fontSize(12).fontColor(TC.textPrimary()).backgroundColor(TC.accent())
           .borderRadius(13).enabled(!this.searchLoading).onClick(() => this.searchSongs())
       }.width('100%')
       if (this.searchLoading) {
         Row({ space: 8 }) {
-          LoadingProgress().width(22).height(22).color('#ef233c')
-          Text('正在搜索单曲…').fontSize(12).fontColor('#85858e')
+          LoadingProgress().width(22).height(22).color(TC.accent())
+          Text('正在搜索单曲…').fontSize(12).fontColor(TC.textTertiary())
         }.layoutWeight(1).justifyContent(FlexAlign.Center)
       } else if (this.searchMessage) {
-        Text(this.searchMessage).layoutWeight(1).width('100%').fontSize(12).fontColor('#85858e')
+        Text(this.searchMessage).layoutWeight(1).width('100%').fontSize(12).fontColor(TC.textTertiary())
           .textAlign(TextAlign.Center)
       } else if (this.searchResults.length > 0) {
         List({ space: 6 }) {
@@ -407,31 +409,31 @@ export struct AiSongStudioPage {
               Row({ space: 11 }) {
                 Image(song.img).width(48).height(48).borderRadius(9).objectFit(ImageFit.Cover)
                 Column({ space: 4 }) {
-                  Text(song.name).width('100%').fontSize(13).fontWeight(FontWeight.Medium).fontColor('#f1f1f3')
+                  Text(song.name).width('100%').fontSize(13).fontWeight(FontWeight.Medium).fontColor(TC.textBody())
                     .maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
                   Text(`${song.author}${song.album ? ` · ${song.album}` : ''}`).width('100%').fontSize(10)
-                    .fontColor('#77777f').maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
+                    .fontColor(TC.textTertiary()).maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
                 }.layoutWeight(1).alignItems(HorizontalAlign.Start)
                 if (this.selectedSongId === song.id) {
-                  SymbolGlyph($r('sys.symbol.checkmark_circle_fill')).fontSize(22).fontColor(['#ef233c'])
+                  SymbolGlyph($r('sys.symbol.checkmark_circle_fill')).fontSize(22).fontColor([TC.accent()])
                 } else {
-                  Text('选择').fontSize(11).fontColor('#ff6577')
+                  Text('选择').fontSize(11).fontColor(TC.accentSoft())
                 }
               }
-              .width('100%').padding(9).backgroundColor('#232329').borderRadius(12)
+              .width('100%').padding(9).backgroundColor(TC.surfaceInset()).borderRadius(12)
               .onClick(() => this.selectSong(song))
             }
           })
         }.layoutWeight(1).width('100%').scrollBar(BarState.Off)
       } else {
         Column({ space: 9 }) {
-          SymbolGlyph($r('sys.symbol.music_note_list')).fontSize(34).fontColor(['#55555d'])
-          Text('搜索并选择一首有歌词的歌曲作为改编参考').fontSize(11).fontColor('#77777f')
+          SymbolGlyph($r('sys.symbol.music_note_list')).fontSize(34).fontColor([TC.textQuaternary()])
+          Text('搜索并选择一首有歌词的歌曲作为改编参考').fontSize(11).fontColor(TC.textTertiary())
         }.layoutWeight(1).justifyContent(FlexAlign.Center)
       }
     }
     .width('100%').height('100%').padding({ left: 16, right: 16, top: 18, bottom: 12 })
-    .backgroundColor('#19191f')
+    .backgroundColor(TC.surfaceCard())
   }
 
   build() {
@@ -439,11 +441,11 @@ export struct AiSongStudioPage {
       Column() {
         Column().width('100%').height(this.topAvoidHeight)
         Row() {
-          SymbolGlyph($r('sys.symbol.chevron_left')).fontSize(24).fontColor(['#ffffff'])
+          SymbolGlyph($r('sys.symbol.chevron_left')).fontSize(24).fontColor([TC.textPrimary()])
             .onClick(() => this.pageStack.pop())
           Text('AI 写歌').layoutWeight(1).fontSize(18).fontWeight(FontWeight.Bold)
-            .fontColor('#ffffff').textAlign(TextAlign.Center)
-          SymbolGlyph($r('sys.symbol.wand_and_stars')).fontSize(22).fontColor(['#ff6577'])
+            .fontColor(TC.textPrimary()).textAlign(TextAlign.Center)
+          SymbolGlyph($r('sys.symbol.wand_and_stars')).fontSize(22).fontColor([TC.accentSoft()])
         }
         .width('100%').height(56).padding({ left: 16, right: 16 })
 
@@ -456,56 +458,56 @@ export struct AiSongStudioPage {
             }
             Column({ space: 11 }) {
               TextInput({ placeholder: '作品风格，例如：城市民谣、迷幻 R&B、电影感摇滚', text: this.style })
-                .height(44).fontColor('#ffffff').placeholderColor('#66666e').backgroundColor('#25252b')
+                .height(44).fontColor(TC.textPrimary()).placeholderColor(TC.textQuaternary()).backgroundColor(TC.surfaceRaised())
                 .borderRadius(12).onChange((value: string) => this.style = value)
               if (this.mode === 'lyrics') {
                 TextArea({ placeholder: '输入几句歌词或零散句子，让 AI 完善成完整作品', text: this.seedLyrics })
-                  .height(150).fontColor('#ffffff').placeholderColor('#66666e').backgroundColor('#25252b')
+                  .height(150).fontColor(TC.textPrimary()).placeholderColor(TC.textQuaternary()).backgroundColor(TC.surfaceRaised())
                   .borderRadius(12).onChange((value: string) => this.seedLyrics = value)
               } else {
                 TextArea({ placeholder: this.mode === 'adapt' ? '描述希望如何改编：叙事视角、情绪、年代或场景' : '用一句话描述歌曲灵感', text: this.inspiration })
-                  .height(125).fontColor('#ffffff').placeholderColor('#66666e').backgroundColor('#25252b')
+                  .height(125).fontColor(TC.textPrimary()).placeholderColor(TC.textQuaternary()).backgroundColor(TC.surfaceRaised())
                   .borderRadius(12).onChange((value: string) => this.inspiration = value)
               }
               TextArea({ placeholder: '其他要求，例如押韵、结构、意象、禁用词', text: this.extraPrompt })
-                .height(90).fontColor('#ffffff').placeholderColor('#66666e').backgroundColor('#25252b')
+                .height(90).fontColor(TC.textPrimary()).placeholderColor(TC.textQuaternary()).backgroundColor(TC.surfaceRaised())
                 .borderRadius(12).onChange((value: string) => this.extraPrompt = value)
               Row({ space: 10 }) {
                 Button(this.polishing ? '润色中…' : 'AI 润色灵感').layoutWeight(1).height(44)
-                  .fontColor('#f2f2f4').backgroundColor('#2b2b32').borderRadius(14)
+                  .fontColor(TC.textBody()).backgroundColor(TC.surfaceRaised()).borderRadius(14)
                   .enabled(!this.polishing && !this.generating).onClick(() => this.polishPrompt())
                 Button(this.generating ? '创作中…' : '生成歌曲').layoutWeight(1).height(44)
-                  .fontColor('#ffffff').backgroundColor('#ef233c').borderRadius(14)
+                  .fontColor(TC.textPrimary()).backgroundColor(TC.accent()).borderRadius(14)
                   .enabled(!this.polishing && !this.generating).onClick(() => this.generateSong())
               }
             }
-            .width('100%').padding(15).backgroundColor('#1b1b20').borderRadius(17)
+            .width('100%').padding(15).backgroundColor(TC.surfaceCard()).borderRadius(17)
 
             if (this.message) {
-              Text(this.message).width('100%').fontSize(11).fontColor('#ff7587').textAlign(TextAlign.Center)
+              Text(this.message).width('100%').fontSize(11).fontColor(TC.accentSoft()).textAlign(TextAlign.Center)
             }
             if (this.result) {
               Column({ space: 10 }) {
                 Row() {
-                  Text('生成作品').fontSize(16).fontWeight(FontWeight.Bold).fontColor('#ffffff')
+                  Text('生成作品').fontSize(16).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary())
                   Blank()
-                  Text('可继续手动编辑').fontSize(9).fontColor('#77777f')
+                  Text('可继续手动编辑').fontSize(9).fontColor(TC.textTertiary())
                 }
                 TextArea({ text: this.result }).height(520).fontSize(13).lineHeight(21)
-                  .fontColor('#d8d8dd').backgroundColor('#202026').borderRadius(13)
+                  .fontColor(TC.textBody()).backgroundColor(TC.surfaceCardAlt()).borderRadius(13)
                   .onChange((value: string) => this.result = value)
               }
-              .width('100%').padding(15).backgroundColor('#1b1b20').borderRadius(17)
+              .width('100%').padding(15).backgroundColor(TC.surfaceCard()).borderRadius(17)
             }
           }
           .width('100%').padding({ left: 12, right: 12, bottom: 32 })
         }
         .layoutWeight(1).scrollBar(BarState.Off)
       }
-      .width('100%').height('100%').backgroundColor('#121215')
+      .width('100%').height('100%').backgroundColor(TC.pageBackground())
       .bindSheet(this.searchSheetVisible, this.SearchSongSheet(), {
         height: '58%',
-        backgroundColor: '#19191f',
+        backgroundColor: TC.sheetBackground(),
         showClose: false,
         dragBar: true,
         onDisappear: () => this.searchSheetVisible = false

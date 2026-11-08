@@ -35,9 +35,11 @@ import { DiscoveryPlaylistsService, FM_ICON } from '../services/DiscoveryPlaylis
 import { playerController } from '../services/PlayerController'
 import { AuthStore } from '../stores/AuthStore'
 import { resizeImageUrl } from '../services/ImageUrl'
+import { TC } from '../services/ThemeColors'
 
 @Component
 struct Recommend {
+  @StorageProp('skinVersion') skinVersionObs: number = 0
   @Consume('pageStack') pageStack: NavPathStack
   @Consume('authStore') authStore: AuthStore
   onMenuClick: () => void = () => {}
@@ -489,14 +491,14 @@ struct Recommend {
   private SectionTitle(title: string, subtitle: string) {
     Row() {
       Column({ space: 3 }) {
-        Text(title).fontSize(19).fontWeight(FontWeight.Bold).fontColor('#f4f4f6')
+        Text(title).fontSize(19).fontWeight(FontWeight.Bold).fontColor(TC.textBody())
         if (subtitle.length > 0) {
-          Text(subtitle).fontSize(10).fontColor('#66666e')
+          Text(subtitle).fontSize(10).fontColor(TC.textQuaternary())
         }
       }
       .layoutWeight(1)
       .alignItems(HorizontalAlign.Start)
-      SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(16).fontColor(['#66666e'])
+      SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(16).fontColor([TC.textQuaternary()])
     }
     .width('100%')
     .padding({ left: 16, right: 16, top: 22, bottom: 10 })
@@ -515,23 +517,23 @@ struct Recommend {
                   Text(item.name)
                     .width('100%')
                     .fontSize(13)
-                    .fontColor('#eeeeF1')
+                    .fontColor(TC.textBody())
                     .maxLines(1)
                     .textOverflow({ overflow: TextOverflow.Ellipsis })
                   Row({ space: 6 }) {
                     if (item.recommendTag && item.recommendTag.length > 0) {
                       Text(item.recommendTag)
                         .fontSize(9)
-                        .fontColor('#ef4058')
+                        .fontColor(TC.accentSoft())
                         .maxLines(1)
                         .padding({ left: 5, right: 5, top: 1, bottom: 1 })
-                        .border({ width: 1, color: '#ef4058' })
+                        .border({ width: 1, color: TC.accent() })
                         .borderRadius(4)
                     }
                     Text(item.author)
                       .layoutWeight(1)
                       .fontSize(10)
-                      .fontColor('#77777f')
+                      .fontColor(TC.textTertiary())
                       .maxLines(1)
                       .textOverflow({ overflow: TextOverflow.Ellipsis })
                   }
@@ -539,7 +541,7 @@ struct Recommend {
                 }
                 .layoutWeight(1)
                 .alignItems(HorizontalAlign.Start)
-                SymbolGlyph($r('sys.symbol.play_circle_fill')).fontSize(23).fontColor(['#a9a9b0'])
+                SymbolGlyph($r('sys.symbol.play_circle_fill')).fontSize(23).fontColor([TC.textQuaternary()])
               }
               .width(310)
               .height(68)
@@ -549,7 +551,7 @@ struct Recommend {
             })
           }
           .padding({ top: 4, bottom: 4 })
-          .backgroundColor('#18181d')
+          .backgroundColor(TC.surfaceCardAlt())
           .borderRadius(18)
         }, (column: SongColumn) => column.key)
       }
@@ -573,9 +575,9 @@ struct Recommend {
                 Column().width(104).height(70).borderRadius({ bottomLeft: 15, bottomRight: 15 })
                   .linearGradient({ angle: 180, colors: [['rgba(0,0,0,0)', 0], ['rgba(0,0,0,0.82)', 1]] })
                 Column({ space: 2 }) {
-                  Text(ranking.name).width(92).fontSize(13).fontWeight(FontWeight.Bold).fontColor('#ffffff')
+                  Text(ranking.name).width(92).fontSize(13).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary())
                     .maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
-                  Text(ranking.updateFrequency).width(92).fontSize(9).fontColor('#d0d0d5').maxLines(1)
+                  Text(ranking.updateFrequency).width(92).fontSize(9).fontColor(TC.textBody()).maxLines(1)
                 }.margin({ left: 7, bottom: 8 }).alignItems(HorizontalAlign.Start)
               }.onClick(() => this.openRanking(ranking.id, ranking.name, ranking.cover))
               Column({ space: 3 }) {
@@ -583,25 +585,25 @@ struct Recommend {
                   ForEach(ranking.songs, (song: songItemType, index: number) => {
                     Row({ space: 7 }) {
                       Text(`${index + 1}`).width(17).fontSize(14).fontWeight(FontWeight.Bold)
-                        .fontColor(index === 0 ? '#ef4058' : '#8d8d95')
+                        .fontColor(index === 0 ? TC.accent() : TC.textTertiary())
                       Column({ space: 3 }) {
-                        Text(song.name).width('100%').fontSize(12).fontColor('#ededf0').maxLines(1)
+                        Text(song.name).width('100%').fontSize(12).fontColor(TC.textBody()).maxLines(1)
                           .textOverflow({ overflow: TextOverflow.Ellipsis })
-                        Text(song.author).width('100%').fontSize(9).fontColor('#707078').maxLines(1)
+                        Text(song.author).width('100%').fontSize(9).fontColor(TC.textQuaternary()).maxLines(1)
                           .textOverflow({ overflow: TextOverflow.Ellipsis })
                       }.layoutWeight(1).alignItems(HorizontalAlign.Start)
-                      SymbolGlyph($r('sys.symbol.play_circle_fill')).fontSize(18).fontColor(['#8a8a92'])
+                      SymbolGlyph($r('sys.symbol.play_circle_fill')).fontSize(18).fontColor([TC.textSecondary()])
                     }.width(184).height(41).onClick(() => this.playRanking(ranking, index))
                   })
                 } else {
                   ForEach(ranking.fallbackTracks.slice(0, 3), (track: ToplistTrackPreview, index: number) => {
                     Row({ space: 7 }) {
                       Text(`${index + 1}`).width(17).fontSize(14).fontWeight(FontWeight.Bold)
-                        .fontColor(index === 0 ? '#ef4058' : '#8d8d95')
+                        .fontColor(index === 0 ? TC.accent() : TC.textTertiary())
                       Column({ space: 3 }) {
-                        Text(track.first).width('100%').fontSize(12).fontColor('#ededf0').maxLines(1)
+                        Text(track.first).width('100%').fontSize(12).fontColor(TC.textBody()).maxLines(1)
                           .textOverflow({ overflow: TextOverflow.Ellipsis })
-                        Text(track.second).width('100%').fontSize(9).fontColor('#707078').maxLines(1)
+                        Text(track.second).width('100%').fontSize(9).fontColor(TC.textQuaternary()).maxLines(1)
                           .textOverflow({ overflow: TextOverflow.Ellipsis })
                       }.layoutWeight(1).alignItems(HorizontalAlign.Start)
                     }.width(184).height(41)
@@ -609,7 +611,7 @@ struct Recommend {
                 }
               }.layoutWeight(1).justifyContent(FlexAlign.Center)
             }
-            .width(316).height(150).padding(9).backgroundColor('#1a1a20').borderRadius(18)
+            .width(316).height(150).padding(9).backgroundColor(TC.surfaceCardAlt()).borderRadius(18)
           }, (ranking: RankingPreview) => ranking.id)
         }.padding({ left: 16, right: 16 })
       }.width('100%').scrollable(ScrollDirection.Horizontal).scrollBar(BarState.Off)
@@ -627,14 +629,14 @@ struct Recommend {
               Stack({ alignContent: Alignment.TopStart }) {
                 Image(artist.picUrl || artist.img1v1Url || '').width(88).height(88).borderRadius(44)
                   .objectFit(ImageFit.Cover)
-                Text(`${index + 1}`).fontSize(11).fontWeight(FontWeight.Bold).fontColor('#ffffff')
-                  .width(27).height(27).textAlign(TextAlign.Center).backgroundColor(index < 3 ? '#ef233c' : '#34343c')
+                Text(`${index + 1}`).fontSize(11).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary())
+                  .width(27).height(27).textAlign(TextAlign.Center).backgroundColor(index < 3 ? TC.accent() : TC.surfaceInset())
                   .borderRadius(14).margin({ left: -3, top: -3 })
               }
-              Text(artist.name).width(102).fontSize(12).fontWeight(FontWeight.Medium).fontColor('#e8e8eb')
+              Text(artist.name).width(102).fontSize(12).fontWeight(FontWeight.Medium).fontColor(TC.textBody())
                 .textAlign(TextAlign.Center).maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
               Text(this.artistRankChange(artist, index)).fontSize(9)
-                .fontColor(this.artistRankChange(artist, index).startsWith('↑') ? '#ef6577' : '#696971')
+                .fontColor(this.artistRankChange(artist, index).startsWith('↑') ? TC.accentSoft() : TC.textTertiary())
             }.width(102).onClick(() => this.openRankArtist(artist))
           }, (artist: ArtistToplistArtist) => artist.id.toString())
         }.padding({ left: 17, right: 17, top: 4 })
@@ -654,10 +656,10 @@ struct Recommend {
                 .objectFit(ImageFit.Cover)
               Column().width('100%').height(50).borderRadius({ bottomLeft: 14, bottomRight: 14 })
                 .linearGradient({ angle: 180, colors: [['rgba(0,0,0,0)', 0], ['rgba(0,0,0,0.78)', 1]] })
-              Text(item.updateFrequency || '').width('90%').fontSize(8).fontColor('#ededf0')
+              Text(item.updateFrequency || '').width('90%').fontSize(8).fontColor(TC.textBody())
                 .margin({ left: 7, bottom: 7 }).maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
             }
-            Text(item.name).width('100%').fontSize(11).fontColor('#dcdce1').maxLines(2)
+            Text(item.name).width('100%').fontSize(11).fontColor(TC.textBody()).maxLines(2)
               .textOverflow({ overflow: TextOverflow.Ellipsis })
           }
           .width('31%').margin({ bottom: 15 }).alignItems(HorizontalAlign.Start)
@@ -680,9 +682,9 @@ struct Recommend {
                 .fontSize(31)
                 .fontColor(['rgba(255,255,255,0.92)'])
             }
-            Text(item.title).width(148).fontSize(12).fontColor('#e3e3e6').maxLines(2)
+            Text(item.title).width(148).fontSize(12).fontColor(TC.textBody()).maxLines(2)
               .textOverflow({ overflow: TextOverflow.Ellipsis })
-            Text(item.subtitle).width(148).fontSize(10).fontColor('#77777f').maxLines(1)
+            Text(item.subtitle).width(148).fontSize(10).fontColor(TC.textTertiary()).maxLines(1)
               .textOverflow({ overflow: TextOverflow.Ellipsis })
           }
           .alignItems(HorizontalAlign.Start)
@@ -702,23 +704,23 @@ struct Recommend {
         Column() {
           Row({ space: 12 }) {
             Stack() {
-              SymbolGlyph($r('sys.symbol.line_3_horizontal')).fontSize(21).fontColor(['#e4e4e8'])
+              SymbolGlyph($r('sys.symbol.line_3_horizontal')).fontSize(21).fontColor([TC.textBody()])
             }
-            .width(42).height(42).borderRadius(14).backgroundColor('#1e1e24')
+            .width(42).height(42).borderRadius(14).backgroundColor(TC.surfaceCardAlt())
             .onClick(() => this.onMenuClick())
 
             Row({ space: 8 }) {
-              SymbolGlyph($r('sys.symbol.magnifyingglass')).fontSize(18).fontColor(['#85858d'])
-              Text('搜索歌曲、歌手、专辑').layoutWeight(1).fontSize(13).fontColor('#77777f')
+              SymbolGlyph($r('sys.symbol.magnifyingglass')).fontSize(18).fontColor([TC.textSecondary()])
+              Text('搜索歌曲、歌手、专辑').layoutWeight(1).fontSize(13).fontColor(TC.textTertiary())
             }
             .layoutWeight(1).height(42).padding({ left: 14, right: 14 })
-            .backgroundColor('#1e1e24').borderRadius(14)
+            .backgroundColor(TC.surfaceCardAlt()).borderRadius(14)
             .onClick(() => this.pageStack.pushPathByName('SearchPage', null))
           }
           .width('100%').padding({ left: 14, right: 14, top: 12 })
 
           if (this.refreshText) {
-            Text(this.refreshText).width('100%').fontSize(10).fontColor('#77777f')
+            Text(this.refreshText).width('100%').fontSize(10).fontColor(TC.textTertiary())
               .textAlign(TextAlign.Center).padding({ top: 10 })
           }
 
@@ -738,13 +740,13 @@ struct Recommend {
                   }
                   Column({ space: 2 }) {
                     Text(this.todayDate)
-                      .fontSize(38).fontWeight(FontWeight.Bold).fontColor('#ffffff')
-                    Text('今日').fontSize(10).fontColor('#f2d8dd')
+                      .fontSize(38).fontWeight(FontWeight.Bold).fontColor(TC.textOnMedia())
+                    Text('今日').fontSize(10).fontColor(TC.textOnMedia())
                   }
                 }
                 .width(132).height(132).borderRadius(17).clip(true)
-                Text('每日推荐').width(132).fontSize(14).fontWeight(FontWeight.Bold).fontColor('#f0f0f3')
-                Text('今日限定好歌推荐').width(132).fontSize(10).fontColor('#77777f').maxLines(1)
+                Text('每日推荐').width(132).fontSize(14).fontWeight(FontWeight.Bold).fontColor(TC.textBody())
+                Text('今日限定好歌推荐').width(132).fontSize(10).fontColor(TC.textTertiary()).maxLines(1)
               }
               .alignItems(HorizontalAlign.Start)
               .onClick(() => this.openDailyRecommend())
@@ -763,17 +765,17 @@ struct Recommend {
                   }
                   if (this.heartModeLoading) {
                     Column({ space: 7 }) {
-                      LoadingProgress().width(31).height(31).color('#ffffff')
-                      Text('生成中').fontSize(9).fontColor('#f7e9ed')
+                      LoadingProgress().width(31).height(31).color(TC.textOnMedia())
+                      Text('生成中').fontSize(9).fontColor(TC.textOnMedia())
                     }
                   } else {
                     Column({ space: 5 }) {
-                      SymbolGlyph($r('sys.symbol.heart_fill')).fontSize(42).fontColor(['#ffffff'])
+                      SymbolGlyph($r('sys.symbol.heart_fill')).fontSize(42).fontColor([TC.textPrimary()])
                     }
                   }
                 }.width(132).height(132).borderRadius(17).clip(true)
-                Text('心动模式').width(132).fontSize(14).fontWeight(FontWeight.Bold).fontColor('#f0f0f3')
-                Text('红心歌曲与相似推荐').width(132).fontSize(10).fontColor('#77777f').maxLines(1)
+                Text('心动模式').width(132).fontSize(14).fontWeight(FontWeight.Bold).fontColor(TC.textBody())
+                Text('红心歌曲与相似推荐').width(132).fontSize(10).fontColor(TC.textTertiary()).maxLines(1)
               }.alignItems(HorizontalAlign.Start).onClick(() => this.openHeartMode())
 
               Column({ space: 8 }) {
@@ -782,8 +784,8 @@ struct Recommend {
                   Column().width(132).height(132).borderRadius(17).backgroundColor('rgba(0,0,0,0.35)')
                   Image(FM_ICON).width(46).height(46).borderRadius(23)
                 }.width(132).height(132)
-                Text('私人FM').width(132).fontSize(14).fontWeight(FontWeight.Bold).fontColor('#f0f0f3')
-                Text('为你推荐的下一首').width(132).fontSize(10).fontColor('#77777f')
+                Text('私人FM').width(132).fontSize(14).fontWeight(FontWeight.Bold).fontColor(TC.textBody())
+                Text('为你推荐的下一首').width(132).fontSize(10).fontColor(TC.textTertiary())
               }.alignItems(HorizontalAlign.Start).onClick(() =>
                 this.pageStack.pushPathByName('PlaylistDetailPage', DiscoveryPlaylistsService.playlist()))
 
@@ -792,12 +794,12 @@ struct Recommend {
                   Stack({ alignContent: Alignment.TopEnd }) {
                     Image(item.cover).width(132).height(132).borderRadius(17).objectFit(ImageFit.Cover)
                     if (item.count > 0) {
-                      Text(`${this.formatCount(item.count)}首`).fontSize(9).fontColor('#ffffff')
+                      Text(`${this.formatCount(item.count)}首`).fontSize(9).fontColor(TC.textPrimary())
                         .padding({ left: 6, right: 6, top: 3, bottom: 3 })
                         .backgroundColor('rgba(0,0,0,0.42)').borderRadius(8).margin(7)
                     }
                   }
-                  Text(item.name).width(132).fontSize(12).fontColor('#dedee2').maxLines(2)
+                  Text(item.name).width(132).fontSize(12).fontColor(TC.textBody()).maxLines(2)
                     .textOverflow({ overflow: TextOverflow.Ellipsis })
                 }
                 .alignItems(HorizontalAlign.Start)
@@ -813,7 +815,7 @@ struct Recommend {
             this.ThreeRowSongs(this.personalizedNewSongColumns)
           } else if (!this.loading) {
             Text('暂无个性化新歌推荐')
-              .width('100%').fontSize(11).fontColor('#66666e').textAlign(TextAlign.Center)
+              .width('100%').fontSize(11).fontColor(TC.textQuaternary()).textAlign(TextAlign.Center)
               .padding({ top: 18, bottom: 18 })
           }
 
@@ -824,7 +826,7 @@ struct Recommend {
                 ForEach(this.radarPlaylists, (item: playlistType) => {
                   Column({ space: 8 }) {
                     Image(item.cover).width(120).height(120).borderRadius(12)
-                    Text(item.name).fontSize(12).fontColor('#eeeeee').maxLines(2)
+                    Text(item.name).fontSize(12).fontColor(TC.textBody()).maxLines(2)
                   }.width(120).onClick(() => this.pageStack.pushPathByName('PlaylistDetailPage', item))
                 })
               }.padding({ left: 16, right: 16 })
@@ -838,8 +840,8 @@ struct Recommend {
                 Stack({ alignContent: Alignment.BottomStart }) {
                   Image(item.cover).width(200).height(120).borderRadius(18).objectFit(ImageFit.Cover)
                   Column({ space: 3 }) {
-                    Text(item.title).fontSize(17).fontWeight(FontWeight.Bold).fontColor('#ffffff')
-                    Text(item.subtitle).fontSize(9).fontColor('#e3e3e6').maxLines(1)
+                    Text(item.title).fontSize(17).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary())
+                    Text(item.subtitle).fontSize(9).fontColor(TC.textBody()).maxLines(1)
                   }
                   .width('60%').padding(12)
                   .linearGradient({ angle: 0, colors: [['rgba(0,0,0,0.72)', 0], ['rgba(0,0,0,0)', 1]] })
@@ -873,7 +875,7 @@ struct Recommend {
                       SymbolGlyph($r('sys.symbol.play_circle_fill')).fontSize(32)
                         .fontColor(['rgba(255,255,255,0.9)'])
                     }
-                    Text(item.name).width(220).fontSize(12).fontColor('#e3e3e6').maxLines(2)
+                    Text(item.name).width(220).fontSize(12).fontColor(TC.textBody()).maxLines(2)
                       .textOverflow({ overflow: TextOverflow.Ellipsis })
                   }
                   .alignItems(HorizontalAlign.Start)
@@ -890,7 +892,7 @@ struct Recommend {
       }
       .width('100%').height('100%').scrollBar(BarState.Off)
     }
-    .width('100%').height('100%').backgroundColor('#121215')
+    .width('100%').height('100%').backgroundColor(TC.pageBackground())
     .onRefreshing(async () => {
       this.isRefreshing = true
       await this.loadHomeData()

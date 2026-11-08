@@ -18,12 +18,14 @@ import {
 import { ApiClient } from '../services/ApiClient'
 import { playerController } from '../services/PlayerController'
 import { AuthStore } from '../stores/AuthStore'
+import { TC } from '../services/ThemeColors'
 
 interface RecentVideoUrl { url: string; r?: number }
 interface RecentVideoUrlResponse { code: number; urls?: RecentVideoUrl[] }
 
 @Component
 export struct MvPlayerPage {
+  @StorageProp('skinVersion') skinVersionObs: number = 0
   @Consume('pageStack') pageStack: NavPathStack
   @Consume('topAvoidHeight') topAvoidHeight: number
   @Consume('authStore') authStore: AuthStore
@@ -601,16 +603,16 @@ export struct MvPlayerPage {
       }
       if (this.loading) {
         Column({ space: 10 }) {
-          LoadingProgress().width(38).height(38).color('#ef233c')
-          Text('正在获取 MV 播放地址…').fontSize(11).fontColor('#b8b8bf')
+          LoadingProgress().width(38).height(38).color(TC.accent())
+          Text('正在获取 MV 播放地址…').fontSize(11).fontColor(TC.textBody())
         }
       }
       if (!this.loading && this.message && !this.videoUrl) {
         Column({ space: 12 }) {
-          SymbolGlyph($r('sys.symbol.exclamationmark_triangle_fill')).fontSize(31).fontColor(['#ff8b65'])
-          Text(this.message).width('80%').fontSize(12).lineHeight(19).fontColor('#c8c8ce')
+          SymbolGlyph($r('sys.symbol.exclamationmark_triangle_fill')).fontSize(31).fontColor([TC.accentSoft()])
+          Text(this.message).width('80%').fontSize(12).lineHeight(19).fontColor(TC.textBody())
             .textAlign(TextAlign.Center)
-          Button('重新获取').height(38).fontSize(12).fontColor('#ffffff').backgroundColor('#ef233c')
+          Button('重新获取').height(38).fontSize(12).fontColor(TC.textPrimary()).backgroundColor(TC.accent())
             .borderRadius(18).onClick(() => this.loadVideoUrl(this.selectedResolution))
         }
       }
@@ -624,8 +626,8 @@ export struct MvPlayerPage {
     Column({ space: 6 }) {
       Stack() {
         SymbolGlyph(icon()).fontSize(22).fontColor([active() ? '#ef233c' : '#e0e0e4'])
-      }.width(42).height(42).borderRadius(21).backgroundColor('#24242a')
-      Text(title()).fontSize(10).fontColor('#a0a0a8')
+      }.width(42).height(42).borderRadius(21).backgroundColor(TC.surfaceInset())
+      Text(title()).fontSize(10).fontColor(TC.textQuaternary())
       if (value()) {
         Text(value()).fontSize(9).fontColor(active() ? '#ef6577' : '#66666e')
       }
@@ -638,14 +640,14 @@ export struct MvPlayerPage {
       Column() {
         Column().width('100%').height(this.topAvoidHeight)
         Row() {
-          SymbolGlyph($r('sys.symbol.chevron_left')).fontSize(24).fontColor(['#ffffff'])
+          SymbolGlyph($r('sys.symbol.chevron_left')).fontSize(24).fontColor([TC.textPrimary()])
             .onClick(() => this.pageStack.pop())
           Text('MV 播放').layoutWeight(1).fontSize(18).fontWeight(FontWeight.Bold)
-            .fontColor('#ffffff').textAlign(TextAlign.Center)
+            .fontColor(TC.textPrimary()).textAlign(TextAlign.Center)
           SymbolGlyph($r('sys.symbol.rectangle_on_rectangle')).fontSize(21)
             .fontColor([this.pipSupported ? (this.pipActive ? '#ef233c' : '#d8d8dd') : '#55555d'])
             .margin({ right: 18 }).onClick(() => this.startPip())
-          SymbolGlyph($r('sys.symbol.arrow_up_left_and_arrow_down_right')).fontSize(20).fontColor(['#d8d8dd'])
+          SymbolGlyph($r('sys.symbol.arrow_up_left_and_arrow_down_right')).fontSize(20).fontColor([TC.textBody()])
             .onClick(() => this.controller.requestFullscreen(true))
         }.width('100%').height(56).padding({ left: 16, right: 16 })
 
@@ -655,23 +657,23 @@ export struct MvPlayerPage {
           Column({ space: 18 }) {
             Column({ space: 8 }) {
               Text(this.mvName || 'MV').width('100%').fontSize(20).fontWeight(FontWeight.Bold)
-                .fontColor('#f5f5f7').maxLines(2).textOverflow({ overflow: TextOverflow.Ellipsis })
+                .fontColor(TC.textBody()).maxLines(2).textOverflow({ overflow: TextOverflow.Ellipsis })
               if (this.mvArtistName) {
-                Text(this.mvArtistName).width('100%').fontSize(13).fontColor('#a0a0a8')
+                Text(this.mvArtistName).width('100%').fontSize(13).fontColor(TC.textQuaternary())
               }
               Row({ space: 12 }) {
                 if (this.mvPlayCount > 0) {
-                  Text(`${this.compactCount(this.mvPlayCount)} 次播放`).fontSize(11).fontColor('#686870')
+                  Text(`${this.compactCount(this.mvPlayCount)} 次播放`).fontSize(11).fontColor(TC.textQuaternary())
                 }
                 if (this.mvDuration > 0) {
-                  Text(this.formatDuration(this.mvDuration)).fontSize(11).fontColor('#686870')
+                  Text(this.formatDuration(this.mvDuration)).fontSize(11).fontColor(TC.textQuaternary())
                 }
                 if (this.mvPublishTime) {
-                  Text(this.mvPublishTime).fontSize(11).fontColor('#686870')
+                  Text(this.mvPublishTime).fontSize(11).fontColor(TC.textQuaternary())
                 }
               }
               if (this.mvDescription) {
-                Text(this.mvDescription).width('100%').fontSize(12).lineHeight(19).fontColor('#85858e')
+                Text(this.mvDescription).width('100%').fontSize(12).lineHeight(19).fontColor(TC.textTertiary())
                   .maxLines(3).textOverflow({ overflow: TextOverflow.Ellipsis })
               }
             }.width('100%').alignItems(HorizontalAlign.Start)
@@ -701,18 +703,18 @@ export struct MvPlayerPage {
 
             Column({ space: 11 }) {
               Row() {
-                Text('播放清晰度').fontSize(14).fontWeight(FontWeight.Bold).fontColor('#ffffff')
+                Text('播放清晰度').fontSize(14).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary())
                 Blank()
                 if (this.actualResolution > 0) {
-                  Text(`当前 ${this.resolutionTitle(this.actualResolution)}`).fontSize(10).fontColor('#77777f')
+                  Text(`当前 ${this.resolutionTitle(this.actualResolution)}`).fontSize(10).fontColor(TC.textTertiary())
                 }
               }.width('100%')
               Row({ space: 9 }) {
                 ForEach(this.resolutions, (resolution: number) => {
                   Text(this.resolutionTitle(resolution)).layoutWeight(1).height(38).fontSize(11)
                     .fontWeight(FontWeight.Medium).textAlign(TextAlign.Center)
-                    .fontColor(this.selectedResolution === resolution ? '#ffffff' : '#8b8b93')
-                    .backgroundColor(this.selectedResolution === resolution ? '#ef233c' : '#24242a')
+                    .fontColor(this.selectedResolution === resolution ? TC.textOnAccent() : TC.textTertiary())
+                    .backgroundColor(this.selectedResolution === resolution ? TC.accent() : TC.surfaceInset())
                     .borderRadius(12).onClick(() => {
                       if (this.selectedResolution !== resolution) {
                         this.loadVideoUrl(resolution)
@@ -720,27 +722,27 @@ export struct MvPlayerPage {
                     })
                 })
               }.width('100%')
-            }.width('100%').padding(15).backgroundColor('#1b1b20').borderRadius(17)
+            }.width('100%').padding(15).backgroundColor(TC.surfaceCard()).borderRadius(17)
 
             if (this.actionMessage) {
               Text(this.actionMessage).width('100%').padding(12).fontSize(11).lineHeight(18)
                 .fontColor(this.actionMessage.includes('已') ? '#65c98c' : '#ff9a78')
-                .textAlign(TextAlign.Center).backgroundColor('#202026').borderRadius(13)
+                .textAlign(TextAlign.Center).backgroundColor(TC.surfaceCardAlt()).borderRadius(13)
             }
             if (this.message && this.videoUrl) {
               Row({ space: 8 }) {
-                SymbolGlyph($r('sys.symbol.exclamationmark_triangle_fill')).fontSize(18).fontColor(['#ff8b65'])
-                Text(this.message).layoutWeight(1).fontSize(11).lineHeight(18).fontColor('#ff9a78')
-                Text('重试').fontSize(11).fontColor('#ff6577')
+                SymbolGlyph($r('sys.symbol.exclamationmark_triangle_fill')).fontSize(18).fontColor([TC.accentSoft()])
+                Text(this.message).layoutWeight(1).fontSize(11).lineHeight(18).fontColor(TC.accentSoft())
+                Text('重试').fontSize(11).fontColor(TC.accentSoft())
                   .onClick(() => this.loadVideoUrl(this.selectedResolution))
-              }.width('100%').padding(12).backgroundColor('#2b211f').borderRadius(13)
+              }.width('100%').padding(12).backgroundColor(TC.surfaceInset()).borderRadius(13)
             }
           }.width('100%').padding({ left: 16, right: 16, top: 18, bottom: 34 })
         }.layoutWeight(1).scrollBar(BarState.Off)
       }
-      .width('100%').height('100%').backgroundColor('#121215')
+      .width('100%').height('100%').backgroundColor(TC.pageBackground())
       .bindSheet(this.commentSheetVisible, this.CommentSheet(), {
-        height: '72%', backgroundColor: '#19191f', showClose: false, dragBar: true,
+        height: '72%', backgroundColor: TC.sheetBackground(), showClose: false, dragBar: true,
         onDisappear: () => this.commentSheetVisible = false
       })
     }.hideTitleBar(true)

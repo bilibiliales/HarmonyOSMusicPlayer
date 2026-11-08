@@ -14,6 +14,7 @@ import { ApiClient } from '../services/ApiClient'
 import { AuthStore } from '../stores/AuthStore'
 import { playerController } from '../services/PlayerController'
 import { common, OpenLinkOptions } from '@kit.AbilityKit'
+import { TC } from '../services/ThemeColors'
 
 class ChatMessage {
   msg: string = ''
@@ -102,6 +103,7 @@ interface ParsedMsgBody {
 
 @Component
 export struct PrivateChatPage {
+  @StorageProp('skinVersion') skinVersionObs: number = 0
   @Consume('pageStack') pageStack: NavPathStack
   @Consume('topAvoidHeight') topAvoidHeight: number
   @Consume('authStore') authStore: AuthStore
@@ -477,13 +479,13 @@ export struct PrivateChatPage {
           Row({ space: 10 }) {
             Image(item.songItem.img).width(46).height(46).borderRadius(8).objectFit(ImageFit.Cover)
             Column({ space: 4 }) {
-              Text(item.songItem.name).fontSize(13).fontColor('#ededf0').maxLines(1)
-              Text(item.songItem.author).fontSize(11).fontColor('#77777f').maxLines(1)
+              Text(item.songItem.name).fontSize(13).fontColor(TC.textBody()).maxLines(1)
+              Text(item.songItem.author).fontSize(11).fontColor(TC.textTertiary()).maxLines(1)
             }
             .layoutWeight(1).alignItems(HorizontalAlign.Start)
-            SymbolGlyph($r('sys.symbol.play_circle_fill')).fontSize(22).fontColor(['#ef233c'])
+            SymbolGlyph($r('sys.symbol.play_circle_fill')).fontSize(22).fontColor([TC.accent()])
           }
-          .width(220).padding(10).backgroundColor('#2a2a30').borderRadius(14)
+          .width(220).padding(10).backgroundColor(TC.surfaceRaised()).borderRadius(14)
           .onClick(() => {
             if (item.songItem) {
               this.playSong(item.songItem)
@@ -491,18 +493,18 @@ export struct PrivateChatPage {
           })
         } else if (item.type === 'playlist' && item.playlistName) {
           Row({ space: 8 }) {
-            SymbolGlyph($r('sys.symbol.music_note_list')).fontSize(18).fontColor(['#ef233c'])
-            Text(item.playlistName).fontSize(13).fontColor('#ededf0').maxLines(1)
+            SymbolGlyph($r('sys.symbol.music_note_list')).fontSize(18).fontColor([TC.accent()])
+            Text(item.playlistName).fontSize(13).fontColor(TC.textBody()).maxLines(1)
           }
-          .width(220).padding(10).backgroundColor('#2a2a30').borderRadius(14)
+          .width(220).padding(10).backgroundColor(TC.surfaceRaised()).borderRadius(14)
         } else if (item.type === 'album' && item.albumName) {
           Row({ space: 8 }) {
             if (item.albumImg) {
               Image(item.albumImg).width(36).height(36).borderRadius(6).objectFit(ImageFit.Cover)
             }
-            Text(item.albumName).fontSize(13).fontColor('#ededf0').maxLines(1)
+            Text(item.albumName).fontSize(13).fontColor(TC.textBody()).maxLines(1)
           }
-          .width(220).padding(10).backgroundColor('#2a2a30').borderRadius(14)
+          .width(220).padding(10).backgroundColor(TC.surfaceRaised()).borderRadius(14)
         } else if (item.type === 'general' && item.generalTitle) {
           Column({ space: 0 }) {
             if (item.generalCover) {
@@ -510,27 +512,27 @@ export struct PrivateChatPage {
             }
             Column({ space: 7 }) {
               Text(item.generalTitle).width('100%').fontSize(14).fontWeight(FontWeight.Bold)
-                .fontColor('#f4f4f6').maxLines(2).textOverflow({ overflow: TextOverflow.Ellipsis })
+                .fontColor(TC.textBody()).maxLines(2).textOverflow({ overflow: TextOverflow.Ellipsis })
               if (item.generalNotice && item.generalNotice !== item.generalTitle) {
-                Text(item.generalNotice).width('100%').fontSize(11).lineHeight(17).fontColor('#94949c')
+                Text(item.generalNotice).width('100%').fontSize(11).lineHeight(17).fontColor(TC.textSecondary())
                   .maxLines(3).textOverflow({ overflow: TextOverflow.Ellipsis })
               }
               Row() {
-                Text('查看详情').fontSize(11).fontColor('#ff6577')
+                Text('查看详情').fontSize(11).fontColor(TC.accentSoft())
                 Blank()
-                SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(14).fontColor(['#77777f'])
+                SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(14).fontColor([TC.textTertiary()])
               }.width('100%')
             }.width('100%').padding(12).alignItems(HorizontalAlign.Start)
           }
-          .width(238).clip(true).backgroundColor('#25252b').borderRadius(15)
-          .border({ width: 1, color: '#303037' })
+          .width(238).clip(true).backgroundColor(TC.surfaceRaised()).borderRadius(15)
+          .border({ width: 1, color: TC.textTertiary() })
           .onClick(() => this.openGeneralCard(item))
         }
         if (item.msg && item.type === 'text') {
           Text(item.msg)
-            .fontSize(14).fontColor(item.isSelf ? '#ffffff' : '#ededf0')
+            .fontSize(14).fontColor(item.isSelf ? TC.textOnAccent() : TC.textPrimary())
             .padding({ left: 14, right: 14, top: 10, bottom: 10 })
-            .backgroundColor(item.isSelf ? '#ef233c' : '#2a2a30')
+            .backgroundColor(item.isSelf ? TC.accent() : TC.surfaceCard())
             .borderRadius(18)
             .maxLines(10)
         }
@@ -551,9 +553,9 @@ export struct PrivateChatPage {
         Column().width('100%').height(this.topAvoidHeight)
         Row() {
           SymbolGlyph($r('sys.symbol.chevron_left'))
-            .fontSize(24).fontColor(['#ffffff']).onClick(() => this.pageStack.pop())
+            .fontSize(24).fontColor([TC.textPrimary()]).onClick(() => this.pageStack.pop())
           Text(this.pageParam.nickname).layoutWeight(1).fontSize(17).fontWeight(FontWeight.Bold)
-            .fontColor('#ffffff').textAlign(TextAlign.Center)
+            .fontColor(TC.textPrimary()).textAlign(TextAlign.Center)
           Image(this.pageParam.avatarUrl).width(28).height(28).borderRadius(14)
             .objectFit(ImageFit.Cover).margin({ right: 16 })
             .onClick(() => this.openOtherUserProfile())
@@ -562,14 +564,14 @@ export struct PrivateChatPage {
 
         if (this.loading && this.messages.length === 0) {
           Column({ space: 12 }) {
-            LoadingProgress().width(36).height(36).color('#ef233c')
-            Text('加载中…').fontSize(13).fontColor('#77777f')
+            LoadingProgress().width(36).height(36).color(TC.accent())
+            Text('加载中…').fontSize(13).fontColor(TC.textTertiary())
           }
           .layoutWeight(1).justifyContent(FlexAlign.Center)
         } else if (this.messages.length === 0) {
           Column({ space: 12 }) {
-            SymbolGlyph($r('sys.symbol.ellipsis_bubble')).fontSize(40).fontColor(['#55555d'])
-            Text('暂无消息记录').fontSize(13).fontColor('#77777f')
+            SymbolGlyph($r('sys.symbol.ellipsis_bubble')).fontSize(40).fontColor([TC.textQuaternary()])
+            Text('暂无消息记录').fontSize(13).fontColor(TC.textTertiary())
           }
           .layoutWeight(1).justifyContent(FlexAlign.Center)
         } else {
@@ -578,10 +580,10 @@ export struct PrivateChatPage {
               ListItem() {
                 Row() {
                   if (this.loadMoreLoading) {
-                    LoadingProgress().width(20).height(20).color('#ef233c')
+                    LoadingProgress().width(20).height(20).color(TC.accent())
                   }
                   Text(this.loadMoreLoading ? '加载中…' : '加载更多消息')
-                    .fontSize(12).fontColor('#77777f')
+                    .fontSize(12).fontColor(TC.textTertiary())
                 }
                 .width('100%').height(40).justifyContent(FlexAlign.Center)
                 .onClick(() => this.loadHistory(true))
@@ -597,37 +599,37 @@ export struct PrivateChatPage {
         }
 
         if (this.chatMessage) {
-          Text(this.chatMessage).width('100%').fontSize(11).fontColor('#ff6577')
+          Text(this.chatMessage).width('100%').fontSize(11).fontColor(TC.accentSoft())
             .textAlign(TextAlign.Center).padding({ top: 4, bottom: 4 })
         }
 
         if (this.pageParam.shareType && !this.hasAutoShared) {
           Row({ space: 8 }) {
-            Text(`发送「${this.pageParam.shareMsg || '分享内容'}」`).fontSize(13).fontColor('#ededf0')
+            Text(`发送「${this.pageParam.shareMsg || '分享内容'}」`).fontSize(13).fontColor(TC.textBody())
               .layoutWeight(1).maxLines(1)
-            Button('发送').height(32).fontSize(12).fontColor('#ffffff').backgroundColor('#ef233c')
+            Button('发送').height(32).fontSize(12).fontColor(TC.textPrimary()).backgroundColor(TC.accent())
               .borderRadius(16).enabled(!this.sending)
               .onClick(() => this.sendShareMessage())
           }
           .width('100%').padding({ left: 16, right: 16, top: 6, bottom: 6 })
-          .backgroundColor('#1f1f26').borderRadius(12).margin({ left: 12, right: 12, top: 4 })
+          .backgroundColor(TC.surfaceCardAlt()).borderRadius(12).margin({ left: 12, right: 12, top: 4 })
         }
 
         Row({ space: 10 }) {
           TextInput({ text: this.inputText, placeholder: '输入消息…' })
-            .layoutWeight(1).height(42).fontColor('#ffffff').placeholderColor('#696972')
-            .backgroundColor('#202026').borderRadius(21).padding({ left: 18, right: 18 })
+            .layoutWeight(1).height(42).fontColor(TC.textPrimary()).placeholderColor(TC.textQuaternary())
+            .backgroundColor(TC.surfaceCardAlt()).borderRadius(21).padding({ left: 18, right: 18 })
             .onChange((value: string) => this.inputText = value)
             .onSubmit(() => this.sendTextMessage())
           Button(this.sending ? '…' : '发送')
-            .height(42).fontSize(13).fontColor('#ffffff').backgroundColor('#ef233c')
+            .height(42).fontSize(13).fontColor(TC.textPrimary()).backgroundColor(TC.accent())
             .borderRadius(21).enabled(!this.sending)
             .onClick(() => this.sendTextMessage())
         }
         .width('100%').padding({ left: 12, right: 12, top: 8, bottom: 12 })
-        .backgroundColor('#17171c')
+        .backgroundColor(TC.surfaceCard())
       }
-      .width('100%').height('100%').backgroundColor('#121215')
+      .width('100%').height('100%').backgroundColor(TC.pageBackground())
       if (this.previewImageMounted && this.previewImageUrl) {
         Stack() {
           Column().width('100%').height('100%').backgroundColor('#000000')

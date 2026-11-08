@@ -10,9 +10,11 @@ import {
 import { BubbleTip } from '../services/BubbleTip'
 import { ApiClient } from '../services/ApiClient'
 import { AuthStore } from '../stores/AuthStore'
+import { TC } from '../services/ThemeColors'
 
 @Component
 export struct ShareSheet {
+  @StorageProp('skinVersion') skinVersionObs: number = 0
   @Consume('pageStack') pageStack: NavPathStack
   @Consume('authStore') authStore: AuthStore
   @Prop shareParam: SharePageParam = { type: 'song', id: '', name: '', img: '' }
@@ -129,11 +131,11 @@ export struct ShareSheet {
   private ShareOption(icon: Resource, title: string, onClick: () => void) {
     Column({ space: 8 }) {
       Stack() {
-        SymbolGlyph(icon).fontSize(22).fontColor(['#ffffff'])
+        SymbolGlyph(icon).fontSize(22).fontColor([TC.textPrimary()])
       }
-      .width(52).height(52).borderRadius(14).backgroundColor('#2a2a30')
+      .width(52).height(52).borderRadius(14).backgroundColor(TC.surfaceRaised())
       .alignContent(Alignment.Center)
-      Text(title).fontSize(11).fontColor('#b5b5bc')
+      Text(title).fontSize(11).fontColor(TC.textBody())
     }
     .onClick(onClick)
   }
@@ -143,13 +145,13 @@ export struct ShareSheet {
     Row({ space: 10 }) {
       Image(user.avatarUrl || '').width(40).height(40).borderRadius(20).objectFit(ImageFit.Cover)
       Column({ space: 3 }) {
-        Text(user.nickname || '').fontSize(13).fontColor('#ededf0').maxLines(1)
+        Text(user.nickname || '').fontSize(13).fontColor(TC.textBody()).maxLines(1)
         if (user.mutual) {
-          Text('互相关注').fontSize(10).fontColor('#77777f')
+          Text('互相关注').fontSize(10).fontColor(TC.textTertiary())
         }
       }
       .layoutWeight(1).alignItems(HorizontalAlign.Start)
-      SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(16).fontColor(['#55555d'])
+      SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(16).fontColor([TC.textQuaternary()])
     }
     .width('100%')
     .height(56)
@@ -166,10 +168,10 @@ export struct ShareSheet {
           Column({ space: 4 }) {
             Text(`分享「${this.shareParam.name}」`).fontSize(16).fontWeight(FontWeight.Bold).fontColor(
               $r('sys.color.white')).maxLines(2)
-            Text('选择分享方式').fontSize(11).fontColor('#77777f')
+            Text('选择分享方式').fontSize(11).fontColor(TC.textTertiary())
           }
           .layoutWeight(1).alignItems(HorizontalAlign.Start)
-          SymbolGlyph($r('sys.symbol.xmark_circle_fill')).fontSize(24).fontColor(['#686870'])
+          SymbolGlyph($r('sys.symbol.xmark_circle_fill')).fontSize(24).fontColor([TC.textQuaternary()])
             .onClick(() => this.onClose())
         }
         .width('100%').padding({ left: 20, right: 20, top: 18, bottom: 4 })
@@ -178,12 +180,12 @@ export struct ShareSheet {
           Column({ space: 10 }) {
             if (this.contactsLoading) {
               Row() {
-                LoadingProgress().width(24).height(24).color('#ef233c')
-                Text('加载联系人…').fontSize(12).fontColor('#77777f').margin({ left: 8 })
+                LoadingProgress().width(24).height(24).color(TC.accent())
+                Text('加载联系人…').fontSize(12).fontColor(TC.textTertiary()).margin({ left: 8 })
               }
               .width('100%').justifyContent(FlexAlign.Center).padding({ top: 16, bottom: 16 })
             } else if (this.contacts.length > 0) {
-              Text('选择联系人发起私信').fontSize(12).fontColor('#9999a0').width('100%').padding({ left: 20 })
+              Text('选择联系人发起私信').fontSize(12).fontColor(TC.textSecondary()).width('100%').padding({ left: 20 })
               List({ space: 0 }) {
                 ForEach(this.contacts, (user: MsgRecentContactUser) => {
                   ListItem() {
@@ -195,10 +197,10 @@ export struct ShareSheet {
               .height(280)
               .scrollBar(BarState.Off)
             } else {
-              Text('暂无联系人').fontSize(12).fontColor('#77777f').width('100%')
+              Text('暂无联系人').fontSize(12).fontColor(TC.textTertiary()).width('100%')
                 .textAlign(TextAlign.Center).padding({ top: 16, bottom: 16 })
             }
-            Button('返回').width('100%').backgroundColor('#2a2a30').fontColor('#b5b5bc')
+            Button('返回').width('100%').backgroundColor(TC.surfaceRaised()).fontColor(TC.textBody())
               .onClick(() => { this.contactsVisible = false })
           }
           .width('100%').padding({ left: 20, right: 20 })
@@ -210,7 +212,7 @@ export struct ShareSheet {
           }
           .width('100%').justifyContent(FlexAlign.Center).padding({ left: 20, right: 20 })
           Text('支持的设备可在此碰一碰分享或隔空传送')
-            .fontSize(11).fontColor('#9999a0').margin({ top: 12 })
+            .fontSize(11).fontColor(TC.textSecondary()).margin({ top: 12 })
         }
 
         if (this.shareMessage) {
@@ -220,7 +222,7 @@ export struct ShareSheet {
         }
       }
       .width('100%')
-      .backgroundColor('#19191f')
+      .backgroundColor(TC.surfaceCard())
       .borderRadius({ topLeft: 28, topRight: 28, bottomLeft: 0, bottomRight: 0 })
       .padding({ bottom: 28 })
       .transition(TransitionEffect.translate({ y: 400 }).animation({ duration: 260, curve: Curve.EaseOut }))

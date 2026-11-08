@@ -20,9 +20,11 @@ import { AuthStore } from '../stores/AuthStore'
 import { PlayerStore } from '../stores/PlayerStore'
 import { UserProfilePageParam } from '../models/api'
 import { BubbleTip } from '../services/BubbleTip'
+import { TC } from '../services/ThemeColors'
 
 @Component
 export struct EventDetailPage {
+  @StorageProp('skinVersion') skinVersionObs: number = 0
   @Consume('pageStack') pageStack: NavPathStack
   @Consume('topAvoidHeight') topAvoidHeight: number
   @Consume('authStore') authStore: AuthStore
@@ -186,9 +188,9 @@ export struct EventDetailPage {
       Row({ space: 8 }) {
         Image(source.user?.avatarUrl || '').width(28).height(28).borderRadius(14).objectFit(ImageFit.Cover)
         Text(source.user?.nickname || '源动态作者').fontSize(12).fontWeight(FontWeight.Medium)
-          .fontColor('#ffffff').maxLines(1)
+          .fontColor(TC.textPrimary()).maxLines(1)
       }.width('100%')
-      Text(this.sourceContent(source)).width('100%').fontSize(13).lineHeight(20).fontColor('#aaaab2')
+      Text(this.sourceContent(source)).width('100%').fontSize(13).lineHeight(20).fontColor(TC.textBody())
         .maxLines(5).textOverflow({ overflow: TextOverflow.Ellipsis })
       if ((source.pics || []).length > 0) {
         EventImages({ pictures: source.pics || [] })
@@ -199,16 +201,16 @@ export struct EventDetailPage {
             Image(this.sourceResourceImage(source)).width(44).height(44).borderRadius(8).objectFit(ImageFit.Cover)
           }
           Column({ space: 3 }) {
-            Text(this.sourceResourceKind(source)).fontSize(9).fontColor('#ff7587')
-            Text(this.sourceResourceTitle(source)).fontSize(12).fontColor('#dedee2').maxLines(1)
+            Text(this.sourceResourceKind(source)).fontSize(9).fontColor(TC.accentSoft())
+            Text(this.sourceResourceTitle(source)).fontSize(12).fontColor(TC.textBody()).maxLines(1)
             if (this.sourceResourceSubtitle(source)) {
-              Text(this.sourceResourceSubtitle(source)).fontSize(9).fontColor('#77777f').maxLines(1)
+              Text(this.sourceResourceSubtitle(source)).fontSize(9).fontColor(TC.textTertiary()).maxLines(1)
             }
           }.layoutWeight(1).alignItems(HorizontalAlign.Start)
-        }.width('100%').padding(9).backgroundColor('#202026').borderRadius(10)
+        }.width('100%').padding(9).backgroundColor(TC.surfaceCardAlt()).borderRadius(10)
       }
     }
-    .width('100%').padding(12).backgroundColor('#19191e').borderRadius(13)
+    .width('100%').padding(12).backgroundColor(TC.surfaceCard()).borderRadius(13)
     .onClick(() => this.openSourceEvent(source))
   }
 
@@ -323,7 +325,7 @@ export struct EventDetailPage {
       title: '删除动态',
       message: '确定删除这条动态？删除后无法恢复。',
       primaryButton: { value: '取消', action: () => {} },
-      secondaryButton: { value: '删除', fontColor: '#ef233c', action: () => { this.deleteEvent() } }
+      secondaryButton: { value: '删除', fontColor: TC.accent(), action: () => { this.deleteEvent() } }
     })
   }
 
@@ -406,11 +408,11 @@ export struct EventDetailPage {
         Column() {
           Column().width('100%').height(this.topAvoidHeight)
           Row() {
-          SymbolGlyph($r('sys.symbol.chevron_left')).fontSize(24).fontColor(['#ffffff'])
+          SymbolGlyph($r('sys.symbol.chevron_left')).fontSize(24).fontColor([TC.textPrimary()])
             .onClick(() => this.pageStack.pop())
           Text('动态详情').layoutWeight(1).fontSize(17).fontWeight(FontWeight.Bold)
-            .fontColor('#ffffff').textAlign(TextAlign.Center)
-          SymbolGlyph($r('sys.symbol.ellipsis_circle')).fontSize(23).fontColor(['#ffffff'])
+            .fontColor(TC.textPrimary()).textAlign(TextAlign.Center)
+          SymbolGlyph($r('sys.symbol.ellipsis_circle')).fontSize(23).fontColor([TC.textPrimary()])
             .width(44).height(44).bindMenu(this.moreOptions())
           }.height(56).padding({ left: 16, right: 16 })
           Scroll() {
@@ -419,12 +421,12 @@ export struct EventDetailPage {
               Image(this.event.user.avatarUrl).width(46).height(46)
                 .sourceSize({ width: 96, height: 96 }).borderRadius(23).objectFit(ImageFit.Cover)
               Column({ space: 4 }) {
-                Text(this.event.user.nickname).fontSize(14).fontWeight(FontWeight.Bold).fontColor('#ffffff')
+                Text(this.event.user.nickname).fontSize(14).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary())
                   .onClick(() => this.openUserProfile())
-                Text(this.formatTime(this.event.showTime || this.event.eventTime || 0)).fontSize(10).fontColor('#66666e')
+                Text(this.formatTime(this.event.showTime || this.event.eventTime || 0)).fontSize(10).fontColor(TC.textQuaternary())
               }.layoutWeight(1).alignItems(HorizontalAlign.Start)
             }.width('100%')
-            Text(this.content()).width('100%').fontSize(15).lineHeight(24).fontColor('#dedee2')
+            Text(this.content()).width('100%').fontSize(15).lineHeight(24).fontColor(TC.textBody())
             if (this.sourceEvent()) {
               this.SourceEventCard(this.sourceEvent()!)
             }
@@ -436,17 +438,17 @@ export struct EventDetailPage {
                 Image(this.song()?.img || '').width(66).height(66)
                   .sourceSize({ width: 144, height: 144 }).borderRadius(12).objectFit(ImageFit.Cover)
                 Column({ space: 5 }) {
-                  Text(this.song()?.name || '').fontSize(14).fontColor('#ffffff').maxLines(1)
-                  Text(this.song()?.author || '').fontSize(11).fontColor('#77777f').maxLines(1)
+                  Text(this.song()?.name || '').fontSize(14).fontColor(TC.textPrimary()).maxLines(1)
+                  Text(this.song()?.author || '').fontSize(11).fontColor(TC.textTertiary()).maxLines(1)
                 }.layoutWeight(1).alignItems(HorizontalAlign.Start)
                 SymbolGlyph(this.songLiked ? $r('sys.symbol.heart_fill') : $r('sys.symbol.heart'))
-                  .fontSize(21).fontColor([this.songLiked ? '#ef233c' : '#77777f'])
+                  .fontSize(21).fontColor([this.songLiked ? TC.accent() : TC.textTertiary()])
                   .onClick(() => this.toggleSongLike())
-                SymbolGlyph($r('sys.symbol.ellipsis_bubble')).fontSize(21).fontColor(['#77777f'])
+                SymbolGlyph($r('sys.symbol.ellipsis_bubble')).fontSize(21).fontColor([TC.textTertiary()])
                   .onClick(() => this.openSongComments())
-                SymbolGlyph($r('sys.symbol.play_circle_fill')).fontSize(25).fontColor(['#ffffff'])
+                SymbolGlyph($r('sys.symbol.play_circle_fill')).fontSize(25).fontColor([TC.textPrimary()])
                   .onClick(() => this.playSong())
-              }.width('100%').padding(12).backgroundColor('#24242a').borderRadius(14)
+              }.width('100%').padding(12).backgroundColor(TC.surfaceInset()).borderRadius(14)
             }
             if (this.hasAttachedResource()) {
               Row({ space: 11 }) {
@@ -455,19 +457,19 @@ export struct EventDetailPage {
                     .borderRadius(11).objectFit(ImageFit.Cover)
                 } else {
                   Stack() {
-                    SymbolGlyph($r('sys.symbol.music')).fontSize(25).fontColor(['#a0a0a8'])
-                  }.width(58).height(58).borderRadius(11).backgroundColor('#303037')
+                    SymbolGlyph($r('sys.symbol.music')).fontSize(25).fontColor([TC.textQuaternary()])
+                  }.width(58).height(58).borderRadius(11).backgroundColor(TC.surfaceRaised())
                 }
                 Column({ space: 5 }) {
-                  Text(this.attachedResource().kind).fontSize(9).fontColor('#ff7587')
+                  Text(this.attachedResource().kind).fontSize(9).fontColor(TC.accentSoft())
                   Text(this.attachedResource().title).fontSize(13).fontWeight(FontWeight.Medium)
-                    .fontColor('#ededf0').maxLines(1)
+                    .fontColor(TC.textBody()).maxLines(1)
                   if (this.attachedResource().subtitle) {
-                    Text(this.attachedResource().subtitle).fontSize(10).fontColor('#77777f').maxLines(1)
+                    Text(this.attachedResource().subtitle).fontSize(10).fontColor(TC.textTertiary()).maxLines(1)
                   }
                 }.layoutWeight(1).alignItems(HorizontalAlign.Start)
-                SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(16).fontColor(['#66666e'])
-              }.width('100%').padding(11).backgroundColor('#24242a').borderRadius(13)
+                SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(16).fontColor([TC.textQuaternary()])
+              }.width('100%').padding(11).backgroundColor(TC.surfaceInset()).borderRadius(13)
                 .onClick(() => this.openAttachedResource())
             }
             if (this.data().mv) {
@@ -476,35 +478,35 @@ export struct EventDetailPage {
                   .width(112).height(64).sourceSize({ width: 240, height: 136 })
                   .borderRadius(10).objectFit(ImageFit.Cover)
                 Column({ space: 5 }) {
-                  Text(this.data().mv?.name || 'MV').width('100%').fontSize(14).fontColor('#ffffff').maxLines(2)
+                  Text(this.data().mv?.name || 'MV').width('100%').fontSize(14).fontColor(TC.textPrimary()).maxLines(2)
                     .textOverflow({ overflow: TextOverflow.Ellipsis })
-                  Text(this.data().mv?.artistName || '').width('100%').fontSize(11).fontColor('#77777f').maxLines(1)
+                  Text(this.data().mv?.artistName || '').width('100%').fontSize(11).fontColor(TC.textTertiary()).maxLines(1)
                 }.layoutWeight(1).alignItems(HorizontalAlign.Start)
-                SymbolGlyph($r('sys.symbol.play_circle_fill')).fontSize(27).fontColor(['#ffffff'])
-              }.width('100%').padding(11).backgroundColor('#24242a').borderRadius(14)
+                SymbolGlyph($r('sys.symbol.play_circle_fill')).fontSize(27).fontColor([TC.textPrimary()])
+              }.width('100%').padding(11).backgroundColor(TC.surfaceInset()).borderRadius(14)
                 .onClick(() => this.openMv())
             }
             Row() {
               Row({ space: 5 }) {
-                SymbolGlyph($r('sys.symbol.arrow_right_up_and_square')).fontSize(18).fontColor(['#77777f'])
-                Text(`${this.event.info.shareCount}`).fontSize(11).fontColor('#77777f')
+                SymbolGlyph($r('sys.symbol.arrow_right_up_and_square')).fontSize(18).fontColor([TC.textTertiary()])
+                Text(`${this.event.info.shareCount}`).fontSize(11).fontColor(TC.textTertiary())
               }.layoutWeight(1).justifyContent(FlexAlign.Center).onClick(() => this.openShare())
               Row({ space: 5 }) {
-                SymbolGlyph($r('sys.symbol.ellipsis_bubble')).fontSize(18).fontColor(['#77777f'])
-                Text(`${this.event.info.commentCount}`).fontSize(11).fontColor('#77777f')
+                SymbolGlyph($r('sys.symbol.ellipsis_bubble')).fontSize(18).fontColor([TC.textTertiary()])
+                Text(`${this.event.info.commentCount}`).fontSize(11).fontColor(TC.textTertiary())
               }.layoutWeight(1).justifyContent(FlexAlign.Center).onClick(() => this.openEventComments())
               Row({ space: 5 }) {
                 SymbolGlyph(this.event.info.liked ? $r('sys.symbol.heart_fill') : $r('sys.symbol.heart'))
-                  .fontSize(18).fontColor([this.event.info.liked ? '#ef233c' : '#77777f'])
+                  .fontSize(18).fontColor([this.event.info.liked ? TC.accent() : TC.textTertiary()])
                 Text(`${this.event.info.likedCount}`).fontSize(11)
-                  .fontColor(this.event.info.liked ? '#ef233c' : '#77777f')
+                  .fontColor(this.event.info.liked ? TC.accent() : TC.textTertiary())
               }.layoutWeight(1).justifyContent(FlexAlign.Center).onClick(() => this.toggleEventLike())
-            }.width('100%').height(50).backgroundColor('#1b1b20').borderRadius(14)
+            }.width('100%').height(50).backgroundColor(TC.surfaceCard()).borderRadius(14)
             }.padding({ left: 16, right: 16, top: 16, bottom: 28 })
           }.layoutWeight(1).scrollBar(BarState.Off)
-        }.width('100%').height('100%').backgroundColor('#121215')
+        }.width('100%').height('100%').backgroundColor(TC.pageBackground())
         .bindSheet(this.commentSheetVisible, this.CommentSheet(), {
-          height: '68%', backgroundColor: '#19191f', showClose: false, dragBar: true,
+          height: '68%', backgroundColor: TC.sheetBackground(), showClose: false, dragBar: true,
           onDisappear: () => this.commentSheetVisible = false
         })
         if (this.shareVisible) { this.ShareOptions() }

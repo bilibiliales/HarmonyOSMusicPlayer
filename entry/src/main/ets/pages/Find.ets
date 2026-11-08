@@ -23,9 +23,11 @@ import { StylePage } from './Style'
 import { RadioPage } from './Radio'
 import { DigitalAlbumPage } from './DigitalAlbum'
 import { SatiPage } from './Sati'
+import { TC } from '../services/ThemeColors'
 
 @Component
 struct Find {
+  @StorageProp('skinVersion') skinVersionObs: number = 0
   @Consume('pageStack') pageStack: NavPathStack
   @State blocks: HomeBlockView[] = []
   @State banners: BannerItem[] = []
@@ -270,14 +272,14 @@ struct Find {
   private PageHeader() {
     Row() {
       Column({ space: 3 }) {
-        Text('发现').fontSize(27).fontWeight(FontWeight.Bold).fontColor('#ffffff')
-        Text(this.sectionSubtitle()).fontSize(11).fontColor('#6f6f77')
+        Text('发现').fontSize(27).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary())
+        Text(this.sectionSubtitle()).fontSize(11).fontColor(TC.textQuaternary())
       }
       .layoutWeight(1).alignItems(HorizontalAlign.Start)
       Stack() {
-        SymbolGlyph($r('sys.symbol.magnifyingglass')).fontSize(19).fontColor(['#ddddE2'])
+        SymbolGlyph($r('sys.symbol.magnifyingglass')).fontSize(19).fontColor([TC.textBody()])
       }
-      .width(42).height(42).borderRadius(14).backgroundColor('#1e1e24')
+      .width(42).height(42).borderRadius(14).backgroundColor(TC.surfaceCardAlt())
       .onClick(() => this.pageStack.pushPathByName('SearchPage', null))
     }
     .width('100%').padding({ left: 16, right: 16, top: 14, bottom: 5 })
@@ -292,9 +294,9 @@ struct Find {
           Column({ space: 7 }) {
             Text(title).fontSize(13)
               .fontWeight(this.currentSection === index ? FontWeight.Bold : FontWeight.Regular)
-              .fontColor(this.currentSection === index ? '#ffffff' : '#74747d')
+              .fontColor(this.currentSection === index ? TC.textOnAccent() : TC.textTertiary())
             Column().width(24).height(3).borderRadius(2)
-              .backgroundColor(this.currentSection === index ? '#ef233c' : 'transparent')
+              .backgroundColor(this.currentSection === index ? TC.accent() : 'transparent')
           }.width(title.length > 4 ? 82 : 66).height(46).justifyContent(FlexAlign.Center)
             .onClick(() => this.switchSection(index))
         })
@@ -306,8 +308,8 @@ struct Find {
   @Builder
   private BlockTitle(title: string) {
     Row() {
-      Text(title).layoutWeight(1).fontSize(19).fontWeight(FontWeight.Bold).fontColor('#eeeeF1')
-      SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(15).fontColor(['#66666e'])
+      Text(title).layoutWeight(1).fontSize(19).fontWeight(FontWeight.Bold).fontColor(TC.textBody())
+      SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(15).fontColor([TC.textQuaternary()])
     }
     .width('100%').padding({ left: 16, right: 16, top: 24, bottom: 11 })
   }
@@ -323,12 +325,12 @@ struct Find {
                 this.NetworkImage(creative.items[0].image, 138, 138, 17)
                 if (creative.items[0].playCount > 0) {
                   Text(`▷ ${this.formatCount(creative.items[0].playCount)}`)
-                    .fontSize(9).fontColor('#ffffff')
+                    .fontSize(9).fontColor(TC.textPrimary())
                     .padding({ left: 6, right: 6, top: 3, bottom: 3 })
                     .backgroundColor('rgba(0,0,0,0.48)').borderRadius(9).margin(7)
                 }
               }
-              Text(creative.items[0].title).width(138).fontSize(12).fontColor('#dedee2').maxLines(2)
+              Text(creative.items[0].title).width(138).fontSize(12).fontColor(TC.textBody()).maxLines(2)
                 .textOverflow({ overflow: TextOverflow.Ellipsis })
             }
             .alignItems(HorizontalAlign.Start)
@@ -349,34 +351,34 @@ struct Find {
           Column() {
             if (creative.title.length > 0) {
               Text(creative.title).width('100%').fontSize(11).fontWeight(FontWeight.Medium)
-                .fontColor('#ef4058').padding({ left: 10, top: 8, bottom: 2 })
+                .fontColor(TC.accentSoft()).padding({ left: 10, top: 8, bottom: 2 })
             }
             ForEach(creative.items, (item: HomeResourceView) => {
               Row({ space: 10 }) {
                 this.NetworkImage(item.image, 54, 54, 12)
                 Column({ space: 5 }) {
-                  Text(item.title).width('100%').fontSize(13).fontColor('#eeeeF1').maxLines(1)
+                  Text(item.title).width('100%').fontSize(13).fontColor(TC.textBody()).maxLines(1)
                     .textOverflow({ overflow: TextOverflow.Ellipsis })
                   if (item.subtitle.length > 0) {
-                    Text(item.subtitle).width('100%').fontSize(10).fontColor('#77777f').maxLines(1)
+                    Text(item.subtitle).width('100%').fontSize(10).fontColor(TC.textTertiary()).maxLines(1)
                       .textOverflow({ overflow: TextOverflow.Ellipsis })
                   } else {
                     Text(item.resourceType === 'album' ? '新碟' : '网易云音乐')
-                      .fontSize(10).fontColor('#77777f')
+                      .fontSize(10).fontColor(TC.textTertiary())
                   }
                 }
                 .layoutWeight(1).alignItems(HorizontalAlign.Start)
                 if (item.song) {
-                  SymbolGlyph($r('sys.symbol.play_circle_fill')).fontSize(23).fontColor(['#9999a1'])
+                  SymbolGlyph($r('sys.symbol.play_circle_fill')).fontSize(23).fontColor([TC.textSecondary()])
                 } else {
-                  SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(14).fontColor(['#66666e'])
+                  SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(14).fontColor([TC.textQuaternary()])
                 }
               }
               .width(310).height(68).padding({ left: 8, right: 8 })
               .onClick(() => this.openResource(block, item))
             })
           }
-          .padding({ bottom: 4 }).backgroundColor('#18181d').borderRadius(18).clip(true)
+          .padding({ bottom: 4 }).backgroundColor(TC.surfaceCardAlt()).borderRadius(18).clip(true)
         }, (creative: HomeCreativeView) => creative.key)
       }
       .padding({ left: 16, right: 16 })
@@ -388,7 +390,7 @@ struct Find {
   private NetworkImage(url: string, width: number, height: number, radius: number) {
     if (!url || this.failedImages.has(url)) {
       Stack() {
-        SymbolGlyph($r('sys.symbol.music')).fontSize(22).fontColor(['#62626c'])
+        SymbolGlyph($r('sys.symbol.music')).fontSize(22).fontColor([TC.textQuaternary()])
       }
       .width(width).height(height).borderRadius(radius)
       .linearGradient({ angle: 135, colors: [['#30303c', 0], ['#1f1f28', 1]] })
@@ -414,7 +416,7 @@ struct Find {
                   Image(resizeImageUrl(item.pic, 720, 292)).width('100%').height('100%')
                     .sourceSize({ width: 720, height: 292 }).borderRadius(18).objectFit(ImageFit.Cover)
                   if (item.typeTitle && item.typeTitle.length > 0) {
-                    Text(item.typeTitle).fontSize(10).fontColor('#ffffff')
+                    Text(item.typeTitle).fontSize(10).fontColor(TC.textPrimary())
                       .padding({ left: 9, right: 9, top: 5, bottom: 5 })
                       .backgroundColor(item.titleColor === 'red' ? '#d9364f' : '#3f67a5')
                       .borderRadius({ topLeft: 10, bottomRight: 18 })
@@ -432,15 +434,15 @@ struct Find {
 
           if (this.loading) {
             Column({ space: 12 }) {
-              LoadingProgress().width(34).height(34).color('#ef233c')
-              Text('正在加载发现内容').fontSize(12).fontColor('#77777f')
+              LoadingProgress().width(34).height(34).color(TC.accent())
+              Text('正在加载发现内容').fontSize(12).fontColor(TC.textTertiary())
             }
             .width('100%').height(420).justifyContent(FlexAlign.Center)
           } else if (this.blocks.length === 0) {
             Column({ space: 12 }) {
-              SymbolGlyph($r('sys.symbol.exclamationmark_circle')).fontSize(36).fontColor(['#77777f'])
-              Text(this.message || '发现页暂无内容').fontSize(12).fontColor('#77777f')
-              Text('下拉可重新请求 /homepage/block/page').fontSize(10).fontColor('#55555d')
+              SymbolGlyph($r('sys.symbol.exclamationmark_circle')).fontSize(36).fontColor([TC.textTertiary()])
+              Text(this.message || '发现页暂无内容').fontSize(12).fontColor(TC.textTertiary())
+              Text('下拉可重新请求 /homepage/block/page').fontSize(10).fontColor(TC.textQuaternary())
             }
             .width('100%').height(420).justifyContent(FlexAlign.Center)
           } else {
@@ -459,7 +461,7 @@ struct Find {
       }
       .width('100%').height('100%').scrollBar(BarState.Off)
     }
-    .width('100%').height('100%').backgroundColor('#121215')
+    .width('100%').height('100%').backgroundColor(TC.pageBackground())
     .onRefreshing(async () => {
       this.isRefreshing = true
       await this.loadData(true)
@@ -499,7 +501,7 @@ struct Find {
       this.PageHeader()
       this.DiscoveryTabs()
       this.SectionContent()
-    }.width('100%').height('100%').backgroundColor('#121215')
+    }.width('100%').height('100%').backgroundColor(TC.pageBackground())
   }
 }
 

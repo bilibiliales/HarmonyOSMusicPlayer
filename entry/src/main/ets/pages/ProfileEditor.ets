@@ -3,6 +3,7 @@ import { photoAccessHelper } from '@kit.MediaLibraryKit'
 import { OperationResponse } from '../models/api'
 import { ApiClient } from '../services/ApiClient'
 import { AuthStore } from '../stores/AuthStore'
+import { TC } from '../services/ThemeColors'
 
 interface CityInfo {
   id: string
@@ -39,6 +40,7 @@ interface LocationDataResponse {
 
 @Component
 export struct ProfileEditorPage {
+  @StorageProp('skinVersion') skinVersionObs: number = 0
   @Consume('pageStack') pageStack: NavPathStack
   @Consume('topAvoidHeight') topAvoidHeight: number
   @Consume('authStore') authStore: AuthStore
@@ -211,12 +213,12 @@ export struct ProfileEditorPage {
       Column() {
         Column().width('100%').height(this.topAvoidHeight)
         Row({ space: 12 }) {
-          SymbolGlyph($r('sys.symbol.chevron_left')).fontSize(24).fontColor(['#ffffff'])
+          SymbolGlyph($r('sys.symbol.chevron_left')).fontSize(24).fontColor([TC.textPrimary()])
             .onClick(() => this.pageStack.pop())
           Text('我的资料').layoutWeight(1).fontSize(18).fontWeight(FontWeight.Bold)
-            .fontColor('#ffffff').textAlign(TextAlign.Center)
-          Button(this.saving ? '保存中' : '保存').height(36).fontSize(12).fontColor('#ffffff')
-            .backgroundColor(this.nickname.trim() && !this.saving ? '#ef233c' : '#38383f').borderRadius(18)
+            .fontColor(TC.textPrimary()).textAlign(TextAlign.Center)
+          Button(this.saving ? '保存中' : '保存').height(36).fontSize(12).fontColor(TC.textPrimary())
+            .backgroundColor(this.nickname.trim() && !this.saving ? TC.accent() : TC.surfaceRaised()).borderRadius(18)
             .enabled(this.nickname.trim().length > 0 && !this.saving).onClick(() => this.save())
         }.width('100%').height(58).padding({ left: 16, right: 16 })
 
@@ -224,67 +226,67 @@ export struct ProfileEditorPage {
           Column({ space: 19 }) {
             Stack({ alignContent: Alignment.BottomEnd }) {
               Image(this.avatarUri || this.pageParam.avatarUrl).width(112).height(112).borderRadius(56)
-                .objectFit(ImageFit.Cover).backgroundColor('#29292f')
+                .objectFit(ImageFit.Cover).backgroundColor(TC.chipBackground())
               Stack() {
-                SymbolGlyph($r('sys.symbol.camera_fill')).fontSize(18).fontColor(['#ffffff'])
-              }.width(38).height(38).borderRadius(19).backgroundColor('#ef233c')
+                SymbolGlyph($r('sys.symbol.camera_fill')).fontSize(18).fontColor([TC.textPrimary()])
+              }.width(38).height(38).borderRadius(19).backgroundColor(TC.accent())
             }.width(112).height(112).onClick(() => this.selectAvatar())
 
             Column({ space: 8 }) {
-              Text('昵称').width('100%').fontSize(12).fontColor('#85858e')
+              Text('昵称').width('100%').fontSize(12).fontColor(TC.textTertiary())
               TextInput({ text: this.nickname, placeholder: '输入昵称' }).width('100%').height(48)
-                .fontColor('#ffffff').placeholderColor('#5f5f67').backgroundColor('#1f1f24').borderRadius(14)
+                .fontColor(TC.textPrimary()).placeholderColor(TC.textQuaternary()).backgroundColor(TC.surfaceCardAlt()).borderRadius(14)
                 .onChange((value: string) => this.nickname = value.substring(0, 30))
             }.width('100%')
 
             Column({ space: 8 }) {
-              Text('个人介绍').width('100%').fontSize(12).fontColor('#85858e')
+              Text('个人介绍').width('100%').fontSize(12).fontColor(TC.textTertiary())
               TextArea({ text: this.signature, placeholder: '介绍一下自己' }).width('100%').height(120)
-                .fontColor('#ffffff').placeholderColor('#5f5f67').backgroundColor('#1f1f24').borderRadius(14)
+                .fontColor(TC.textPrimary()).placeholderColor(TC.textQuaternary()).backgroundColor(TC.surfaceCardAlt()).borderRadius(14)
                 .onChange((value: string) => this.signature = value.substring(0, 300))
             }.width('100%')
 
             Column({ space: 9 }) {
-              Text('性别').width('100%').fontSize(12).fontColor('#85858e')
+              Text('性别').width('100%').fontSize(12).fontColor(TC.textTertiary())
               Row({ space: 9 }) {
                 ForEach(['男', '女'], (label: string, index: number) => {
                   Text(label).layoutWeight(1).height(42).fontSize(13).textAlign(TextAlign.Center)
-                    .fontColor(this.gender === index ? '#ffffff' : '#85858e')
-                    .backgroundColor(this.gender === index ? '#ef233c' : '#24242a').borderRadius(13)
+                    .fontColor(this.gender === index ? TC.textOnAccent() : TC.textTertiary())
+                    .backgroundColor(this.gender === index ? TC.accent() : TC.surfaceInset()).borderRadius(13)
                     .onClick(() => this.gender = index)
                 })
               }.width('100%')
             }.width('100%')
 
             Column({ space: 8 }) {
-              Text('生日').width('100%').fontSize(12).fontColor('#85858e')
+              Text('生日').width('100%').fontSize(12).fontColor(TC.textTertiary())
               TextInput({ text: this.birthdayText, placeholder: 'YYYY-MM-DD' }).width('100%').height(48)
-                .fontColor('#ffffff').placeholderColor('#5f5f67').backgroundColor('#1f1f24').borderRadius(14)
+                .fontColor(TC.textPrimary()).placeholderColor(TC.textQuaternary()).backgroundColor(TC.surfaceCardAlt()).borderRadius(14)
                 .inputFilter('[0-9-]*').onChange((value: string) => this.birthdayText = value.substring(0, 10))
             }.width('100%')
 
             Row({ space: 10 }) {
               Column({ space: 8 }) {
-                Text('省份').width('100%').fontSize(12).fontColor('#85858e')
+                Text('省份').width('100%').fontSize(12).fontColor(TC.textTertiary())
                 Row() {
                   Text(this.selectedProvince ? this.selectedProvince.name : '请选择省份')
                     .fontSize(13)
-                    .fontColor(this.selectedProvince ? '#ffffff' : '#5f5f67')
+                    .fontColor(this.selectedProvince ? TC.textPrimary() : TC.textTertiary())
                 }
                 .width('100%').height(48)
-                .padding({ left: 12 }).backgroundColor('#24242a')
+                .padding({ left: 12 }).backgroundColor(TC.surfaceInset())
                 .borderRadius(14).onClick(() => this.showProvinceSelector = true)
               }.layoutWeight(1)
 
               Column({ space: 8 }) {
-                Text('城市').width('100%').fontSize(12).fontColor('#85858e')
+                Text('城市').width('100%').fontSize(12).fontColor(TC.textTertiary())
                 Row() {
                   Text(this.selectedCity ? this.selectedCity.name : '请选择城市')
                     .fontSize(13)
-                    .fontColor(this.selectedCity ? '#ffffff' : '#5f5f67')
+                    .fontColor(this.selectedCity ? TC.textPrimary() : TC.textTertiary())
                 }
                 .width('100%').height(48)
-                .padding({ left: 12 }).backgroundColor('#24242a')
+                .padding({ left: 12 }).backgroundColor(TC.surfaceInset())
                 .borderRadius(14).onClick(() => {
                   if (this.selectedProvince) {
                     this.showCitySelector = true
@@ -298,12 +300,12 @@ export struct ProfileEditorPage {
             Column({ space: 4 }) {
               Row({ space: 12 }) {
                 Column({ space: 4 }) {
-                  Text('乐迷团').fontSize(14).fontColor('#ffffff')
-                  Text('查看我加入的乐迷团与动态').fontSize(11).fontColor('#92929a')
+                  Text('乐迷团').fontSize(14).fontColor(TC.textPrimary())
+                  Text('查看我加入的乐迷团与动态').fontSize(11).fontColor(TC.textSecondary())
                 }.layoutWeight(1).alignItems(HorizontalAlign.Start)
-                SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(18).fontColor(['#66666e'])
+                SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(18).fontColor([TC.textQuaternary()])
               }.width('100%')
-            }.width('100%').padding(16).backgroundColor('#1b1b20').borderRadius(16)
+            }.width('100%').padding(16).backgroundColor(TC.surfaceCard()).borderRadius(16)
               .onClick(() => this.pageStack.pushPathByName('FanClubListPage', null))
 
             // 省份选择弹窗
@@ -312,16 +314,16 @@ export struct ProfileEditorPage {
                 .zIndex(100).onClick(() => this.showProvinceSelector = false)
               Column() {
                 Row({ space: 12 }) {
-                  Text('选择省份').fontSize(16).fontWeight(FontWeight.Bold).fontColor('#ffffff')
-                  Text('取消').fontSize(14).fontColor('#ef233c')
+                  Text('选择省份').fontSize(16).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary())
+                  Text('取消').fontSize(14).fontColor(TC.accent())
                     .onClick(() => this.showProvinceSelector = false)
                 }.width('100%').padding({ left: 20, right: 20, top: 20, bottom: 10 })
                 List({ space: 2 }) {
                   ForEach(this.provinces, (province: ProvinceInfo) => {
                     ListItem() {
                       Text(province.name).width('100%').height(48).padding({ left: 20 })
-                        .fontSize(14).fontColor('#ffffff').textAlign(TextAlign.Start)
-                        .backgroundColor(province.id === this.selectedProvince?.id ? '#2d2d35' : '#1f1f24')
+                        .fontSize(14).fontColor(TC.textPrimary()).textAlign(TextAlign.Start)
+                        .backgroundColor(province.id === this.selectedProvince?.id ? TC.surfaceRaised() : TC.surfaceInset())
                         .borderRadius(8)
                         .onClick(() => {
                           this.selectedProvince = province
@@ -332,7 +334,7 @@ export struct ProfileEditorPage {
                   })
                 }.width('100%').height(300).padding({ left: 20, right: 20 })
                   .edgeEffect(EdgeEffect.Spring).friction(0.8)
-              }.width('90%').backgroundColor('#24242a').borderRadius(16)
+              }.width('90%').backgroundColor(TC.surfaceInset()).borderRadius(16)
                 .position({ x: '5%', y: 100 }).zIndex(101)
             }
 
@@ -342,16 +344,16 @@ export struct ProfileEditorPage {
                 .zIndex(100).onClick(() => this.showCitySelector = false)
               Column() {
                 Row({ space: 12 }) {
-                  Text('选择城市').fontSize(16).fontWeight(FontWeight.Bold).fontColor('#ffffff')
-                  Text('取消').fontSize(14).fontColor('#ef233c')
+                  Text('选择城市').fontSize(16).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary())
+                  Text('取消').fontSize(14).fontColor(TC.accent())
                     .onClick(() => this.showCitySelector = false)
                 }.width('100%').padding({ left: 20, right: 20, top: 20, bottom: 10 })
                 List({ space: 2 }) {
                   ForEach(this.selectedProvince?.cities || [], (city: CityInfo) => {
                     ListItem() {
                       Text(city.name).width('100%').height(48).padding({ left: 20 })
-                        .fontSize(14).fontColor('#ffffff').textAlign(TextAlign.Start)
-                        .backgroundColor(city.id === this.selectedCity?.id ? '#2d2d35' : '#1f1f24')
+                        .fontSize(14).fontColor(TC.textPrimary()).textAlign(TextAlign.Start)
+                        .backgroundColor(city.id === this.selectedCity?.id ? TC.surfaceRaised() : TC.surfaceInset())
                         .borderRadius(8)
                         .onClick(() => {
                           this.selectedCity = city
@@ -361,18 +363,18 @@ export struct ProfileEditorPage {
                   })
                 }.width('100%').height(300).padding({ left: 20, right: 20 })
                   .edgeEffect(EdgeEffect.Spring).friction(0.8)
-              }.width('90%').backgroundColor('#24242a').borderRadius(16)
+              }.width('90%').backgroundColor(TC.surfaceInset()).borderRadius(16)
                 .position({ x: '5%', y: 100 }).zIndex(101)
             }
 
             if (this.message) {
-              Text(this.message).width('100%').padding(12).fontSize(11).lineHeight(18).fontColor('#ff8b78')
-                .textAlign(TextAlign.Center).backgroundColor('#2b211f').borderRadius(13)
+              Text(this.message).width('100%').padding(12).fontSize(11).lineHeight(18).fontColor(TC.accentSoft())
+                .textAlign(TextAlign.Center).backgroundColor(TC.surfaceInset()).borderRadius(13)
             }
           }.width('100%').alignItems(HorizontalAlign.Center)
             .padding({ left: 18, right: 18, top: 18, bottom: 40 })
         }.layoutWeight(1).scrollBar(BarState.Off)
-      }.width('100%').height('100%').backgroundColor('#121215')
+      }.width('100%').height('100%').backgroundColor(TC.pageBackground())
     }.hideTitleBar(true)
   }
 }

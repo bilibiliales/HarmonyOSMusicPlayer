@@ -13,6 +13,7 @@ import {
 import { ApiClient } from '../services/ApiClient'
 import { playerController } from '../services/PlayerController'
 import { resizeImageUrl } from '../services/ImageUrl'
+import { TC } from '../services/ThemeColors'
 
 interface RankingPreview {
   id: string
@@ -25,6 +26,7 @@ interface RankingPreview {
 
 @Component
 export struct RankingPage {
+  @StorageProp('skinVersion') skinVersionObs: number = 0
   @Consume('pageStack') pageStack: NavPathStack
   @Consume('topAvoidHeight') topAvoidHeight: number
   embedded: boolean = false
@@ -171,15 +173,15 @@ export struct RankingPage {
   @Builder
   private PageHeader() {
     Row({ space: 12 }) {
-      SymbolGlyph($r('sys.symbol.chevron_left')).fontSize(24).fontColor(['#ffffff'])
+      SymbolGlyph($r('sys.symbol.chevron_left')).fontSize(24).fontColor([TC.textPrimary()])
         .onClick(() => this.pageStack.pop())
       Column({ space: 3 }) {
-        Text('排行榜').fontSize(25).fontWeight(FontWeight.Bold).fontColor('#ffffff')
-        Text('官方榜单与歌手热度').fontSize(11).fontColor('#6f6f77')
+        Text('排行榜').fontSize(25).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary())
+        Text('官方榜单与歌手热度').fontSize(11).fontColor(TC.textQuaternary())
       }.layoutWeight(1).alignItems(HorizontalAlign.Start)
       Stack() {
-        SymbolGlyph($r('sys.symbol.magnifyingglass')).fontSize(19).fontColor(['#ddddE2'])
-      }.width(42).height(42).borderRadius(14).backgroundColor('#1e1e24')
+        SymbolGlyph($r('sys.symbol.magnifyingglass')).fontSize(19).fontColor([TC.textBody()])
+      }.width(42).height(42).borderRadius(14).backgroundColor(TC.surfaceCardAlt())
         .onClick(() => this.pageStack.pushPathByName('SearchPage', null))
     }.width('100%').padding({ left: 16, right: 16, top: 14, bottom: 5 })
   }
@@ -188,21 +190,21 @@ export struct RankingPage {
   private DiscoveryTabs() {
     Scroll() {
       Row({ space: 6 }) {
-      Text('发现').fontSize(13).fontColor('#85858e').padding({ left: 12, right: 12, top: 9, bottom: 9 })
-        .backgroundColor('#1d1d22').borderRadius(18).onClick(() => this.pageStack.pop())
-      Text('排行榜').fontSize(13).fontWeight(FontWeight.Bold).fontColor('#ffffff')
-        .padding({ left: 12, right: 12, top: 9, bottom: 9 }).backgroundColor('#ef233c').borderRadius(18)
-      Text('曲风').fontSize(13).fontColor('#85858e').padding({ left: 12, right: 12, top: 9, bottom: 9 })
-        .backgroundColor('#1d1d22').borderRadius(18)
+      Text('发现').fontSize(13).fontColor(TC.textTertiary()).padding({ left: 12, right: 12, top: 9, bottom: 9 })
+        .backgroundColor(TC.surfaceCardAlt()).borderRadius(18).onClick(() => this.pageStack.pop())
+      Text('排行榜').fontSize(13).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary())
+        .padding({ left: 12, right: 12, top: 9, bottom: 9 }).backgroundColor(TC.accent()).borderRadius(18)
+      Text('曲风').fontSize(13).fontColor(TC.textTertiary()).padding({ left: 12, right: 12, top: 9, bottom: 9 })
+        .backgroundColor(TC.surfaceCardAlt()).borderRadius(18)
         .onClick(() => this.pageStack.replacePathByName('StylePage', null))
-      Text('电台').fontSize(13).fontColor('#85858e').padding({ left: 12, right: 12, top: 9, bottom: 9 })
-        .backgroundColor('#1d1d22').borderRadius(18)
+      Text('电台').fontSize(13).fontColor(TC.textTertiary()).padding({ left: 12, right: 12, top: 9, bottom: 9 })
+        .backgroundColor(TC.surfaceCardAlt()).borderRadius(18)
         .onClick(() => this.pageStack.replacePathByName('RadioPage', null))
-      Text('数字专辑').fontSize(13).fontColor('#85858e')
-        .padding({ left: 12, right: 12, top: 9, bottom: 9 }).backgroundColor('#1d1d22').borderRadius(18)
+      Text('数字专辑').fontSize(13).fontColor(TC.textTertiary())
+        .padding({ left: 12, right: 12, top: 9, bottom: 9 }).backgroundColor(TC.surfaceCardAlt()).borderRadius(18)
         .onClick(() => this.pageStack.replacePathByName('DigitalAlbumPage', null))
-      Text('助眠解压').fontSize(13).fontColor('#85858e')
-        .padding({ left: 12, right: 12, top: 9, bottom: 9 }).backgroundColor('#1d1d22').borderRadius(18)
+      Text('助眠解压').fontSize(13).fontColor(TC.textTertiary())
+        .padding({ left: 12, right: 12, top: 9, bottom: 9 }).backgroundColor(TC.surfaceCardAlt()).borderRadius(18)
         .onClick(() => this.pageStack.replacePathByName('SatiPage', null))
       }.padding({ left: 16, right: 16 })
     }.width('100%').scrollable(ScrollDirection.Horizontal).scrollBar(BarState.Off)
@@ -213,9 +215,9 @@ export struct RankingPage {
   private SectionTitle(title: string, subtitle: string) {
     Row() {
       Column({ space: 3 }) {
-        Text(title).fontSize(19).fontWeight(FontWeight.Bold).fontColor('#f4f4f6')
+        Text(title).fontSize(19).fontWeight(FontWeight.Bold).fontColor(TC.textBody())
         if (subtitle.length > 0) {
-          Text(subtitle).fontSize(10).fontColor('#66666e')
+          Text(subtitle).fontSize(10).fontColor(TC.textQuaternary())
         }
       }.layoutWeight(1).alignItems(HorizontalAlign.Start)
     }.width('100%').padding({ left: 16, right: 16, top: 22, bottom: 10 })
@@ -235,9 +237,9 @@ export struct RankingPage {
                 Column().width(104).height(70).borderRadius({ bottomLeft: 15, bottomRight: 15 })
                   .linearGradient({ angle: 180, colors: [['rgba(0,0,0,0)', 0], ['rgba(0,0,0,0.82)', 1]] })
                 Column({ space: 2 }) {
-                  Text(ranking.name).width(92).fontSize(13).fontWeight(FontWeight.Bold).fontColor('#ffffff')
+                  Text(ranking.name).width(92).fontSize(13).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary())
                     .maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
-                  Text(ranking.updateFrequency).width(92).fontSize(9).fontColor('#d0d0d5').maxLines(1)
+                  Text(ranking.updateFrequency).width(92).fontSize(9).fontColor(TC.textBody()).maxLines(1)
                 }.margin({ left: 7, bottom: 8 }).alignItems(HorizontalAlign.Start)
               }.onClick(() => this.openRanking(ranking.id, ranking.name, ranking.cover))
               Column({ space: 3 }) {
@@ -245,32 +247,32 @@ export struct RankingPage {
                   ForEach(ranking.songs, (song: songItemType, index: number) => {
                     Row({ space: 7 }) {
                       Text(`${index + 1}`).width(17).fontSize(14).fontWeight(FontWeight.Bold)
-                        .fontColor(index === 0 ? '#ef4058' : '#8d8d95')
+                        .fontColor(index === 0 ? TC.accent() : TC.textTertiary())
                       Column({ space: 3 }) {
-                        Text(song.name).width('100%').fontSize(12).fontColor('#ededf0').maxLines(1)
+                        Text(song.name).width('100%').fontSize(12).fontColor(TC.textBody()).maxLines(1)
                           .textOverflow({ overflow: TextOverflow.Ellipsis })
-                        Text(song.author).width('100%').fontSize(9).fontColor('#707078').maxLines(1)
+                        Text(song.author).width('100%').fontSize(9).fontColor(TC.textQuaternary()).maxLines(1)
                           .textOverflow({ overflow: TextOverflow.Ellipsis })
                       }.layoutWeight(1).alignItems(HorizontalAlign.Start)
-                      SymbolGlyph($r('sys.symbol.play_circle_fill')).fontSize(18).fontColor(['#8a8a92'])
+                      SymbolGlyph($r('sys.symbol.play_circle_fill')).fontSize(18).fontColor([TC.textSecondary()])
                     }.width(184).height(41).onClick(() => this.playRanking(ranking, index))
                   })
                 } else {
                   ForEach(ranking.fallbackTracks.slice(0, 3), (track: ToplistTrackPreview, index: number) => {
                     Row({ space: 7 }) {
                       Text(`${index + 1}`).width(17).fontSize(14).fontWeight(FontWeight.Bold)
-                        .fontColor(index === 0 ? '#ef4058' : '#8d8d95')
+                        .fontColor(index === 0 ? TC.accent() : TC.textTertiary())
                       Column({ space: 3 }) {
-                        Text(track.first).width('100%').fontSize(12).fontColor('#ededf0').maxLines(1)
+                        Text(track.first).width('100%').fontSize(12).fontColor(TC.textBody()).maxLines(1)
                           .textOverflow({ overflow: TextOverflow.Ellipsis })
-                        Text(track.second).width('100%').fontSize(9).fontColor('#707078').maxLines(1)
+                        Text(track.second).width('100%').fontSize(9).fontColor(TC.textQuaternary()).maxLines(1)
                           .textOverflow({ overflow: TextOverflow.Ellipsis })
                       }.layoutWeight(1).alignItems(HorizontalAlign.Start)
                     }.width(184).height(41)
                   })
                 }
               }.layoutWeight(1).justifyContent(FlexAlign.Center)
-            }.width(316).height(150).padding(9).backgroundColor('#1a1a20').borderRadius(18)
+            }.width(316).height(150).padding(9).backgroundColor(TC.surfaceCardAlt()).borderRadius(18)
           }, (ranking: RankingPreview) => ranking.id)
         }.padding({ left: 16, right: 16 })
       }.width('100%').scrollable(ScrollDirection.Horizontal).scrollBar(BarState.Off)
@@ -292,16 +294,16 @@ export struct RankingPage {
                   .width(88).height(88).sourceSize({ width: 180, height: 180 }).borderRadius(44)
                   .objectFit(ImageFit.Cover)
                 Text(`${index + 1}`).fontSize(11).fontWeight(FontWeight.Bold)
-                  .fontColor('#ffffff')
+                  .fontColor(TC.textPrimary())
                   .width(27).height(27).textAlign(TextAlign.Center)
-                  .backgroundColor(index < 3 ? '#ef233c' : '#34343c')
+                  .backgroundColor(index < 3 ? TC.accent() : TC.surfaceInset())
                   .borderRadius(14).margin({ left: -3, top: -3 })
               }
-              Text(artist.name).width(102).fontSize(12).fontWeight(FontWeight.Medium).fontColor('#e8e8eb')
+              Text(artist.name).width(102).fontSize(12).fontWeight(FontWeight.Medium).fontColor(TC.textBody())
                 .textAlign(TextAlign.Center).maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
               Text(this.artistRankChange(artist, index)).fontSize(9)
                 .fontColor(this.artistRankChange(artist, index).startsWith('↑') ?
-                  '#ef6577' : '#696971')
+                  TC.accentSoft() : TC.textTertiary())
             }.width(102).onClick(() => this.openRankArtist(artist))
           }, (artist: ArtistToplistArtist) => artist.id.toString())
         }.padding({ left: 17, right: 17, top: 4 })
@@ -329,10 +331,10 @@ export struct RankingPage {
                 .objectFit(ImageFit.Cover)
               Column().width('100%').height(50).borderRadius({ bottomLeft: 14, bottomRight: 14 })
                 .linearGradient({ angle: 180, colors: [['rgba(0,0,0,0)', 0], ['rgba(0,0,0,0.78)', 1]] })
-              Text(item.updateFrequency || '').width('90%').fontSize(8).fontColor('#ededf0')
+              Text(item.updateFrequency || '').width('90%').fontSize(8).fontColor(TC.textBody())
                 .margin({ left: 7, bottom: 7 }).maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
             }
-            Text(item.name).width('100%').fontSize(11).fontColor('#dcdce1').maxLines(2)
+            Text(item.name).width('100%').fontSize(11).fontColor(TC.textBody()).maxLines(2)
               .textOverflow({ overflow: TextOverflow.Ellipsis })
           }.width('31%').margin({ bottom: 15 }).alignItems(HorizontalAlign.Start)
             .onClick(() => this.openRanking(item.id.toString(), item.name, item.coverImgUrl || item.picUrl || '',
@@ -354,13 +356,13 @@ export struct RankingPage {
           }
           if (this.loading) {
             Column({ space: 12 }) {
-              LoadingProgress().width(34).height(34).color('#ef233c')
-              Text('正在加载排行榜').fontSize(12).fontColor('#77777f')
+              LoadingProgress().width(34).height(34).color(TC.accent())
+              Text('正在加载排行榜').fontSize(12).fontColor(TC.textTertiary())
             }.width('100%').height(360).justifyContent(FlexAlign.Center)
           } else if (this.toplists.length === 0 && this.artistRanking.length === 0) {
             Column({ space: 12 }) {
-              SymbolGlyph($r('sys.symbol.exclamationmark_circle')).fontSize(36).fontColor(['#77777f'])
-              Text(this.message || '暂无排行榜数据').fontSize(12).fontColor('#77777f')
+              SymbolGlyph($r('sys.symbol.exclamationmark_circle')).fontSize(36).fontColor([TC.textTertiary()])
+              Text(this.message || '暂无排行榜数据').fontSize(12).fontColor(TC.textTertiary())
             }.width('100%').height(360).justifyContent(FlexAlign.Center)
           } else {
             this.FeaturedRankingSection()
@@ -368,13 +370,13 @@ export struct RankingPage {
               this.ArtistRankingSection()
               this.AllRankingsSection()
             } else {
-              LoadingProgress().width(28).height(28).color('#ef233c').margin({ top: 28, bottom: 28 })
+              LoadingProgress().width(28).height(28).color(TC.accent()).margin({ top: 28, bottom: 28 })
             }
             Blank().height(this.embedded ? 145 : 50)
           }
         }.width('100%')
       }.width('100%').height('100%').scrollBar(BarState.Off).onReachEnd(() => this.revealMoreToplists())
-    }.width('100%').height('100%').backgroundColor('#121215').onRefreshing(async () => {
+    }.width('100%').height('100%').backgroundColor(TC.pageBackground()).onRefreshing(async () => {
       this.refreshing = true
       await this.loadData()
       this.refreshing = false
@@ -387,7 +389,7 @@ export struct RankingPage {
     } else {
       NavDestination() {
         this.PageContent(true)
-      }.hideTitleBar(true).backgroundColor('#121215')
+      }.hideTitleBar(true).backgroundColor(TC.pageBackground())
     }
   }
 }

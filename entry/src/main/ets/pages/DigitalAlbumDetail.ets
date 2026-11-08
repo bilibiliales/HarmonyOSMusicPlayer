@@ -8,9 +8,11 @@ import {
 import { ApiClient } from '../services/ApiClient'
 import { resizeImageUrl } from '../services/ImageUrl'
 import { playerController } from '../services/PlayerController'
+import { TC } from '../services/ThemeColors'
 
 @Component
 export struct DigitalAlbumDetailPage {
+  @StorageProp('skinVersion') skinVersionObs: number = 0
   @Consume('pageStack') pageStack: NavPathStack
   @Consume('topAvoidHeight') topAvoidHeight: number
   pageParam: DigitalAlbumDetailPageParam = { albumId: 0 }
@@ -145,9 +147,9 @@ export struct DigitalAlbumDetailPage {
   @Builder
   private Header() {
     Row({ space: 12 }) {
-      SymbolGlyph($r('sys.symbol.chevron_left')).fontSize(24).fontColor(['#ffffff'])
+      SymbolGlyph($r('sys.symbol.chevron_left')).fontSize(24).fontColor([TC.textPrimary()])
         .onClick(() => this.pageStack.pop())
-      Text('数字专辑详情').layoutWeight(1).fontSize(18).fontWeight(FontWeight.Bold).fontColor('#ffffff')
+      Text('数字专辑详情').layoutWeight(1).fontSize(18).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary())
         .textAlign(TextAlign.Center)
       Blank().width(24)
     }.width('100%').height(58).padding({ left: 16, right: 16 })
@@ -163,35 +165,35 @@ export struct DigitalAlbumDetailPage {
       }
       Column({ space: 8 }) {
         Text(this.albumName || '数字专辑').width('100%').fontSize(25).fontWeight(FontWeight.Bold)
-          .fontColor('#ffffff').textAlign(TextAlign.Center).maxLines(2)
-        Text(this.artistName || '未知艺人').fontSize(13).fontColor('#b0b0b8').maxLines(1)
+          .fontColor(TC.textPrimary()).textAlign(TextAlign.Center).maxLines(2)
+        Text(this.artistName || '未知艺人').fontSize(13).fontColor(TC.textBody()).maxLines(1)
           .onClick(() => this.openArtist())
-        Text(this.formatDate(this.pubTime)).fontSize(10).fontColor('#66666e')
+        Text(this.formatDate(this.pubTime)).fontSize(10).fontColor(TC.textQuaternary())
       }.width('100%')
       if (this.tags.length > 0) {
         Row({ space: 7 }) {
           ForEach(this.tags.slice(0, 3), (tag: string) => {
-            Text(tag).fontSize(9).fontColor('#d6d6dc').padding({ left: 10, right: 10, top: 6, bottom: 6 })
-              .backgroundColor('#28282f').borderRadius(14)
+            Text(tag).fontSize(9).fontColor(TC.textBody()).padding({ left: 10, right: 10, top: 6, bottom: 6 })
+              .backgroundColor(TC.surfaceRaised()).borderRadius(14)
           })
         }
       }
       Row() {
         Column({ space: 4 }) {
-          Text(this.formatPrice()).fontSize(20).fontWeight(FontWeight.Bold).fontColor('#ef6577')
-          Text(this.canBuy ? '当前可购买' : '当前不可购买').fontSize(9).fontColor('#696971')
+          Text(this.formatPrice()).fontSize(20).fontWeight(FontWeight.Bold).fontColor(TC.accentSoft())
+          Text(this.canBuy ? '当前可购买' : '当前不可购买').fontSize(9).fontColor(TC.textQuaternary())
         }.layoutWeight(1)
         Column({ space: 4 }) {
-          Text(this.formatCount(this.saleNum)).fontSize(18).fontWeight(FontWeight.Bold).fontColor('#ffffff')
-          Text('销量').fontSize(9).fontColor('#696971')
+          Text(this.formatCount(this.saleNum)).fontSize(18).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary())
+          Text('销量').fontSize(9).fontColor(TC.textQuaternary())
         }.layoutWeight(1)
         Column({ space: 4 }) {
-          Text(this.formatCount(this.boughtCount)).fontSize(18).fontWeight(FontWeight.Bold).fontColor('#ffffff')
-          Text('已购买').fontSize(9).fontColor('#696971')
+          Text(this.formatCount(this.boughtCount)).fontSize(18).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary())
+          Text('已购买').fontSize(9).fontColor(TC.textQuaternary())
         }.layoutWeight(1)
-      }.width('92%').height(72).backgroundColor('#1d1d23').borderRadius(20)
-      Button('查看歌曲与普通专辑详情').width('86%').height(45).fontSize(13).fontColor('#ffffff')
-        .backgroundColor('#ef233c').borderRadius(23).onClick(() => this.openAlbum())
+      }.width('92%').height(72).backgroundColor(TC.surfaceCardAlt()).borderRadius(20)
+      Button('查看歌曲与普通专辑详情').width('86%').height(45).fontSize(13).fontColor(TC.textPrimary())
+        .backgroundColor(TC.accent()).borderRadius(23).onClick(() => this.openAlbum())
     }.width('100%').padding({ left: 16, right: 16, top: 20, bottom: 8 })
   }
 
@@ -201,8 +203,8 @@ export struct DigitalAlbumDetailPage {
       Column({ space: 10 }) {
         Row() {
           Text(this.mvTitle || '宣传视频').layoutWeight(1).fontSize(18).fontWeight(FontWeight.Bold)
-            .fontColor('#ffffff')
-          SymbolGlyph($r('sys.symbol.arrow_up_left_and_arrow_down_right')).fontSize(19).fontColor(['#d7d7dc'])
+            .fontColor(TC.textPrimary())
+          SymbolGlyph($r('sys.symbol.arrow_up_left_and_arrow_down_right')).fontSize(19).fontColor([TC.textBody()])
             .onClick(() => this.videoController.requestFullscreen(true))
         }.width('100%')
         Video({ src: this.mvUrl, previewUri: resizeImageUrl(this.mvCover, 760, 430), controller: this.videoController })
@@ -222,13 +224,13 @@ export struct DigitalAlbumDetailPage {
   private DescriptionSection() {
     if (this.donateMsg || this.descriptions.length > 0) {
       Column({ space: 13 }) {
-        Text('专辑介绍').width('100%').fontSize(19).fontWeight(FontWeight.Bold).fontColor('#ffffff')
+        Text('专辑介绍').width('100%').fontSize(19).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary())
         if (this.donateMsg) {
           Text(this.donateMsg).width('100%').fontSize(14).lineHeight(23).fontWeight(FontWeight.Medium)
-            .fontColor('#e1e1e6')
+            .fontColor(TC.textBody())
         }
         ForEach(this.descriptions, (text: string) => {
-          Text(text).width('100%').fontSize(12).lineHeight(21).fontColor('#9999a2')
+          Text(text).width('100%').fontSize(12).lineHeight(21).fontColor(TC.textBody())
         })
       }.width('100%').padding({ left: 18, right: 18, top: 26 }).alignItems(HorizontalAlign.Start)
     }
@@ -238,9 +240,9 @@ export struct DigitalAlbumDetailPage {
   private BuyNotesSection() {
     if (this.buyNotes.length > 0) {
       Column({ space: 9 }) {
-        Text('购买须知').width('100%').fontSize(17).fontWeight(FontWeight.Bold).fontColor('#e6e6eb')
+        Text('购买须知').width('100%').fontSize(17).fontWeight(FontWeight.Bold).fontColor(TC.textBody())
         ForEach(this.buyNotes, (note: string) => {
-          Text(note).width('100%').fontSize(10).lineHeight(17).fontColor('#686870')
+          Text(note).width('100%').fontSize(10).lineHeight(17).fontColor(TC.textQuaternary())
         })
       }.width('100%').padding({ left: 18, right: 18, top: 28 }).alignItems(HorizontalAlign.Start)
     }
@@ -253,11 +255,11 @@ export struct DigitalAlbumDetailPage {
         this.Header()
         if (this.loading) {
           Column({ space: 12 }) {
-            LoadingProgress().width(40).height(40).color('#ef233c')
-            Text('正在加载数字专辑详情').fontSize(11).fontColor('#77777f')
+            LoadingProgress().width(40).height(40).color(TC.accent())
+            Text('正在加载数字专辑详情').fontSize(11).fontColor(TC.textTertiary())
           }.layoutWeight(1).justifyContent(FlexAlign.Center)
         } else if (this.message && !this.albumName) {
-          Text(this.message).layoutWeight(1).width('100%').fontSize(12).fontColor('#77777f')
+          Text(this.message).layoutWeight(1).width('100%').fontSize(12).fontColor(TC.textTertiary())
             .textAlign(TextAlign.Center)
         } else {
           Scroll() {
@@ -267,7 +269,7 @@ export struct DigitalAlbumDetailPage {
               this.DescriptionSection()
               this.BuyNotesSection()
               if (this.message) {
-                Text(this.message).width('100%').fontSize(10).fontColor('#ef6577')
+                Text(this.message).width('100%').fontSize(10).fontColor(TC.accentSoft())
                   .textAlign(TextAlign.Center).padding(16)
               }
               Blank().height(55)
@@ -275,6 +277,6 @@ export struct DigitalAlbumDetailPage {
           }.width('100%').layoutWeight(1).scrollBar(BarState.Off)
         }
       }.width('100%').height('100%')
-    }.hideTitleBar(true).backgroundColor('#121215')
+    }.hideTitleBar(true).backgroundColor(TC.pageBackground())
   }
 }

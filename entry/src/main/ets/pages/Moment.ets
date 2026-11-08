@@ -24,9 +24,11 @@ import { playerController } from '../services/PlayerController'
 import { resizeImageUrl } from '../services/ImageUrl'
 import { AuthStore } from '../stores/AuthStore'
 import { PlayerStore } from '../stores/PlayerStore'
+import { TC } from '../services/ThemeColors'
 
 @Component
 struct Moment {
+  @StorageProp('skinVersion') skinVersionObs: number = 0
   @Consume('pageStack') pageStack: NavPathStack
   @Consume('authStore') authStore: AuthStore
   @Consume('playerStore') playerStore: PlayerStore
@@ -409,9 +411,9 @@ struct Moment {
         Column({ space: 7 }) {
           Text(tab === 'following' ? '关注' : '发现')
             .fontSize(14).fontWeight(this.currentTab === tab ? FontWeight.Bold : FontWeight.Regular)
-            .fontColor(this.currentTab === tab ? '#ffffff' : '#74747d')
+            .fontColor(this.currentTab === tab ? TC.textOnAccent() : TC.textTertiary())
           Column().width(24).height(3).borderRadius(2)
-            .backgroundColor(this.currentTab === tab ? '#ef233c' : 'transparent')
+            .backgroundColor(this.currentTab === tab ? TC.accent() : 'transparent')
         }
         .layoutWeight(1).height(46).justifyContent(FlexAlign.Center)
         .onClick(() => this.switchTab(tab))
@@ -428,36 +430,36 @@ struct Moment {
           .sourceSize({ width: 360, height: 520 })
           .borderRadius({ topLeft: 15, topRight: 15 }).objectFit(ImageFit.Cover)
         if ((item.pics || []).length > 1) {
-          Text(`${(item.pics || []).length} 图`).fontSize(9).fontColor('#ffffff')
+          Text(`${(item.pics || []).length} 图`).fontSize(9).fontColor(TC.textPrimary())
             .padding({ left: 7, right: 7, top: 4, bottom: 4 })
             .margin({ top: 8, right: 8 }).borderRadius(10).backgroundColor('rgba(0,0,0,0.55)')
         }
       }
       .width('100%').onClick(() => this.openEventDetail(item))
       if (item.actName) {
-        Text(`# ${item.actName}`).width('100%').fontSize(10).fontColor('#ff6577').maxLines(1)
+        Text(`# ${item.actName}`).width('100%').fontSize(10).fontColor(TC.accentSoft()).maxLines(1)
           .padding({ left: 11, right: 11 })
       }
-      Text(this.contentOf(item)).width('100%').fontSize(12).lineHeight(18).fontColor('#d1d1d6')
+      Text(this.contentOf(item)).width('100%').fontSize(12).lineHeight(18).fontColor(TC.textBody())
         .maxLines(4).textOverflow({ overflow: TextOverflow.Ellipsis })
         .padding({ left: 11, right: 11 }).onClick(() => this.openEventDetail(item))
       Row({ space: 7 }) {
         Image(resizeImageUrl(item.user.avatarUrl, 64, 64)).width(24).height(24)
           .sourceSize({ width: 64, height: 64 }).borderRadius(32).objectFit(ImageFit.Cover)
           .onClick(() => this.openUser(item.user.userId))
-        Text(item.user.nickname).layoutWeight(1).fontSize(10).fontColor('#92929a').maxLines(1)
+        Text(item.user.nickname).layoutWeight(1).fontSize(10).fontColor(TC.textSecondary()).maxLines(1)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
         Row({ space: 3 }) {
           SymbolGlyph(item.info.liked ? $r('sys.symbol.heart_fill') : $r('sys.symbol.heart'))
-            .fontSize(14).fontColor([item.info.liked ? '#ef233c' : '#77777f'])
+            .fontSize(14).fontColor([item.info.liked ? TC.accent() : TC.textTertiary()])
           Text(`${item.info.likedCount || 0}`).fontSize(9)
-            .fontColor(item.info.liked ? '#ef233c' : '#77777f')
+            .fontColor(item.info.liked ? TC.accent() : TC.textTertiary())
         }
         .onClick(() => this.toggleEventLike(item))
       }
       .width('100%').padding({ left: 11, right: 11, bottom: 11 })
     }
-    .width('100%').backgroundColor('#1b1b20').borderRadius(15)
+    .width('100%').backgroundColor(TC.surfaceCard()).borderRadius(15)
   }
 
 
@@ -468,11 +470,11 @@ struct Moment {
           Text('动态').fontSize(22).fontWeight(FontWeight.Bold).fontColor($r('sys.color.white'))
           Text(this.currentTab === 'discover' ? '从热门话题中发现图片动态' :
             (this.authStore.loggedIn ? '关注的人最近分享' : '登录后查看关注动态'))
-            .fontSize(10).fontColor('#66666e')
+            .fontSize(10).fontColor(TC.textQuaternary())
         }
         .layoutWeight(1).alignItems(HorizontalAlign.Start)
         if (this.currentTab === 'following' && !this.authStore.loggedIn) {
-          Button('登录').fontSize(12).fontColor($r('sys.color.white')).backgroundColor('#ef233c')
+          Button('登录').fontSize(12).fontColor($r('sys.color.white')).backgroundColor(TC.accent())
             .onClick(() => this.pageStack.pushPathByName('LoginPage', null))
         }
       }
@@ -484,16 +486,16 @@ struct Moment {
           if (this.currentTab === 'following') {
             if (!this.authStore.loggedIn) {
               Column({ space: 12 }) {
-                SymbolGlyph($r('sys.symbol.person_2_fill')).fontSize(44).fontColor(['#55555d'])
-                Text('登录后获取完整动态和评论').fontSize(12).fontColor('#77777f')
+                SymbolGlyph($r('sys.symbol.person_2_fill')).fontSize(44).fontColor([TC.textQuaternary()])
+                Text('登录后获取完整动态和评论').fontSize(12).fontColor(TC.textTertiary())
               }
               .layoutWeight(1).justifyContent(FlexAlign.Center)
             } else if (this.loading && this.events.length === 0) {
-              LoadingProgress().layoutWeight(1).width(42).color('#ef233c')
+              LoadingProgress().layoutWeight(1).width(42).color(TC.accent())
             } else if (this.events.length === 0) {
               Column({ space: 11 }) {
-                SymbolGlyph($r('sys.symbol.ellipsis_bubble')).fontSize(42).fontColor(['#55555d'])
-                Text(this.message || '暂时没有动态').fontSize(12).fontColor('#77777f')
+                SymbolGlyph($r('sys.symbol.ellipsis_bubble')).fontSize(42).fontColor([TC.textQuaternary()])
+                Text(this.message || '暂时没有动态').fontSize(12).fontColor(TC.textTertiary())
               }
               .layoutWeight(1).justifyContent(FlexAlign.Center)
             } else {
@@ -507,9 +509,9 @@ struct Moment {
                 ListItem() {
                   Row() {
                     if (this.loading) {
-                      LoadingProgress().width(24).height(24).color('#ef233c')
+                      LoadingProgress().width(24).height(24).color(TC.accent())
                     } else {
-                      Text(this.more ? '上滑加载更多' : '已经到底了').fontSize(11).fontColor('#66666e')
+                      Text(this.more ? '上滑加载更多' : '已经到底了').fontSize(11).fontColor(TC.textQuaternary())
                     }
                   }
                   .width('100%').height(54).justifyContent(FlexAlign.Center)
@@ -519,11 +521,11 @@ struct Moment {
             }
           } else {
             if (this.discoverLoading && this.discoverEvents.length === 0) {
-              LoadingProgress().layoutWeight(1).width(42).color('#ef233c')
+              LoadingProgress().layoutWeight(1).width(42).color(TC.accent())
             } else if (this.discoverEvents.length === 0) {
               Column({ space: 11 }) {
-                SymbolGlyph($r('sys.symbol.ellipsis_bubble')).fontSize(42).fontColor(['#55555d'])
-                Text(this.message || '暂时没有带图片的热门动态').fontSize(12).fontColor('#77777f')
+                SymbolGlyph($r('sys.symbol.ellipsis_bubble')).fontSize(42).fontColor([TC.textQuaternary()])
+                Text(this.message || '暂时没有带图片的热门动态').fontSize(12).fontColor(TC.textTertiary())
               }
               .layoutWeight(1).justifyContent(FlexAlign.Center)
             } else {
@@ -536,10 +538,10 @@ struct Moment {
                 FlowItem() {
                   Row() {
                     if (this.discoverLoading) {
-                      LoadingProgress().width(24).height(24).color('#ef233c')
+                      LoadingProgress().width(24).height(24).color(TC.accent())
                     } else {
                       Text(this.discoverMore ? '继续上滑发现更多' : '已经到底了')
-                        .fontSize(10).fontColor('#66666e')
+                        .fontSize(10).fontColor(TC.textQuaternary())
                     }
                   }
                   .width('100%').height(52).justifyContent(FlexAlign.Center)

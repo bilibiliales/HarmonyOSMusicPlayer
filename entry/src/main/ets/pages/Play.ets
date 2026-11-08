@@ -39,9 +39,11 @@ import { VinylRecord } from '../components/VinylRecord'
 import { AppSettings } from '../services/AppSettings'
 import { BubbleTip } from '../services/BubbleTip'
 import { RectShape } from '@kit.ArkUI'
+import { TC } from '../services/ThemeColors'
 
 @Component
 export struct Play {
+  @StorageProp('skinVersion') skinVersionObs: number = 0
   @Consume('pageStack') pageStack: NavPathStack
   @Consume('topAvoidHeight') topAvoidHeight: number
   @Consume('playerStore') playerStore: PlayerStore
@@ -649,7 +651,7 @@ export struct Play {
               Text(character)
                 .fontSize(this.lyricFontSize(index))
                 .fontWeight(FontWeight.Bold)
-                .fontColor('#ffffff')
+                .fontColor(TC.textPrimary())
                 .lineHeight(this.lyricLineHeight(index))
               Text(character)
                 .fontSize(this.lyricFontSize(index))
@@ -954,7 +956,7 @@ export struct Play {
       if (AppSettings.askDownloadSaveMode) {
         const result = await this.getUIContext().getPromptAction().showActionMenu({
           title: '保存方式',
-          buttons: [{ text: '保存到下载目录', color: '#ef233c' }, { text: '另存为…', color: '#777777' }]
+          buttons: [{ text: '保存到下载目录', color: TC.accent() }, { text: '另存为…', color: '#777777' }]
         })
         saveMode = result.index === 1 ? 'saveAs' : 'download'
       }
@@ -1167,7 +1169,7 @@ export struct Play {
           Text(artist.name).fontSize(fontSize).fontColor(color).maxLines(1)
             .onClick(() => this.openArtist(artist))
           if (index < (this.playerStore.currentSong.artists || []).length - 1) {
-            Text('/').fontSize(fontSize).fontColor('#66666e')
+            Text('/').fontSize(fontSize).fontColor(TC.textQuaternary())
           }
         })
       } else {
@@ -1256,8 +1258,8 @@ export struct Play {
           Blank()
           Row({ space: 5 }) {
             SymbolGlyph($r('sys.symbol.arrow_up_left_and_arrow_down_right'))
-              .fontSize(14).fontColor(['#d9d9de'])
-            Text('退出沉浸').fontSize(10).fontColor('#d9d9de')
+              .fontSize(14).fontColor([TC.textBody()])
+            Text('退出沉浸').fontSize(10).fontColor(TC.textBody())
           }
           .padding({ left: 10, right: 10, top: 7, bottom: 7 })
           .backgroundColor('rgba(255,255,255,0.08)')
@@ -1274,7 +1276,7 @@ export struct Play {
           Text('歌词')
             .fontSize(15)
             .fontWeight(FontWeight.Bold)
-            .fontColor('#ffffff')
+            .fontColor(TC.textPrimary())
           Text(this.lyricUserScrolling ? '正在浏览，3.5 秒后恢复跟随' :
             (this.hasPreciseLyrics() ? '逐字歌词 · 点击任意歌词可跳转' : '点击任意歌词可跳转播放'))
             .fontSize(9)
@@ -1283,7 +1285,7 @@ export struct Play {
         .layoutWeight(1)
         .alignItems(HorizontalAlign.Start)
         Row({ space: 8 }) {
-          SymbolGlyph($r('sys.symbol.gearshape')).fontSize(18).fontColor(['#d9d9de'])
+          SymbolGlyph($r('sys.symbol.gearshape')).fontSize(18).fontColor([TC.textBody()])
             .onClick(() => this.activeSheet = 'lyricSettings')
           Row({ space: 5 }) {
             SymbolGlyph($r('sys.symbol.arrow_up_left_and_arrow_down_right'))
@@ -1296,8 +1298,8 @@ export struct Play {
           .borderRadius(14)
           .onClick(() => this.toggleLyricsImmersive())
           Row({ space: 5 }) {
-            SymbolGlyph($r('sys.symbol.music')).fontSize(14).fontColor(['#d9d9de'])
-            Text('返回唱片').fontSize(10).fontColor('#d9d9de')
+            SymbolGlyph($r('sys.symbol.music')).fontSize(14).fontColor([TC.textBody()])
+            Text('返回唱片').fontSize(10).fontColor(TC.textBody())
           }
           .padding({ left: 10, right: 10, top: 7, bottom: 7 })
           .backgroundColor('rgba(255,255,255,0.08)')
@@ -1311,19 +1313,19 @@ export struct Play {
 
       if (this.lyricsLoading) {
         Column({ space: 12 }) {
-          LoadingProgress().width(40).color('#ffffff')
-          Text('正在加载歌词…').fontSize(11).fontColor('#85858e')
+          LoadingProgress().width(40).color(TC.textPrimary())
+          Text('正在加载歌词…').fontSize(11).fontColor(TC.textTertiary())
         }
         .layoutWeight(1)
         .justifyContent(FlexAlign.Center)
       } else if (this.lyricMessage) {
         Column({ space: 12 }) {
-          SymbolGlyph($r('sys.symbol.text_alignleft')).fontSize(40).fontColor(['#55555d'])
-          Text(this.lyricMessage).fontSize(12).fontColor('#85858e')
+          SymbolGlyph($r('sys.symbol.text_alignleft')).fontSize(40).fontColor([TC.textQuaternary()])
+          Text(this.lyricMessage).fontSize(12).fontColor(TC.textTertiary())
           if (this.lyricCanRetry) {
             Row({ space: 7 }) {
-              SymbolGlyph($r('sys.symbol.arrow_clockwise')).fontSize(17).fontColor(['#ffffff'])
-              Text('重新加载歌词').fontSize(12).fontColor('#ffffff')
+              SymbolGlyph($r('sys.symbol.arrow_clockwise')).fontSize(17).fontColor([TC.textPrimary()])
+              Text('重新加载歌词').fontSize(12).fontColor(TC.textPrimary())
             }
             .padding({ left: 14, right: 14, top: 9, bottom: 9 })
             .backgroundColor('rgba(255,255,255,0.10)').borderRadius(18)
@@ -1393,8 +1395,8 @@ export struct Play {
 
           if (this.lyricUserScrolling) {
             Row({ space: 7 }) {
-              SymbolGlyph($r('sys.symbol.hand_draw')).fontSize(13).fontColor(['#ff8b9a'])
-              Text('已暂停自动跟随').fontSize(10).fontColor('#ffffff')
+              SymbolGlyph($r('sys.symbol.hand_draw')).fontSize(13).fontColor([TC.accentSoft()])
+              Text('已暂停自动跟随').fontSize(10).fontColor(TC.textPrimary())
             }
             .padding({ left: 11, right: 11, top: 7, bottom: 7 })
             .backgroundColor('rgba(22,18,22,0.86)')
@@ -1418,7 +1420,7 @@ export struct Play {
       Stack() {
         SymbolGlyph(icon)
           .fontSize(21)
-          .fontColor(['#e8e8ec'])
+          .fontColor([TC.textBody()])
       }
       .width(36)
       .height(36)
@@ -1426,7 +1428,7 @@ export struct Play {
       .backgroundColor('rgba(255,255,255,0.08)')
       Text(text)
         .fontSize(10)
-        .fontColor('#a9a9b0')
+        .fontColor(TC.textQuaternary())
     }
     .layoutWeight(1)
     .onClick(onClick)
@@ -1437,12 +1439,12 @@ export struct Play {
     Column() {
       this.SheetHeader('选择播放音质', `当前：${this.playerStore.qualityTitle()} · 目标：${this.playerStore.requestedQualityTitle()}`)
       if (this.qualityLoading) {
-        LoadingProgress().width(36).height(36).color('#ef233c').margin({ top: 28 })
+        LoadingProgress().width(36).height(36).color(TC.accent()).margin({ top: 28 })
       } else if (this.qualityError) {
-        Text(`${this.qualityError} · 点击重试`).fontSize(14).fontColor('#a9a9b0').margin({ top: 28 })
+        Text(`${this.qualityError} · 点击重试`).fontSize(14).fontColor(TC.textQuaternary()).margin({ top: 28 })
           .onClick(() => this.loadMusicQualities())
       } else if (this.availableQualities.length === 0) {
-        Text('暂无可用音质').fontSize(14).fontColor('#888890').margin({ top: 28 })
+        Text('暂无可用音质').fontSize(14).fontColor(TC.textTertiary()).margin({ top: 28 })
       } else {
         List({ space: 4 }) {
         ForEach(this.availableQualities, (item: QualityOption) => {
@@ -1452,17 +1454,17 @@ export struct Play {
                 Text(item.title)
                   .fontSize(15)
                   .fontWeight(item.level === this.playerStore.quality ? FontWeight.Bold : FontWeight.Regular)
-                  .fontColor(item.level === this.playerStore.quality ? '#FE010D' : '#eeeeee')
+                  .fontColor(item.level === this.playerStore.quality ? TC.accent() : TC.textPrimary())
                 Text(item.description)
                   .fontSize(11)
-                  .fontColor('#777777')
+                  .fontColor(TC.textTertiary())
               }
               .layoutWeight(1)
               .alignItems(HorizontalAlign.Start)
               if (item.level === this.playerStore.quality) {
                 SymbolGlyph($r('sys.symbol.checkmark_circle_fill'))
                   .fontSize(22)
-                  .fontColor(['#ef233c'])
+                  .fontColor([TC.accent()])
               }
             }
             .width('100%')
@@ -1484,25 +1486,25 @@ export struct Play {
     Column() {
       this.SheetHeader('选择下载音质', this.downloadSongName)
       if (this.downloadQualityLoading) {
-        LoadingProgress().width(36).height(36).color('#ef233c').margin({ top: 28 })
+        LoadingProgress().width(36).height(36).color(TC.accent()).margin({ top: 28 })
       } else if (this.downloadQualityError) {
-        Text(`${this.downloadQualityError} · 点击重试`).fontSize(14).fontColor('#a9a9b0').margin({ top: 28 })
+        Text(`${this.downloadQualityError} · 点击重试`).fontSize(14).fontColor(TC.textQuaternary()).margin({ top: 28 })
           .onClick(() => this.openDownloadQualitySheet())
       } else if (this.downloadQualities.length === 0) {
-        Text('暂无可下载音质').fontSize(14).fontColor('#888890').margin({ top: 28 })
+        Text('暂无可下载音质').fontSize(14).fontColor(TC.textTertiary()).margin({ top: 28 })
       } else {
         Text('按原始音频格式保存，实际音质以账号可下载资源为准')
-          .fontSize(11).fontColor('#888890').padding({ left: 20, right: 20, bottom: 8 })
+          .fontSize(11).fontColor(TC.textTertiary()).padding({ left: 20, right: 20, bottom: 8 })
         List({ space: 4 }) {
           ForEach(this.downloadQualities, (item: QualityOption) => {
             ListItem() {
               Row({ space: 12 }) {
                 Column({ space: 4 }) {
                   Text(item.level === this.preferredDownloadLevel ? `${item.title} · 默认可用` : item.title)
-                    .fontSize(15).fontColor(item.level === this.preferredDownloadLevel ? '#ef233c' : '#eeeeee')
-                  Text(item.description).fontSize(11).fontColor('#777777')
+                    .fontSize(15).fontColor(item.level === this.preferredDownloadLevel ? TC.accent() : TC.textPrimary())
+                  Text(item.description).fontSize(11).fontColor(TC.textTertiary())
                 }.layoutWeight(1).alignItems(HorizontalAlign.Start)
-                SymbolGlyph($r('sys.symbol.arrow_down_circle')).fontSize(22).fontColor(['#a9a9b0'])
+                SymbolGlyph($r('sys.symbol.arrow_down_circle')).fontSize(22).fontColor([TC.textQuaternary()])
               }.width('100%').padding({ left: 20, right: 20, top: 12, bottom: 12 })
                 .onClick(() => this.downloadSong(item.level))
             }
@@ -1523,8 +1525,8 @@ export struct Play {
       this.SheetHeader(`播放队列 · ${this.playerStore.queue.length} 首`, this.playerStore.modeTitle())
       if (this.playerStore.queue.length === 0) {
         Column({ space: 10 }) {
-          SymbolGlyph($r('sys.symbol.music')).fontSize(38).fontColor(['#55555d'])
-          Text('播放列表为空').fontSize(14).fontColor('#888890')
+          SymbolGlyph($r('sys.symbol.music')).fontSize(38).fontColor([TC.textQuaternary()])
+          Text('播放列表为空').fontSize(14).fontColor(TC.textTertiary())
         }
         .layoutWeight(1).justifyContent(FlexAlign.Center)
       } else {
@@ -1533,19 +1535,19 @@ export struct Play {
             ListItem() {
               Row({ space: 12 }) {
                 if (index === this.playerStore.currentIndex) {
-                  SymbolGlyph($r('sys.symbol.text_alignleft')).width(24).fontSize(18).fontColor(['#FE010D'])
+                  SymbolGlyph($r('sys.symbol.text_alignleft')).width(24).fontSize(18).fontColor([TC.accent()])
                 } else {
-                  Text((index + 1).toString()).width(24).fontSize(12).fontColor('#66666e')
+                  Text((index + 1).toString()).width(24).fontSize(12).fontColor(TC.textQuaternary())
                     .textAlign(TextAlign.Center)
                 }
                 Column({ space: 3 }) {
                   Text(item.name).fontSize(14)
-                    .fontColor(index === this.playerStore.currentIndex ? '#FE010D' : '#e8e8eb').maxLines(1)
-                  Text(item.author).fontSize(11).fontColor('#77777f').maxLines(1)
+                    .fontColor(index === this.playerStore.currentIndex ? TC.accent() : TC.textPrimary()).maxLines(1)
+                  Text(item.author).fontSize(11).fontColor(TC.textTertiary()).maxLines(1)
                 }
                 .layoutWeight(1).alignItems(HorizontalAlign.Start)
                   .onClick(() => this.selectQueueSong(index))
-                SymbolGlyph($r('sys.symbol.xmark')).fontSize(15).fontColor(['#66666e'])
+                SymbolGlyph($r('sys.symbol.xmark')).fontSize(15).fontColor([TC.textQuaternary()])
                   .onClick(() => playerController.removeAt(index))
               }
               .height(58).padding({ left: 18, right: 18 })
@@ -1553,7 +1555,7 @@ export struct Play {
           })
         }
         .layoutWeight(1)
-        Text('清空播放列表').width('100%').height(48).fontSize(13).fontColor('#ef4058')
+        Text('清空播放列表').width('100%').height(48).fontSize(13).fontColor(TC.accentSoft())
           .textAlign(TextAlign.Center).onClick(async () => {
             await playerController.clearQueue()
           })
@@ -1567,13 +1569,13 @@ export struct Play {
       this.SheetHeader('歌曲选项', '刷新当前歌曲的封面、歌词和页面信息')
       Row({ space: 14 }) {
         if (this.pageReloading) {
-          LoadingProgress().width(24).height(24).color('#ffffff')
+          LoadingProgress().width(24).height(24).color(TC.textPrimary())
         } else {
-          SymbolGlyph($r('sys.symbol.arrow_clockwise')).fontSize(24).fontColor(['#ffffff'])
+          SymbolGlyph($r('sys.symbol.arrow_clockwise')).fontSize(24).fontColor([TC.textPrimary()])
         }
         Column({ space: 4 }) {
-          Text(this.pageReloading ? '正在重新加载…' : '重新加载').fontSize(15).fontColor('#ffffff')
-          Text('重新获取歌曲详情、封面与歌词').fontSize(11).fontColor('#77777f')
+          Text(this.pageReloading ? '正在重新加载…' : '重新加载').fontSize(15).fontColor(TC.textPrimary())
+          Text('重新获取歌曲详情、封面与歌词').fontSize(11).fontColor(TC.textTertiary())
         }
         .layoutWeight(1).alignItems(HorizontalAlign.Start)
       }
@@ -1581,13 +1583,13 @@ export struct Play {
       .enabled(!this.pageReloading).onClick(() => this.reloadSongPage())
       Row({ space: 14 }) {
         if (this.coverSaving) {
-          LoadingProgress().width(24).height(24).color('#ffffff')
+          LoadingProgress().width(24).height(24).color(TC.textPrimary())
         } else {
-          SymbolGlyph($r('sys.symbol.arrow_down_circle')).fontSize(24).fontColor(['#ffffff'])
+          SymbolGlyph($r('sys.symbol.arrow_down_circle')).fontSize(24).fontColor([TC.textPrimary()])
         }
         Column({ space: 4 }) {
-          Text(this.coverSaving ? '正在保存封面…' : '保存歌曲封面').fontSize(15).fontColor('#ffffff')
-          Text('将当前歌曲封面保存到系统图库').fontSize(11).fontColor('#77777f')
+          Text(this.coverSaving ? '正在保存封面…' : '保存歌曲封面').fontSize(15).fontColor(TC.textPrimary())
+          Text('将当前歌曲封面保存到系统图库').fontSize(11).fontColor(TC.textTertiary())
         }
         .layoutWeight(1).alignItems(HorizontalAlign.Start)
       }
@@ -1596,13 +1598,13 @@ export struct Play {
       .onClick(() => this.saveCoverFromMenu())
       Row({ space: 14 }) {
         if (this.simiInserting) {
-          LoadingProgress().width(24).height(24).color('#ffffff')
+          LoadingProgress().width(24).height(24).color(TC.textPrimary())
         } else {
-          SymbolGlyph($r('sys.symbol.plus_circle')).fontSize(24).fontColor(['#ffffff'])
+          SymbolGlyph($r('sys.symbol.plus_circle')).fontSize(24).fontColor([TC.textPrimary()])
         }
         Column({ space: 4 }) {
-          Text(this.simiInserting ? '正在插播…' : '插播相似歌曲').fontSize(15).fontColor('#ffffff')
-          Text('获取相似歌曲并插入到当前歌曲之后').fontSize(11).fontColor('#77777f')
+          Text(this.simiInserting ? '正在插播…' : '插播相似歌曲').fontSize(15).fontColor(TC.textPrimary())
+          Text('获取相似歌曲并插入到当前歌曲之后').fontSize(11).fontColor(TC.textTertiary())
         }
         .layoutWeight(1).alignItems(HorizontalAlign.Start)
       }
@@ -1619,8 +1621,8 @@ export struct Play {
       this.SheetHeader('收藏到歌单', '选择一个自己创建的歌单')
       if (this.playlists.length === 0) {
         Column({ space: 12 }) {
-          LoadingProgress().width(38).height(38).color('#ef233c')
-          Text('正在加载歌单…').fontSize(12).fontColor('#77777f')
+          LoadingProgress().width(38).height(38).color(TC.accent())
+          Text('正在加载歌单…').fontSize(12).fontColor(TC.textTertiary())
         }
         .layoutWeight(1)
         .justifyContent(FlexAlign.Center)
@@ -1635,14 +1637,14 @@ export struct Play {
                   .borderRadius(10)
                   .objectFit(ImageFit.Cover)
                 Column({ space: 4 }) {
-                  Text(item.name).fontSize(14).fontColor('#ededf0').maxLines(1)
-                  Text(`${item.count} 首`).fontSize(11).fontColor('#77777f')
+                  Text(item.name).fontSize(14).fontColor(TC.textBody()).maxLines(1)
+                  Text(`${item.count} 首`).fontSize(11).fontColor(TC.textTertiary())
                 }
                 .layoutWeight(1)
                 .alignItems(HorizontalAlign.Start)
                 SymbolGlyph($r('sys.symbol.plus_circle'))
                   .fontSize(22)
-                  .fontColor(['#ff6577'])
+                  .fontColor([TC.accentSoft()])
               }
               .height(66)
               .padding({ left: 18, right: 18 })
@@ -1659,14 +1661,14 @@ export struct Play {
   private SheetHeader(title: string, subtitle: string) {
     Row() {
       Column({ space: 4 }) {
-        Text(title).fontSize(17).fontWeight(FontWeight.Bold).fontColor('#ffffff')
-        Text(subtitle).fontSize(10).fontColor('#77777f')
+        Text(title).fontSize(17).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary())
+        Text(subtitle).fontSize(10).fontColor(TC.textTertiary())
       }
       .layoutWeight(1)
       .alignItems(HorizontalAlign.Start)
       SymbolGlyph($r('sys.symbol.xmark_circle_fill'))
         .fontSize(24)
-        .fontColor(['#686870'])
+        .fontColor([TC.textQuaternary()])
         .onClick(() => this.closeSheet())
     }
     .width('100%')
@@ -1680,7 +1682,7 @@ export struct Play {
       Column()
         .width('100%')
         .height('100%')
-        .backgroundColor('#050507')
+        .backgroundColor(TC.sheetBackground())
 
       Image(this.playerStore.currentSong.img)
         .width('100%')
@@ -1705,7 +1707,7 @@ export struct Play {
             .width('100%')
             .fontSize(18)
             .fontWeight(FontWeight.Bold)
-            .fontColor('#ffffff')
+            .fontColor(TC.textPrimary())
             .maxLines(1)
             .textOverflow({ overflow: TextOverflow.Ellipsis })
             .textAlign(TextAlign.Center)
@@ -1713,21 +1715,21 @@ export struct Play {
           Button() {
             Row({ space: 7 }) {
               if (this.coverSaving) {
-                LoadingProgress().width(18).height(18).color('#ffffff')
+                LoadingProgress().width(18).height(18).color(TC.textPrimary())
               } else {
                 SymbolGlyph($r('sys.symbol.arrow_down_circle'))
                   .fontSize(18)
-                  .fontColor(['#ffffff'])
+                  .fontColor([TC.textPrimary()])
               }
               Text(this.coverSaving ? '正在保存…' : '保存图片')
                 .fontSize(14)
                 .fontWeight(FontWeight.Medium)
-                .fontColor('#ffffff')
+                .fontColor(TC.textPrimary())
             }
           }
           .width(176)
           .height(46)
-          .backgroundColor('#ef233c')
+          .backgroundColor(TC.accent())
           .borderRadius(23)
           .enabled(!this.coverSaving)
           .onClick(() => this.saveCoverToGallery())
@@ -1745,7 +1747,7 @@ export struct Play {
     }
     .width('100%')
     .height('100%')
-    .backgroundColor('#050507')
+    .backgroundColor(TC.sheetBackground())
   }
 
   @Builder
@@ -1775,7 +1777,7 @@ export struct Play {
       }
       .width('100%')
       .height(this.activeSheet === 'quality' || this.activeSheet === 'downloadQuality' ? '62%' : this.activeSheet === 'more' ? '38%' : '68%')
-      .backgroundColor('#19191f')
+      .backgroundColor(TC.surfaceCard())
       .borderRadius({ topLeft: 28, topRight: 28 })
       .shadow({ radius: 28, color: 'rgba(0,0,0,0.45)', offsetY: -5 })
       .transition(TransitionEffect.translate({ y: 700 }).animation({ duration: 260, curve: Curve.EaseOut }))
@@ -1808,20 +1810,20 @@ export struct Play {
             Row() {
             SymbolGlyph($r('sys.symbol.chevron_left'))
               .fontSize(24)
-              .fontColor(['#ffffff'])
+              .fontColor([TC.textOnMedia()])
               .onClick(() => this.pageStack.pop())
             Column({ space: 2 }) {
-              Text('正在播放').fontSize(10).fontColor('#a2a2aa')
+              Text('正在播放').fontSize(10).fontColor(TC.textOnMedia())
               Text(this.playerStore.currentSong.album || '网易云音乐')
                 .fontSize(12)
-                .fontColor('#e4e4e8')
+                .fontColor(TC.textOnMedia())
                 .maxLines(1)
                 .onClick(() => this.openCurrentAlbum())
             }
             .layoutWeight(1)
             SymbolGlyph($r('sys.symbol.ellipsis_circle'))
               .fontSize(24)
-              .fontColor(['#ffffff'])
+              .fontColor([TC.textOnMedia()])
               .onClick(() => this.activeSheet = 'more')
             }
             .width('100%')
@@ -1860,8 +1862,8 @@ export struct Play {
               )
 
               Row({ space: 6 }) {
-                SymbolGlyph($r('sys.symbol.text_alignleft')).fontSize(13).fontColor(['#b8b8bf'])
-                Text('点击唱片查看滚动歌词').fontSize(10).fontColor('#b8b8bf')
+                SymbolGlyph($r('sys.symbol.text_alignleft')).fontSize(13).fontColor([TC.textOnMedia()])
+                Text('点击唱片查看滚动歌词').fontSize(10).fontColor(TC.textOnMedia())
               }
               .padding({ left: 11, right: 11, top: 7, bottom: 7 })
               .backgroundColor('rgba(255,255,255,0.07)')
@@ -1885,7 +1887,7 @@ export struct Play {
                 Text(this.playerStore.currentSong.name)
                   .fontSize(24)
                   .fontWeight(FontWeight.Bold)
-                  .fontColor('#ffffff')
+                  .fontColor(TC.textOnMedia())
                   .maxLines(1)
                   .textOverflow({ overflow: TextOverflow.Ellipsis })
                   .layoutWeight(1)
@@ -1893,7 +1895,7 @@ export struct Play {
                   Text('VIP')
                     .fontSize(9)
                     .fontWeight(FontWeight.Bold)
-                    .fontColor('#ff4058')
+                    .fontColor(TC.accentSoft())
                     .padding({ left: 5, right: 5, top: 2, bottom: 2 })
                     .border({ width: 1, color: '#ff4058' })
                     .borderRadius(4)
@@ -1911,7 +1913,7 @@ export struct Play {
                 .fontSize(27)
                 .fontColor([this.liked ? '#ff4058' : '#ffffff'])
               Text(this.redCountLoading ? '…' : this.formatMetricCount(this.redCount))
-                .fontSize(9).fontColor('#9b9ba3')
+                .fontSize(9).fontColor(TC.textOnMedia())
             }
             .onClick(() => this.toggleLike())
             }
@@ -1920,10 +1922,10 @@ export struct Play {
             Column({ space: 3 }) {
               SymbolGlyph($r('sys.symbol.ellipsis_bubble'))
                 .fontSize(25)
-                .fontColor(['#ffffff'])
+                .fontColor([TC.textOnMedia()])
               Text((this.playerStore.currentSong.commentCount || 0).toString())
                 .fontSize(9)
-                .fontColor('#9b9ba3')
+                .fontColor(TC.textOnMedia())
             }
             .onClick(() => this.openComments())
             }
@@ -1941,23 +1943,23 @@ export struct Play {
               .width('100%')
               .blockColor('#ffffff')
               .blockSize({ width: 11, height: 11 })
-              .selectedColor('#ffffff')
+              .selectedColor(TC.textOnMedia())
               .trackColor('rgba(255,255,255,0.22)')
               .trackThickness(2)
               .onChange((value: number, mode: SliderChangeMode) => this.handleProgressChange(value, mode))
             Row() {
-              Text(this.formatTime(this.progressPosition())).fontSize(10).fontColor('#92929a')
+              Text(this.formatTime(this.progressPosition())).fontSize(10).fontColor(TC.textOnMediaSecondary())
               Row({ space: 4 }) {
-                Text(this.playerStore.qualityTitle()).fontSize(10).fontColor('#d8d8dd')
+                Text(this.playerStore.qualityTitle()).fontSize(10).fontColor(TC.textOnMedia())
                 if (!this.isNonCatalogAudio()) {
-                  SymbolGlyph($r('sys.symbol.chevron_up')).fontSize(10).fontColor(['#8d8d95'])
+                  SymbolGlyph($r('sys.symbol.chevron_up')).fontSize(10).fontColor([TC.textOnMediaTertiary()])
                 }
               }
               .padding({ left: 8, right: 8, top: 4, bottom: 4 })
               .backgroundColor('rgba(255,255,255,0.08)')
               .borderRadius(10)
               .onClick(() => { if (!this.isNonCatalogAudio()) { this.openQualitySheet() } })
-              Text(this.formatTime(this.playerStore.duration)).fontSize(10).fontColor('#92929a')
+              Text(this.formatTime(this.playerStore.duration)).fontSize(10).fontColor(TC.textOnMediaSecondary())
             }
             .width('100%')
             .justifyContent(FlexAlign.SpaceBetween)
@@ -1969,26 +1971,26 @@ export struct Play {
             Column({ space: 4 }) {
               SymbolGlyph(this.modeSymbol())
                 .fontSize(24)
-                .fontColor(['#dedee2'])
-              Text(this.playerStore.modeTitle()).fontSize(8).fontColor('#77777f')
+                .fontColor([TC.textOnMedia()])
+              Text(this.playerStore.modeTitle()).fontSize(8).fontColor(TC.textOnMediaTertiary())
             }
             .width(60)
             .onClick(() => playerController.cycleMode())
 
             SymbolGlyph($r('sys.symbol.backward_fill'))
               .fontSize(31)
-              .fontColor(['#ffffff'])
+              .fontColor([TC.textOnMedia()])
               .opacity(this.switchingSong ? 0.45 : 1)
               .onClick(() => this.switchSong(-1))
 
             Stack() {
               if (this.playerStore.isLoading) {
-                LoadingProgress().width(58).height(58).color('#ffffff')
+                LoadingProgress().width(58).height(58).color(TC.textOnMedia())
               } else {
                 SymbolGlyph(this.playerStore.isPlaying ? $r('sys.symbol.pause_circle_fill') :
                   $r('sys.symbol.play_circle_fill'))
                   .fontSize(64)
-                  .fontColor(['#ffffff'])
+                  .fontColor([TC.textOnMedia()])
               }
             }
             .width(72)
@@ -1997,15 +1999,15 @@ export struct Play {
 
             SymbolGlyph($r('sys.symbol.forward_end_fill'))
               .fontSize(31)
-              .fontColor(['#ffffff'])
+              .fontColor([TC.textOnMedia()])
               .opacity(this.switchingSong ? 0.45 : 1)
               .onClick(() => this.switchSong(1))
 
             Column({ space: 4 }) {
               SymbolGlyph($r('sys.symbol.list_bullet'))
                 .fontSize(24)
-                .fontColor(['#dedee2'])
-              Text(`${this.playerStore.queue.length} 首`).fontSize(8).fontColor('#77777f')
+                .fontColor([TC.textOnMedia()])
+              Text(`${this.playerStore.queue.length} 首`).fontSize(8).fontColor(TC.textOnMediaTertiary())
             }
             .width(60)
             .onClick(() => this.activeSheet = 'queue')
@@ -2035,7 +2037,7 @@ export struct Play {
             if (this.playerStore.errorMessage) {
               Text(this.playerStore.errorMessage)
                 .fontSize(10)
-                .fontColor('#ef4058')
+                .fontColor(TC.accentSoft())
                 .maxLines(2)
                 .textAlign(TextAlign.Center)
                 .padding({ left: 20, right: 20, bottom: 8 })
@@ -2067,9 +2069,9 @@ export struct Play {
         }
         .width('100%')
         .height('100%')
-        .backgroundColor('#121215')
+        .backgroundColor(TC.pageBackground())
         .bindSheet(this.commentsVisible, this.CommentsSheet(), {
-          height: '72%', backgroundColor: '#19191f', showClose: false, dragBar: true,
+          height: '72%', backgroundColor: TC.sheetBackground(), showClose: false, dragBar: true,
           onDisappear: () => this.commentsVisible = false
         })
     }

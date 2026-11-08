@@ -7,6 +7,7 @@ import {
 } from '../models/api'
 import { ApiClient } from '../services/ApiClient'
 import { AuthStore } from '../stores/AuthStore'
+import { TC } from '../services/ThemeColors'
 
 export interface RelationshipPageParam {
   type: string
@@ -16,6 +17,7 @@ export interface RelationshipPageParam {
 
 @Component
 export struct RelationshipListPage {
+  @StorageProp('skinVersion') skinVersionObs: number = 0
   @Consume('pageStack') pageStack: NavPathStack
   @Consume('topAvoidHeight') topAvoidHeight: number
   @Consume('authStore') authStore: AuthStore
@@ -180,11 +182,11 @@ export struct RelationshipListPage {
       .height(32)
       .fontSize(12)
       .fontWeight(FontWeight.Medium)
-      .fontColor(this.isFollowing(user) ? '#ef233c' : '#ffffff')
+      .fontColor(this.isFollowing(user) ? TC.accent() : TC.textOnAccent())
       .textAlign(TextAlign.Center)
-      .backgroundColor(this.isFollowing(user) ? '#00ffffff' : '#ef233c')
+      .backgroundColor(this.isFollowing(user) ? '#00ffffff' : TC.accent())
       .borderRadius(16)
-      .border({ width: this.isFollowing(user) ? 1 : 0, color: '#ef233c' })
+      .border({ width: this.isFollowing(user) ? 1 : 0, color: TC.accent() })
       .onClick(() => this.relationClick(user))
   }
 
@@ -201,25 +203,25 @@ export struct RelationshipListPage {
           Text('取消关注')
             .fontSize(18)
             .fontWeight(FontWeight.Bold)
-            .fontColor('#ffffff')
+            .fontColor(TC.textPrimary())
           Text(`确定不再关注「${this.selectedUser?.nickname || ''}」吗？`)
             .fontSize(13)
-            .fontColor('#92929a')
+            .fontColor(TC.textSecondary())
             .textAlign(TextAlign.Center)
         }
         Row({ space: 12 }) {
           Button('暂不取消')
             .layoutWeight(1)
             .height(46)
-            .fontColor('#d6d6da')
-            .backgroundColor('#2a2a30')
+            .fontColor(TC.textBody())
+            .backgroundColor(TC.surfaceRaised())
             .borderRadius(23)
             .onClick(() => this.confirmVisible = false)
           Button('取消关注')
             .layoutWeight(1)
             .height(46)
-            .fontColor('#ffffff')
-            .backgroundColor('#ef233c')
+            .fontColor(TC.textPrimary())
+            .backgroundColor(TC.accent())
             .borderRadius(23)
             .onClick(() => this.cancelFollow())
         }
@@ -228,7 +230,7 @@ export struct RelationshipListPage {
       .height('34%')
       .justifyContent(FlexAlign.Center)
       .padding({ left: 24, right: 24, bottom: 18 })
-      .backgroundColor('#19191f')
+      .backgroundColor(TC.surfaceCard())
       .borderRadius({ topLeft: 28, topRight: 28 })
       .transition(TransitionEffect.translate({ y: 500 }).animation({ duration: 260, curve: Curve.EaseOut }))
     }
@@ -244,13 +246,13 @@ export struct RelationshipListPage {
           Row() {
             SymbolGlyph($r('sys.symbol.chevron_left'))
               .fontSize(24)
-              .fontColor(['#ffffff'])
+              .fontColor([TC.textPrimary()])
               .onClick(() => this.pageStack.pop())
             Text(this.pageParam.title)
               .layoutWeight(1)
               .fontSize(18)
               .fontWeight(FontWeight.Bold)
-              .fontColor('#ffffff')
+              .fontColor(TC.textPrimary())
               .textAlign(TextAlign.Center)
             Column().width(24)
           }
@@ -260,20 +262,20 @@ export struct RelationshipListPage {
 
           if (!this.authStore.loggedIn) {
             Column({ space: 14 }) {
-              Text('登录后才能查看关系列表').fontSize(13).fontColor('#77777f')
+              Text('登录后才能查看关系列表').fontSize(13).fontColor(TC.textTertiary())
               Button('去登录')
-                .fontColor('#ffffff').backgroundColor('#ef233c')
+                .fontColor(TC.textPrimary()).backgroundColor(TC.accent())
                 .onClick(() => this.pageStack.pushPathByName('LoginPage', null))
             }
             .layoutWeight(1)
             .justifyContent(FlexAlign.Center)
           } else if (this.users.length === 0 && this.loading) {
-            LoadingProgress().layoutWeight(1).width(46).color('#ef233c')
+            LoadingProgress().layoutWeight(1).width(46).color(TC.accent())
           } else if (this.users.length === 0) {
             Column({ space: 10 }) {
               SymbolGlyph($r('sys.symbol.person_2_fill'))
-                .fontSize(44).fontColor(['#55555d'])
-              Text(this.message || '这里还没有用户').fontSize(13).fontColor('#77777f')
+                .fontSize(44).fontColor([TC.textQuaternary()])
+              Text(this.message || '这里还没有用户').fontSize(13).fontColor(TC.textTertiary())
             }
             .layoutWeight(1)
             .justifyContent(FlexAlign.Center)
@@ -294,9 +296,9 @@ export struct RelationshipListPage {
                     .onClick(() => this.openUserProfile(user))
                     Column({ space: 5 }) {
                       Text(user.nickname)
-                        .fontSize(14).fontWeight(FontWeight.Medium).fontColor('#ededf0').maxLines(1)
+                        .fontSize(14).fontWeight(FontWeight.Medium).fontColor(TC.textBody()).maxLines(1)
                       Text(user.signature || `${user.follows || 0} 关注 · ${user.followeds || 0} 粉丝`)
-                        .fontSize(10).fontColor('#77777f').maxLines(1)
+                        .fontSize(10).fontColor(TC.textTertiary()).maxLines(1)
                         .textOverflow({ overflow: TextOverflow.Ellipsis })
                     }
                     .layoutWeight(1)
@@ -311,10 +313,10 @@ export struct RelationshipListPage {
               ListItem() {
                 Row() {
                   if (this.loading) {
-                    LoadingProgress().width(24).height(24).color('#ef233c')
+                    LoadingProgress().width(24).height(24).color(TC.accent())
                   } else {
                     Text(this.more ? '继续上滑加载' : '已经到底了')
-                      .fontSize(11).fontColor('#66666e')
+                      .fontSize(11).fontColor(TC.textQuaternary())
                   }
                 }
                 .width('100%').height(54).justifyContent(FlexAlign.Center)
@@ -326,11 +328,11 @@ export struct RelationshipListPage {
 
           if (this.message && this.users.length > 0) {
             Text(this.message)
-              .width('100%').fontSize(11).fontColor('#ff6577').textAlign(TextAlign.Center)
+              .width('100%').fontSize(11).fontColor(TC.accentSoft()).textAlign(TextAlign.Center)
               .padding({ bottom: 8 })
           }
         }
-        .width('100%').height('100%').backgroundColor('#121215')
+        .width('100%').height('100%').backgroundColor(TC.pageBackground())
 
         if (this.confirmVisible) {
           this.CancelSheet()

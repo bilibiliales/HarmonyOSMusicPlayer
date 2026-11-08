@@ -4,6 +4,7 @@ import { ApiClient } from '../services/ApiClient'
 import { SleepTimerService } from '../services/SleepTimerService'
 import { parseVipInfo, VipDisplayInfo } from '../services/VipService'
 import { AuthStore } from '../stores/AuthStore'
+import { TC } from '../services/ThemeColors'
 
 interface SidebarMenuItem {
   icon: Resource
@@ -16,6 +17,7 @@ interface SidebarMenuItem {
 
 @Component
 export struct Sidebar {
+  @StorageProp('skinVersion') skinVersionObs: number = 0
   @Consume('pageStack') pageStack: NavPathStack
   @Consume('authStore') authStore: AuthStore
   @Prop visible: boolean = false
@@ -277,7 +279,7 @@ export struct Sidebar {
                   Text('VIP已过期')
                     .fontSize(15)
                     .fontWeight(FontWeight.Bold)
-                    .fontColor('#888890')
+                    .fontColor(TC.textTertiary())
                 }
               }
               Text(this.vipSubtext())
@@ -425,10 +427,10 @@ export struct Sidebar {
         Text('定时关闭播放')
           .fontSize(17)
           .fontWeight(FontWeight.Bold)
-          .fontColor('#ffffff')
+          .fontColor(TC.textPrimary())
         Text(this.sleepStatusText())
           .fontSize(12)
-          .fontColor('#9a9aa2')
+          .fontColor(TC.textSecondary())
       }
       .width('100%')
       .alignItems(HorizontalAlign.Center)
@@ -437,7 +439,7 @@ export struct Sidebar {
         Text(SleepTimerService.format(this.sleepRemainingMs))
           .fontSize(46)
           .fontWeight(FontWeight.Bold)
-          .fontColor('#ffffff')
+          .fontColor(TC.textPrimary())
           .margin({ top: 2, bottom: 2 })
       }
 
@@ -447,15 +449,15 @@ export struct Sidebar {
             Text(`${minutes}`)
               .fontSize(20)
               .fontWeight(FontWeight.Bold)
-              .fontColor(this.selectedMinutes === minutes && SleepTimerService.enabled ? '#ffffff' : '#e7e7eb')
+              .fontColor(this.selectedMinutes === minutes && SleepTimerService.enabled ? TC.textOnAccent() : TC.textPrimary())
             Text('分钟')
               .fontSize(10)
-              .fontColor('#8a8a92')
+              .fontColor(TC.textSecondary())
           }
           .width(96)
           .height(96)
           .borderRadius(48)
-          .backgroundColor(this.selectedMinutes === minutes && SleepTimerService.enabled ? '#ef233c' : '#232329')
+          .backgroundColor(this.selectedMinutes === minutes && SleepTimerService.enabled ? TC.accent() : TC.surfaceInset())
           .justifyContent(FlexAlign.Center)
           .alignItems(HorizontalAlign.Center)
           .onClick(() => this.selectSleepMinutes(minutes))
@@ -466,21 +468,21 @@ export struct Sidebar {
       Row({ space: 10 }) {
         SymbolGlyph($r('sys.symbol.clock'))
           .fontSize(18)
-          .fontColor(['#e7e7eb'])
+          .fontColor([TC.textBody()])
         Text('自定义时长')
           .fontSize(14)
-          .fontColor('#ededf0')
+          .fontColor(TC.textBody())
         Blank()
         Text(this.customLabel())
           .fontSize(12)
-          .fontColor('#8a8a92')
+          .fontColor(TC.textSecondary())
         SymbolGlyph($r('sys.symbol.chevron_right'))
           .fontSize(15)
-          .fontColor(['#5e5e66'])
+          .fontColor([TC.textQuaternary()])
       }
       .width('100%')
       .padding({ left: 14, right: 14, top: 12, bottom: 12 })
-      .backgroundColor('#232329')
+      .backgroundColor(TC.surfaceInset())
       .borderRadius(14)
       .onClick(() => this.openCustomTime())
 
@@ -488,10 +490,10 @@ export struct Sidebar {
         Column({ space: 3 }) {
           Text('开启定时关闭')
             .fontSize(14)
-            .fontColor('#ededf0')
+            .fontColor(TC.textBody())
           Text('倒计时仅在播放时递减')
             .fontSize(10)
-            .fontColor('#66666e')
+            .fontColor(TC.textQuaternary())
         }
         .layoutWeight(1)
         .alignItems(HorizontalAlign.Start)
@@ -500,17 +502,17 @@ export struct Sidebar {
       }
       .width('100%')
       .padding({ left: 14, right: 14, top: 10, bottom: 10 })
-      .backgroundColor('#232329')
+      .backgroundColor(TC.surfaceInset())
       .borderRadius(14)
 
       Row({ space: 12 }) {
         Column({ space: 3 }) {
           Text('播完整首歌后停止')
             .fontSize(14)
-            .fontColor('#ededf0')
+            .fontColor(TC.textBody())
           Text('等待当前歌曲自然结束后暂停')
             .fontSize(10)
-            .fontColor('#66666e')
+            .fontColor(TC.textQuaternary())
         }
         .layoutWeight(1)
         .alignItems(HorizontalAlign.Start)
@@ -522,15 +524,15 @@ export struct Sidebar {
       }
       .width('100%')
       .padding({ left: 14, right: 14, top: 10, bottom: 10 })
-      .backgroundColor('#232329')
+      .backgroundColor(TC.surfaceInset())
       .borderRadius(14)
 
       if (SleepTimerService.enabled) {
         Button('取消定时关闭')
           .width('100%')
           .height(44)
-          .backgroundColor('#2b2024')
-          .fontColor('#ff7785')
+          .backgroundColor(TC.accentContainer())
+          .fontColor(TC.accentSoft())
           .borderRadius(14)
           .onClick(() => {
             SleepTimerService.cancel()
@@ -576,7 +578,7 @@ export struct Sidebar {
                 Stack() {
                   SymbolGlyph($r('sys.symbol.person_fill'))
                     .fontSize(25)
-                    .fontColor(['#f0f0f2'])
+                    .fontColor([TC.textOnMedia()])
                 }
                 .width(52)
                 .height(52)
@@ -588,17 +590,17 @@ export struct Sidebar {
                 Text(this.authStore.nickname)
                   .fontSize(18)
                   .fontWeight(FontWeight.Bold)
-                  .fontColor('#ffffff')
+                  .fontColor(TC.textOnMedia())
                 Text(this.authStore.loggedIn ? '查看个人主页' : '登录后同步收藏与歌单')
                   .fontSize(11)
-                  .fontColor('#aaaab2')
+                  .fontColor(TC.textOnMedia())
               }
               .layoutWeight(1)
               .alignItems(HorizontalAlign.Start)
 
               SymbolGlyph($r('sys.symbol.chevron_right'))
                 .fontSize(18)
-                .fontColor(['#b3b3ba'])
+                .fontColor([TC.textOnMedia()])
             }
             .width('100%')
             .onClick(() => {
@@ -636,7 +638,7 @@ export struct Sidebar {
                     .fontColor(item.available ? '#ededf0' : '#77777f')
                   Text(item.subtitle)
                     .fontSize(10)
-                    .fontColor('#66666e')
+                    .fontColor(TC.textQuaternary())
                 }
                 .layoutWeight(1)
                 .alignItems(HorizontalAlign.Start)
@@ -644,14 +646,14 @@ export struct Sidebar {
                 if (!item.available) {
                   Text('暂不可用')
                     .fontSize(9)
-                    .fontColor('#77777f')
+                    .fontColor(TC.textOnMediaTertiary())
                     .padding({ left: 7, right: 7, top: 3, bottom: 3 })
-                    .backgroundColor('#232329')
+                    .backgroundColor(TC.surfaceInset())
                     .borderRadius(8)
                 } else {
                   SymbolGlyph($r('sys.symbol.chevron_right'))
                     .fontSize(15)
-                    .fontColor(['#5e5e66'])
+                    .fontColor([TC.textQuaternary()])
                 }
               }
               .width('100%')
@@ -683,7 +685,7 @@ export struct Sidebar {
         if (this.hint) {
           Text(this.hint)
             .fontSize(11)
-            .fontColor('#a9a9b0')
+            .fontColor(TC.textQuaternary())
             .padding({ left: 18, right: 18, bottom: 8 })
         }
 
@@ -707,7 +709,7 @@ export struct Sidebar {
       }
       .width('84%')
       .height('100%')
-      .backgroundColor('#151519')
+      .backgroundColor(TC.sheetBackground())
       .borderRadius({ topRight: 28, bottomRight: 28 })
       .clip(true)
       .translate({ x: this.visible ? 0 : -360 })
@@ -719,7 +721,7 @@ export struct Sidebar {
     .height('100%')
     .bindSheet(this.sleepSheetVisible, this.SleepSheetBuilder(), {
       height: '64%',
-      backgroundColor: '#19191f',
+      backgroundColor: TC.sheetBackground(),
       showClose: false,
       dragBar: true,
       onDisappear: () => {

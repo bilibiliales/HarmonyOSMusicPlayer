@@ -5,9 +5,11 @@ import { RadioService } from '../services/RadioService'
 import { RadioPlayback } from '../services/RadioPlayback'
 import { BubbleTip } from '../services/BubbleTip'
 import { RadioStationCard, RadioProgramRow } from '../components/RadioCards'
+import { TC } from '../services/ThemeColors'
 
 @Component
 export struct RadioPage {
+  @StorageProp('skinVersion') skinVersionObs: number = 0
   @Consume('pageStack') pageStack: NavPathStack
   @Consume('topAvoidHeight') topAvoidHeight: number
   embedded: boolean = false
@@ -123,15 +125,15 @@ export struct RadioPage {
   private CategoriesSheet() {
     Column({ space: 16 }) {
       Row() {
-        Text('电台分类').fontSize(20).fontWeight(FontWeight.Bold).fontColor('#ffffff').layoutWeight(1)
-        Text('关闭').fontSize(14).fontColor('#9999a4').onClick(() => this.categoryVisible = false)
+        Text('电台分类').fontSize(20).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary()).layoutWeight(1)
+        Text('关闭').fontSize(14).fontColor(TC.textSecondary()).onClick(() => this.categoryVisible = false)
       }.width('100%')
       Scroll() {
         Flex({ wrap: FlexWrap.Wrap }) {
-          Text('全部分类').fontSize(14).fontColor(this.category === 0 ? '#ff6577' : '#bbbbC5')
+          Text('全部分类').fontSize(14).fontColor(this.category === 0 ? TC.accentSoft() : TC.textSecondary())
             .padding(12).onClick(() => this.chooseCategory(0, '全部分类'))
           ForEach(this.categories, (item: RadioCategory) => {
-            Text(item.name).fontSize(14).fontColor(this.category === item.id ? '#ff6577' : '#bbbbC5')
+            Text(item.name).fontSize(14).fontColor(this.category === item.id ? TC.accentSoft() : TC.textSecondary())
               .padding(12).onClick(() => this.chooseCategory(item.id, item.name))
           }, (item: RadioCategory) => String(item.id))
         }.width('100%')
@@ -143,37 +145,37 @@ export struct RadioPage {
   private Header() {
     if (!this.embedded) {
       Row({ space: 12 }) {
-        SymbolGlyph($r('sys.symbol.chevron_left')).fontSize(24).fontColor(['#ffffff']).onClick(() => this.pageStack.pop())
-        Text('电台').fontSize(23).fontWeight(FontWeight.Bold).fontColor('#ffffff')
+        SymbolGlyph($r('sys.symbol.chevron_left')).fontSize(24).fontColor([TC.textPrimary()]).onClick(() => this.pageStack.pop())
+        Text('电台').fontSize(23).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary())
       }.width('100%').height(56 + this.topAvoidHeight).padding({ left: 17, top: this.topAvoidHeight })
     }
     Row({ space: 12 }) {
       Column({ space: 5 }) {
-        Text('音乐电台').fontSize(18).fontWeight(FontWeight.Bold).fontColor('#ffffff')
-        Text('DIFM · 电音 / 古典 / 爵士').fontSize(12).fontColor('#aaaaB5')
+        Text('音乐电台').fontSize(18).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary())
+        Text('DIFM · 电音 / 古典 / 爵士').fontSize(12).fontColor(TC.textQuaternary())
       }.layoutWeight(1).alignItems(HorizontalAlign.Start)
-      SymbolGlyph($r('sys.symbol.podcast')).fontSize(28).fontColor(['#ff6577'])
-      SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(13).fontColor(['#9999a4'])
-    }.width('92%').padding(18).borderRadius(18).backgroundColor('#202027').margin({ top: 12, bottom: 16 })
+      SymbolGlyph($r('sys.symbol.podcast')).fontSize(28).fontColor([TC.accentSoft()])
+      SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(13).fontColor([TC.textSecondary()])
+    }.width('92%').padding(18).borderRadius(18).backgroundColor(TC.surfaceCard()).margin({ top: 12, bottom: 16 })
       .onClick(() => this.pageStack.pushPathByName('DifmPage', null))
     Scroll() {
       Row({ space: 22 }) {
-        Text(this.categoryName + ' ▾').fontSize(13).fontColor('#ff6577').onClick(() => this.categoryVisible = true)
+        Text(this.categoryName + ' ▾').fontSize(13).fontColor(TC.accentSoft()).onClick(() => this.categoryVisible = true)
         ForEach(this.categories.slice(0, 8), (item: RadioCategory) => {
-          Text(item.name).fontSize(13).fontColor(this.category === item.id ? '#ff6577' : '#a0a0aa')
+          Text(item.name).fontSize(13).fontColor(this.category === item.id ? TC.accentSoft() : TC.textSecondary())
             .onClick(() => this.chooseCategory(item.id, item.name))
         }, (item: RadioCategory) => String(item.id))
       }.padding({ left: 17, right: 17, top: 8, bottom: 8 })
     }.width('100%').scrollable(ScrollDirection.Horizontal).scrollBar(BarState.Off)
-    if (this.homeMessage) { Text(this.homeMessage).fontSize(11).fontColor('#9999a4').padding(12) }
+    if (this.homeMessage) { Text(this.homeMessage).fontSize(11).fontColor(TC.textSecondary()).padding(12) }
   }
 
   @Builder
   private RecommendedPrograms() {
     if (this.category === 0 && this.mode === 'recommend' && this.recommendations.length > 0) {
       Row() {
-        Text('精选节目').fontSize(19).fontWeight(FontWeight.Bold).fontColor('#ffffff').layoutWeight(1)
-        Text(this.playing ? '准备播放…' : '播放全部').fontSize(12).fontColor('#ff6577')
+        Text('精选节目').fontSize(19).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary()).layoutWeight(1)
+        Text(this.playing ? '准备播放…' : '播放全部').fontSize(12).fontColor(TC.accentSoft())
           .enabled(!this.playing).onClick(() => this.play(this.recommendations))
       }.width('100%').padding({ left: 17, right: 17, top: 18, bottom: 8 })
       ForEach(this.recommendations, (program: ProgramItem, index: number) => {
@@ -193,14 +195,14 @@ export struct RadioPage {
             ForEach(this.category > 0 ? ['recommend', 'hot'] : ['recommend', 'hot', 'new', 'programs'], (mode: string) => {
               Text(mode === 'recommend' ? '推荐电台' : mode === 'hot' ? '热门' : mode === 'new' ? '新晋' : '节目榜')
                 .fontSize(14).fontWeight(this.mode === mode ? FontWeight.Bold : FontWeight.Regular)
-                .fontColor(this.mode === mode ? '#ffffff' : '#85858f').onClick(() => this.chooseMode(mode))
+                .fontColor(this.mode === mode ? TC.textPrimary() : TC.textTertiary()).onClick(() => this.chooseMode(mode))
             })
           }.width('100%').padding({ left: 17, right: 17, top: 20, bottom: 14 })
         }
         if (this.mode !== 'programs') {
           ListItem() {
             Search({ value: this.query, placeholder: '筛选已加载电台' }).margin({ left: 17, right: 17, bottom: 10 })
-              .fontColor('#eeeeF2').backgroundColor('#222229').onChange((value: string) => this.query = value)
+              .fontColor(TC.textBody()).backgroundColor(TC.surfaceRaised()).onChange((value: string) => this.query = value)
           }
           ForEach(this.visibleStations(), (station: DjRadioItem) => {
             ListItem() { RadioStationCard({ station: station, onOpen: () => this.openStation(station.id, station.name, station.picUrl) }) }
@@ -213,28 +215,28 @@ export struct RadioPage {
         }
         ListItem() {
           Column({ space: 12 }) {
-            if (this.loading) { LoadingProgress().width(30).height(30).color('#ef233c') }
+            if (this.loading) { LoadingProgress().width(30).height(30).color(TC.accent()) }
             else if (this.message) {
-              Text(this.message).fontSize(13).fontColor('#ff6577')
-              Button('重试').backgroundColor('#303038').onClick(() => { this.message = ''; this.loadList() })
+              Text(this.message).fontSize(13).fontColor(TC.accentSoft())
+              Button('重试').backgroundColor(TC.surfaceRaised()).onClick(() => { this.message = ''; this.loadList() })
             } else {
               Text((this.mode === 'programs' ? this.ranked.length === 0 : this.visibleStations().length === 0) ?
-                '暂无内容' : this.more ? '加载更多' : '已经到底了').fontSize(12).fontColor('#85858f')
+                '暂无内容' : this.more ? '加载更多' : '已经到底了').fontSize(12).fontColor(TC.textTertiary())
                 .onClick(() => this.loadList())
             }
           }.width('100%').padding({ top: 20, bottom: this.embedded ? 145 : 40 })
         }
       }.width('100%').height('100%').scrollBar(BarState.Off).onReachEnd(() => this.loadList())
-    }.width('100%').height('100%').backgroundColor('#121215')
+    }.width('100%').height('100%').backgroundColor(TC.pageBackground())
       .onRefreshing(async () => { this.refreshing = true; await this.loadHome(); this.refreshing = false })
       .bindSheet(this.categoryVisible, this.CategoriesSheet(), {
-        height: '62%', backgroundColor: '#19191f', showClose: false, dragBar: true,
+        height: '62%', backgroundColor: TC.sheetBackground(), showClose: false, dragBar: true,
         onDisappear: () => this.categoryVisible = false
       })
   }
 
   build() {
     if (this.embedded) { this.Content() }
-    else { NavDestination() { this.Content() }.hideTitleBar(true).backgroundColor('#121215') }
+    else { NavDestination() { this.Content() }.hideTitleBar(true).backgroundColor(TC.pageBackground()) }
   }
 }

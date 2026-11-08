@@ -10,9 +10,11 @@ import { CloudService } from '../services/CloudService'
 import { playerController } from '../services/PlayerController'
 import { BubbleTip } from '../services/BubbleTip'
 import { AuthStore } from '../stores/AuthStore'
+import { TC } from '../services/ThemeColors'
 
 @Component
 export struct CloudDrivePage {
+  @StorageProp('skinVersion') skinVersionObs: number = 0
   @Consume('pageStack') pageStack: NavPathStack
   @Consume('topAvoidHeight') topAvoidHeight: number
   @Consume('authStore') @Watch('onAuthChanged') authStore: AuthStore
@@ -334,30 +336,30 @@ export struct CloudDrivePage {
       Row() {
         Text(this.sheet === 'match' ? '歌曲纠偏' : this.sheet === 'collect' ? '收藏到歌单' :
           this.sheet === 'delete' ? '删除云盘歌曲' : this.sheet === 'sort' ? '排列顺序' : '歌曲选项')
-          .fontSize(19).fontWeight(FontWeight.Bold).fontColor('#ffffff').layoutWeight(1)
-        Text('关闭').fontSize(14).fontColor('#9999a1').enabled(!this.busy).onClick(() => { this.sheet = ''; this.searchToken++ })
+          .fontSize(19).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary()).layoutWeight(1)
+        Text('关闭').fontSize(14).fontColor(TC.textSecondary()).enabled(!this.busy).onClick(() => { this.sheet = ''; this.searchToken++ })
       }.width('100%')
-      if (this.sheetMessage) { Text(this.sheetMessage).fontSize(12).fontColor('#ff6577') }
-      if (this.busy || this.sheetLoading) { LoadingProgress().width(26).height(26).color('#ef233c') }
+      if (this.sheetMessage) { Text(this.sheetMessage).fontSize(12).fontColor(TC.accentSoft()) }
+      if (this.busy || this.sheetLoading) { LoadingProgress().width(26).height(26).color(TC.accent()) }
       if (this.sheet === 'more' && this.target) {
-        Text(CloudService.song(this.target).name).fontSize(17).fontColor('#eeeeee')
+        Text(CloudService.song(this.target).name).fontSize(17).fontColor(TC.textBody())
         Text(`${CloudService.song(this.target).author} · ${this.bytes(this.target.fileSize || 0)}`)
-          .fontSize(12).fontColor('#888890')
-        Button('纠偏 / 解除关联').width('100%').backgroundColor('#303038').enabled(!this.busy && !this.sheetLoading)
+          .fontSize(12).fontColor(TC.textTertiary())
+        Button('纠偏 / 解除关联').width('100%').backgroundColor(TC.surfaceRaised()).enabled(!this.busy && !this.sheetLoading)
           .onClick(() => this.openMatch())
-        Button('删除').width('100%').backgroundColor('#ef233c').enabled(!this.busy)
+        Button('删除').width('100%').backgroundColor(TC.accent()).enabled(!this.busy)
           .onClick(() => { if (this.target) { this.requestDelete([String(this.target.songId)]) } })
       } else if (this.sheet === 'match') {
         Search({ value: this.matchQuery, placeholder: '搜索要关联的歌名或歌手' })
           .onChange((value: string) => { this.matchQuery = value; this.searchToken++; this.searching = false; this.matches = []; this.searchMore = false })
           .onSubmit(() => this.search(true)).searchButton('搜索').enabled(!this.busy)
-        Button('解除当前关联').width('100%').backgroundColor('#303038').enabled(!this.busy).onClick(() => this.match('0'))
+        Button('解除当前关联').width('100%').backgroundColor(TC.surfaceRaised()).enabled(!this.busy).onClick(() => this.match('0'))
         List() {
           ForEach(this.matches, (song: songItemType) => {
             ListItem() {
               Column({ space: 5 }) {
-                Text(song.name).fontSize(15).fontColor('#ffffff').maxLines(1)
-                Text(`${song.author} · ${song.album || ''}`).fontSize(12).fontColor('#9999a1').maxLines(1)
+                Text(song.name).fontSize(15).fontColor(TC.textPrimary()).maxLines(1)
+                Text(`${song.author} · ${song.album || ''}`).fontSize(12).fontColor(TC.textSecondary()).maxLines(1)
               }.width('100%').alignItems(HorizontalAlign.Start).padding({ top: 12, bottom: 12 })
                 .enabled(!this.busy).onClick(() => this.match(song.id))
             }
@@ -369,13 +371,13 @@ export struct CloudDrivePage {
         }.layoutWeight(1)
       } else if (this.sheet === 'delete') {
         Text(`确认从云盘删除 ${this.actionIds.length} 首歌曲？删除后需重新上传才能恢复。`)
-          .fontSize(15).fontColor('#dddddf')
-        Button('确认删除').backgroundColor('#ef233c').enabled(!this.busy).onClick(() => this.batch())
+          .fontSize(15).fontColor(TC.textBody())
+        Button('确认删除').backgroundColor(TC.accent()).enabled(!this.busy).onClick(() => this.batch())
       } else if (this.sheet === 'collect') {
         List() {
           ForEach(this.playlists, (playlist: playlistType) => {
             ListItem() {
-              Text(playlist.name).fontSize(16).fontColor('#eeeeee').width('100%').padding(16)
+              Text(playlist.name).fontSize(16).fontColor(TC.textBody()).width('100%').padding(16)
                 .enabled(!this.busy).onClick(() => this.batch(playlist))
             }
           }, (playlist: playlistType) => playlist.id)
@@ -384,7 +386,7 @@ export struct CloudDrivePage {
         ForEach(['new', 'old', 'name', 'artist', 'size'], (key: string) => {
           Text(key === 'new' ? '上传时间：新到旧' : key === 'old' ? '上传时间：旧到新' :
             key === 'name' ? '歌曲名称' : key === 'artist' ? '歌手名称' : '文件大小：大到小')
-            .fontSize(16).fontColor(this.sortKey === key ? '#ff6577' : '#eeeeee').width('100%').padding(14)
+            .fontSize(16).fontColor(this.sortKey === key ? TC.accentSoft() : TC.textPrimary()).width('100%').padding(14)
             .onClick(() => { this.sortKey = key; this.sheet = '' })
         })
       }
@@ -396,9 +398,9 @@ export struct CloudDrivePage {
       Stack({ alignContent: Alignment.Bottom }) {
         Column({ space: 10 }) {
           Row({ space: 16 }) {
-            SymbolGlyph($r('sys.symbol.chevron_left')).fontSize(24).fontColor(['#ffffff']).onClick(() => this.pageStack.pop())
-            Text('我的云盘').fontSize(20).fontWeight(FontWeight.Bold).fontColor('#ffffff').layoutWeight(1)
-            Text('上传').fontSize(15).fontColor('#ff6577').enabled(!this.busy && !this.loading && this.authStore.loggedIn)
+            SymbolGlyph($r('sys.symbol.chevron_left')).fontSize(24).fontColor([TC.textPrimary()]).onClick(() => this.pageStack.pop())
+            Text('我的云盘').fontSize(20).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary()).layoutWeight(1)
+            Text('上传').fontSize(15).fontColor(TC.accentSoft()).enabled(!this.busy && !this.loading && this.authStore.loggedIn)
               .onClick(() => this.upload())
           }.width('100%').height(56 + this.topAvoidHeight).padding({ left: 18, right: 18, top: this.topAvoidHeight })
           if (!this.authStore.loggedIn) {
@@ -407,16 +409,16 @@ export struct CloudDrivePage {
             Search({ value: this.query, placeholder: '查找云盘歌曲、歌手或文件名' }).margin({ left: 16, right: 16 })
               .onChange((value: string) => this.query = value)
             Row() {
-              Text(`共 ${this.songs.length} 首${this.quota ? ` · ${this.quota}` : ''}`).fontSize(11).fontColor('#888890').layoutWeight(1)
-              Text('刷新').fontSize(13).fontColor('#aaaaB2').enabled(!this.loading && !this.busy).onClick(() => this.reload())
+              Text(`共 ${this.songs.length} 首${this.quota ? ` · ${this.quota}` : ''}`).fontSize(11).fontColor(TC.textTertiary()).layoutWeight(1)
+              Text('刷新').fontSize(13).fontColor(TC.textBody()).enabled(!this.loading && !this.busy).onClick(() => this.reload())
             }.width('100%').padding({ left: 18, right: 18 })
-            if (this.message) { Text(this.message).fontSize(12).fontColor('#ff6577').padding({ left: 18, right: 18 }).maxLines(4) }
-            if (this.loading) { Text('正在加载完整云盘列表…').fontSize(12).fontColor('#9999a1') }
+            if (this.message) { Text(this.message).fontSize(12).fontColor(TC.accentSoft()).padding({ left: 18, right: 18 }).maxLines(4) }
+            if (this.loading) { Text('正在加载完整云盘列表…').fontSize(12).fontColor(TC.textSecondary()) }
             Row({ space: 20 }) {
-              Text('播放全部').fontSize(15).fontColor('#ffffff').onClick(() => this.play())
+              Text('播放全部').fontSize(15).fontColor(TC.textPrimary()).onClick(() => this.play())
               Blank()
-              Text('排序').fontSize(14).fontColor('#aaaaB2').onClick(() => this.sheet = 'sort')
-              Text(this.selecting ? '完成' : '多选').fontSize(14).fontColor('#aaaaB2')
+              Text('排序').fontSize(14).fontColor(TC.textBody()).onClick(() => this.sheet = 'sort')
+              Text(this.selecting ? '完成' : '多选').fontSize(14).fontColor(TC.textBody())
                 .onClick(() => { this.selecting = !this.selecting; this.selected = [] })
             }.width('100%').padding({ left: 18, right: 18 }).height(40).enabled(this.complete && !this.busy)
             List() {
@@ -425,33 +427,33 @@ export struct CloudDrivePage {
                   Row({ space: 12 }) {
                     if (this.selecting) {
                       SymbolGlyph(this.selected.includes(String(song.songId)) ? $r('sys.symbol.checkmark_circle_fill') : $r('sys.symbol.circle'))
-                        .fontSize(22).fontColor(['#ef233c']).onClick(() => this.toggle(String(song.songId)))
+                        .fontSize(22).fontColor([TC.accent()]).onClick(() => this.toggle(String(song.songId)))
                     }
                     Image(CloudService.song(song).img).width(48).height(48).borderRadius(8).objectFit(ImageFit.Cover)
-                      .backgroundColor('#25252c')
+                      .backgroundColor(TC.surfaceRaised())
                     Column({ space: 5 }) {
-                      Text(CloudService.song(song).name).fontSize(15).fontColor('#eeeeee').maxLines(1)
-                      Text(`${CloudService.song(song).author} · ${this.bytes(song.fileSize || 0)}`).fontSize(11).fontColor('#888890').maxLines(1)
+                      Text(CloudService.song(song).name).fontSize(15).fontColor(TC.textBody()).maxLines(1)
+                      Text(`${CloudService.song(song).author} · ${this.bytes(song.fileSize || 0)}`).fontSize(11).fontColor(TC.textTertiary()).maxLines(1)
                     }.layoutWeight(1).alignItems(HorizontalAlign.Start).onClick(() => {
                       if (this.selecting) { this.toggle(String(song.songId)) } else { this.play(song) }
                     })
                     if (!this.selecting) {
-                      SymbolGlyph($r('sys.symbol.ellipsis_circle')).fontSize(23).fontColor(['#aaaaB2']).onClick(() => this.more(song))
+                      SymbolGlyph($r('sys.symbol.ellipsis_circle')).fontSize(23).fontColor([TC.textBody()]).onClick(() => this.more(song))
                     }
                   }.height(70).padding({ left: 18, right: 18 }).enabled(!this.busy && this.complete)
                 }
               }, (song: CloudSong) => String(song.songId))
               if (!this.loading && this.visibleSongs().length === 0) {
                 ListItem() { Text(this.query ? '未找到匹配的歌曲' : '云盘暂无歌曲，点击右上角上传 MP3')
-                  .fontSize(14).fontColor('#888890').padding(28) }
+                  .fontSize(14).fontColor(TC.textTertiary()).padding(28) }
               }
             }.layoutWeight(1).width('100%')
             if (this.selecting) {
               Row({ space: 16 }) {
-                Text(`全选 (${this.selected.length})`).fontColor('#eeeeee').onClick(() => this.selectAll())
-                Text('收藏').fontColor('#eeeeee').enabled(this.selected.length > 0).onClick(() => this.choosePlaylist())
-                Text('加入队列').fontColor('#eeeeee').enabled(this.selected.length > 0).onClick(() => this.enqueue())
-                Text('删除').fontColor('#ff6577').enabled(this.selected.length > 0).onClick(() => this.requestDelete(this.selected))
+                Text(`全选 (${this.selected.length})`).fontColor(TC.textBody()).onClick(() => this.selectAll())
+                Text('收藏').fontColor(TC.textBody()).enabled(this.selected.length > 0).onClick(() => this.choosePlaylist())
+                Text('加入队列').fontColor(TC.textBody()).enabled(this.selected.length > 0).onClick(() => this.enqueue())
+                Text('删除').fontColor(TC.accentSoft()).enabled(this.selected.length > 0).onClick(() => this.requestDelete(this.selected))
               }.height(56).width('100%').justifyContent(FlexAlign.Center).enabled(!this.busy && this.complete)
             }
           }
@@ -459,10 +461,10 @@ export struct CloudDrivePage {
         if (this.sheet) {
           Column().width('100%').height('100%').backgroundColor('rgba(0,0,0,0.55)')
             .onClick(() => { if (!this.busy) { this.sheet = ''; this.searchToken++ } })
-          Column() { this.SheetContent() }.width('100%').height('62%').backgroundColor('#19191f')
+          Column() { this.SheetContent() }.width('100%').height('62%').backgroundColor(TC.surfaceCard())
             .borderRadius({ topLeft: 24, topRight: 24 })
         }
-      }.width('100%').height('100%').backgroundColor('#121215')
+      }.width('100%').height('100%').backgroundColor(TC.pageBackground())
     }.hideTitleBar(true)
   }
 }

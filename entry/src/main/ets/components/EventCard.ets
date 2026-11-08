@@ -11,9 +11,11 @@ import { ShareSheet } from './ShareSheet'
 import { EventImages } from './EventImages'
 import { ResourceComments } from './ResourceComments'
 import { CommentResource } from '../models/CommentResource'
+import { TC } from '../services/ThemeColors'
 
 @Component
 export struct EventCard {
+  @StorageProp('skinVersion') skinVersionObs: number = 0
   @Consume('pageStack') pageStack: NavPathStack
   @Consume('authStore') authStore: AuthStore
   @Consume('playerStore') playerStore: PlayerStore
@@ -83,18 +85,18 @@ export struct EventCard {
         Image(resizeImageUrl(resource.image, 128, 128)).width(58).height(58)
           .sourceSize({ width: 128, height: 128 }).borderRadius(11).objectFit(ImageFit.Cover)
       } else {
-        Stack() { SymbolGlyph($r('sys.symbol.music')).fontSize(25).fontColor(['#a0a0a8']) }
-          .width(58).height(58).borderRadius(11).backgroundColor('#303037')
+        Stack() { SymbolGlyph($r('sys.symbol.music')).fontSize(25).fontColor([TC.textQuaternary()]) }
+          .width(58).height(58).borderRadius(11).backgroundColor(TC.surfaceRaised())
       }
       Column({ space: 5 }) {
-        Text(resource.kind).fontSize(9).fontColor('#ff7587')
-        Text(resource.title).fontSize(13).fontWeight(FontWeight.Medium).fontColor('#ededf0').maxLines(1)
-        if (resource.subtitle) { Text(resource.subtitle).fontSize(10).fontColor('#77777f').maxLines(1) }
+        Text(resource.kind).fontSize(9).fontColor(TC.accentSoft())
+        Text(resource.title).fontSize(13).fontWeight(FontWeight.Medium).fontColor(TC.textBody()).maxLines(1)
+        if (resource.subtitle) { Text(resource.subtitle).fontSize(10).fontColor(TC.textTertiary()).maxLines(1) }
       }.layoutWeight(1).alignItems(HorizontalAlign.Start)
       if (resource.song) {
-        SymbolGlyph($r('sys.symbol.play_circle_fill')).fontSize(25).fontColor(['#ffffff'])
+        SymbolGlyph($r('sys.symbol.play_circle_fill')).fontSize(25).fontColor([TC.textPrimary()])
       }
-    }.width('100%').padding(11).backgroundColor('#24242a').borderRadius(13)
+    }.width('100%').padding(11).backgroundColor(TC.surfaceInset()).borderRadius(13)
       .onClick(() => this.openResource(resource))
   }
 
@@ -103,13 +105,13 @@ export struct EventCard {
     Column({ space: 7 }) {
       Row({ space: 7 }) {
         Image(resizeImageUrl(source.user.avatarUrl, 64, 64)).width(24).height(24).borderRadius(12).objectFit(ImageFit.Cover)
-        Text(source.user.nickname).fontSize(12).fontColor('#ededf0').maxLines(1)
+        Text(source.user.nickname).fontSize(12).fontColor(TC.textBody()).maxLines(1)
       }.width('100%').onClick(() => this.open(source))
-      Text(EventPresentation.content(source)).width('100%').fontSize(12).lineHeight(18).fontColor('#9999a1').maxLines(3)
+      Text(EventPresentation.content(source)).width('100%').fontSize(12).lineHeight(18).fontColor(TC.textSecondary()).maxLines(3)
         .onClick(() => this.open(source))
       if (source.pics?.length) { EventImages({ pictures: source.pics || [] }) }
       if (EventPresentation.resource(source).title) { this.ResourceCard(EventPresentation.resource(source)) }
-    }.width('100%').padding(10).backgroundColor('#202026').borderRadius(11)
+    }.width('100%').padding(10).backgroundColor(TC.surfaceCardAlt()).borderRadius(11)
   }
 
   @Builder
@@ -151,13 +153,13 @@ export struct EventCard {
           if (this.item.user.userType === 4) { Image($r('app.media.ic_singer')).width(18).height(18).borderRadius(9) }
         }.width(46).height(46).onClick(() => this.openUser(this.item.user.userId))
         Column({ space: 4 }) {
-          Text(this.item.user.nickname).fontSize(14).fontWeight(FontWeight.Medium).fontColor('#ffffff').maxLines(1)
-          Text(EventPresentation.time(this.item.showTime || this.item.eventTime || 0)).fontSize(10).fontColor('#66666e')
+          Text(this.item.user.nickname).fontSize(14).fontWeight(FontWeight.Medium).fontColor(TC.textPrimary()).maxLines(1)
+          Text(EventPresentation.time(this.item.showTime || this.item.eventTime || 0)).fontSize(10).fontColor(TC.textQuaternary())
         }.layoutWeight(1).alignItems(HorizontalAlign.Start).onClick(() => this.open())
-        SymbolGlyph($r('sys.symbol.ellipsis_circle')).fontSize(20).fontColor(['#9999a1']).padding(8)
+        SymbolGlyph($r('sys.symbol.ellipsis_circle')).fontSize(20).fontColor([TC.textSecondary()]).padding(8)
           .onClick(() => this.sharing = true)
       }.width('100%')
-      Text(EventPresentation.content(this.item)).width('100%').fontSize(13).lineHeight(20).fontColor('#b5b5bc')
+      Text(EventPresentation.content(this.item)).width('100%').fontSize(13).lineHeight(20).fontColor(TC.textBody())
         .onClick(() => this.open())
       if (EventPresentation.data(this.item).event) {
         this.SourceCard(EventPresentation.source(EventPresentation.data(this.item).event!))
@@ -166,22 +168,22 @@ export struct EventCard {
       if (EventPresentation.resource(this.item).title) { this.ResourceCard(EventPresentation.resource(this.item)) }
       Row({ space: 24 }) {
         Row({ space: 4 }) {
-          SymbolGlyph($r('sys.symbol.arrow_right_up_and_square')).fontSize(16).fontColor(['#77777f'])
-          Text(String(this.item.info.shareCount || 0)).fontSize(10).fontColor('#77777f')
+          SymbolGlyph($r('sys.symbol.arrow_right_up_and_square')).fontSize(16).fontColor([TC.textTertiary()])
+          Text(String(this.item.info.shareCount || 0)).fontSize(10).fontColor(TC.textTertiary())
         }.onClick(() => this.sharing = true)
         Row({ space: 4 }) {
-          SymbolGlyph($r('sys.symbol.ellipsis_bubble')).fontSize(16).fontColor(['#77777f'])
-          Text(String(this.item.info.commentCount || 0)).fontSize(10).fontColor('#77777f')
+          SymbolGlyph($r('sys.symbol.ellipsis_bubble')).fontSize(16).fontColor([TC.textTertiary()])
+          Text(String(this.item.info.commentCount || 0)).fontSize(10).fontColor(TC.textTertiary())
         }.onClick(() => this.commentsVisible = true)
         Row({ space: 4 }) {
           SymbolGlyph(this.item.info.liked ? $r('sys.symbol.heart_fill') : $r('sys.symbol.heart'))
-            .fontSize(16).fontColor([this.item.info.liked ? '#ef233c' : '#77777f'])
-          Text(String(this.item.info.likedCount || 0)).fontSize(10).fontColor(this.item.info.liked ? '#ef233c' : '#77777f')
+            .fontSize(16).fontColor([this.item.info.liked ? TC.accent() : TC.textTertiary()])
+          Text(String(this.item.info.likedCount || 0)).fontSize(10).fontColor(this.item.info.liked ? TC.accent() : TC.textTertiary())
         }.enabled(!this.liking).onClick(() => this.like())
       }.width('100%')
-    }.width('100%').padding(16).backgroundColor('#1b1b20').borderRadius(16)
+    }.width('100%').padding(16).backgroundColor(TC.surfaceCard()).borderRadius(16)
       .bindSheet(this.commentsVisible, this.Comments(), {
-        height: '75%', backgroundColor: '#19191f', showClose: false, dragBar: false,
+        height: '75%', backgroundColor: TC.sheetBackground(), showClose: false, dragBar: false,
         onDisappear: () => this.commentsVisible = false
       })
       .bindContentCover(this.sharing, this.ShareOptions(), {

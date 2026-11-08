@@ -13,6 +13,7 @@ import {
 } from '../models/api'
 import { ApiClient } from '../services/ApiClient'
 import { AuthStore } from '../stores/AuthStore'
+import { TC } from '../services/ThemeColors'
 
 interface PrivateMessageBody {
   msg?: string
@@ -54,6 +55,7 @@ interface NoticeDisplay {
 
 @Component
 export struct MessageCenterPage {
+  @StorageProp('skinVersion') skinVersionObs: number = 0
   @Consume('pageStack') pageStack: NavPathStack
   @Consume('topAvoidHeight') topAvoidHeight: number
   @Consume('authStore') authStore: AuthStore
@@ -282,9 +284,9 @@ export struct MessageCenterPage {
         Column({ space: 7 }) {
           Text(tab === 'private' ? '私信' : tab === 'comments' ? '评论' : '通知')
             .fontSize(14).fontWeight(this.currentTab === tab ? FontWeight.Bold : FontWeight.Regular)
-            .fontColor(this.currentTab === tab ? '#ffffff' : '#77777f')
+            .fontColor(this.currentTab === tab ? TC.textOnAccent() : TC.textTertiary())
           Column().width(24).height(3).borderRadius(2)
-            .backgroundColor(this.currentTab === tab ? '#ef233c' : 'transparent')
+            .backgroundColor(this.currentTab === tab ? TC.accent() : 'transparent')
         }
         .layoutWeight(1).height(46).justifyContent(FlexAlign.Center).onClick(() => this.switchTab(tab))
       })
@@ -302,18 +304,18 @@ export struct MessageCenterPage {
               Image(this.otherUser(item).avatarUrl).width(52).height(52).borderRadius(18).objectFit(ImageFit.Cover)
               if ((item.newMsgCount || 0) > 0) {
                 Text(item.newMsgCount > 99 ? '99+' : item.newMsgCount.toString())
-                  .fontSize(8).fontColor('#ffffff').padding({ left: 5, right: 5, top: 2, bottom: 2 })
-                  .borderRadius(9).backgroundColor('#ef233c')
+                  .fontSize(8).fontColor(TC.textPrimary()).padding({ left: 5, right: 5, top: 2, bottom: 2 })
+                  .borderRadius(9).backgroundColor(TC.accent())
               }
             }
             .width(52).height(52)
             Column({ space: 6 }) {
               Row() {
                 Text(this.otherUser(item).nickname).layoutWeight(1).fontSize(14)
-                  .fontWeight(FontWeight.Medium).fontColor('#ededf0').maxLines(1)
-                Text(this.formatTime(item.lastMsgTime)).fontSize(9).fontColor('#66666e')
+                  .fontWeight(FontWeight.Medium).fontColor(TC.textBody()).maxLines(1)
+                Text(this.formatTime(item.lastMsgTime)).fontSize(9).fontColor(TC.textQuaternary())
               }
-              Text(this.privatePreview(item.lastMsg)).width('100%').fontSize(11).fontColor('#85858e')
+              Text(this.privatePreview(item.lastMsg)).width('100%').fontSize(11).fontColor(TC.textTertiary())
                 .maxLines(2).textOverflow({ overflow: TextOverflow.Ellipsis })
             }
             .layoutWeight(1).alignItems(HorizontalAlign.Start)
@@ -338,14 +340,14 @@ export struct MessageCenterPage {
             Column({ space: 6 }) {
               Row() {
                 Text(item.user.nickname).layoutWeight(1).fontSize(13).fontWeight(FontWeight.Medium)
-                  .fontColor('#ededf0').maxLines(1)
-                Text(this.formatTime(item.time)).fontSize(9).fontColor('#66666e')
+                  .fontColor(TC.textBody()).maxLines(1)
+                Text(this.formatTime(item.time)).fontSize(9).fontColor(TC.textQuaternary())
               }
-              Text(item.content || '回复了你的评论').fontSize(12).lineHeight(18).fontColor('#c5c5cb').maxLines(3)
+              Text(item.content || '回复了你的评论').fontSize(12).lineHeight(18).fontColor(TC.textBody()).maxLines(3)
               if (item.beRepliedContent || this.resourceName(item.resourceJson)) {
                 Text(item.beRepliedContent || this.resourceName(item.resourceJson)).width('100%')
-                  .fontSize(10).fontColor('#77777f').maxLines(2)
-                  .padding(9).backgroundColor('#25252b').borderRadius(9)
+                  .fontSize(10).fontColor(TC.textTertiary()).maxLines(2)
+                  .padding(9).backgroundColor(TC.surfaceRaised()).borderRadius(9)
               }
             }
             .layoutWeight(1).alignItems(HorizontalAlign.Start)
@@ -370,18 +372,18 @@ export struct MessageCenterPage {
                 .onClick(() => this.openUser(this.noticeDisplay(item).user?.userId || 0))
             } else {
               Stack() {
-                SymbolGlyph($r('sys.symbol.bell_fill')).fontSize(21).fontColor(['#ffffff'])
+                SymbolGlyph($r('sys.symbol.bell_fill')).fontSize(21).fontColor([TC.textPrimary()])
               }
-              .width(44).height(44).borderRadius(16).backgroundColor('#ef233c')
+              .width(44).height(44).borderRadius(16).backgroundColor(TC.accent())
             }
             Column({ space: 6 }) {
               Row() {
                 Text(this.noticeDisplay(item).title).layoutWeight(1).fontSize(13)
-                  .fontWeight(FontWeight.Medium).fontColor('#ededf0').maxLines(1)
-                Text(this.formatTime(item.time)).fontSize(9).fontColor('#66666e')
+                  .fontWeight(FontWeight.Medium).fontColor(TC.textBody()).maxLines(1)
+                Text(this.formatTime(item.time)).fontSize(9).fontColor(TC.textQuaternary())
               }
               Text(this.noticeDisplay(item).content).width('100%').fontSize(11).lineHeight(18)
-                .fontColor('#9d9da5').maxLines(4).textOverflow({ overflow: TextOverflow.Ellipsis })
+                .fontColor(TC.textBody()).maxLines(4).textOverflow({ overflow: TextOverflow.Ellipsis })
             }
             .layoutWeight(1).alignItems(HorizontalAlign.Start)
           }
@@ -398,9 +400,9 @@ export struct MessageCenterPage {
     ListItem() {
       Row() {
         if (this.loading) {
-          LoadingProgress().width(24).height(24).color('#ef233c')
+          LoadingProgress().width(24).height(24).color(TC.accent())
         } else {
-          Text(this.more ? '继续上滑加载' : '已经到底了').fontSize(10).fontColor('#66666e')
+          Text(this.more ? '继续上滑加载' : '已经到底了').fontSize(10).fontColor(TC.textQuaternary())
         }
       }
       .width('100%').height(52).justifyContent(FlexAlign.Center)
@@ -412,11 +414,11 @@ export struct MessageCenterPage {
       Column() {
         Column().width('100%').height(this.topAvoidHeight)
         Row() {
-          SymbolGlyph($r('sys.symbol.chevron_left')).fontSize(24).fontColor(['#ffffff'])
+          SymbolGlyph($r('sys.symbol.chevron_left')).fontSize(24).fontColor([TC.textPrimary()])
             .onClick(() => this.pageStack.pop())
           Text('消息中心').layoutWeight(1).fontSize(18).fontWeight(FontWeight.Bold)
-            .fontColor('#ffffff').textAlign(TextAlign.Center)
-          SymbolGlyph($r('sys.symbol.arrow_clockwise')).fontSize(20).fontColor(['#888890'])
+            .fontColor(TC.textPrimary()).textAlign(TextAlign.Center)
+          SymbolGlyph($r('sys.symbol.arrow_clockwise')).fontSize(20).fontColor([TC.textTertiary()])
             .onClick(() => this.loadCurrentTab(true))
         }
         .width('100%').height(56).padding({ left: 16, right: 16 })
@@ -424,36 +426,36 @@ export struct MessageCenterPage {
 
         if (!this.authStore.loggedIn) {
           Column({ space: 13 }) {
-            SymbolGlyph($r('sys.symbol.envelope_fill')).fontSize(42).fontColor(['#55555d'])
-            Text('登录后查看消息中心').fontSize(13).fontColor('#77777f')
-            Button('去登录').fontSize(12).fontColor('#ffffff').backgroundColor('#ef233c')
+            SymbolGlyph($r('sys.symbol.envelope_fill')).fontSize(42).fontColor([TC.textQuaternary()])
+            Text('登录后查看消息中心').fontSize(13).fontColor(TC.textTertiary())
+            Button('去登录').fontSize(12).fontColor(TC.textPrimary()).backgroundColor(TC.accent())
               .onClick(() => this.pageStack.pushPathByName('LoginPage', null))
           }
           .layoutWeight(1).justifyContent(FlexAlign.Center)
         } else if (this.loading && this.conversations.length === 0 && this.commentMessages.length === 0 &&
           this.notices.length === 0) {
-          LoadingProgress().layoutWeight(1).width(44).color('#ef233c')
+          LoadingProgress().layoutWeight(1).width(44).color(TC.accent())
         } else if (this.currentTab === 'private') {
           if (this.conversations.length > 0) {
             this.PrivateList()
           } else {
-            Text(this.message || '暂无私信').layoutWeight(1).fontSize(13).fontColor('#77777f')
+            Text(this.message || '暂无私信').layoutWeight(1).fontSize(13).fontColor(TC.textTertiary())
           }
         } else if (this.currentTab === 'comments') {
           if (this.commentMessages.length > 0) {
             this.CommentsList()
           } else {
-            Text(this.message || '暂无评论通知').layoutWeight(1).fontSize(13).fontColor('#77777f')
+            Text(this.message || '暂无评论通知').layoutWeight(1).fontSize(13).fontColor(TC.textTertiary())
           }
         } else {
           if (this.notices.length > 0) {
             this.NoticesList()
           } else {
-            Text(this.message || '暂无通知').layoutWeight(1).fontSize(13).fontColor('#77777f')
+            Text(this.message || '暂无通知').layoutWeight(1).fontSize(13).fontColor(TC.textTertiary())
           }
         }
       }
-      .width('100%').height('100%').backgroundColor('#121215')
+      .width('100%').height('100%').backgroundColor(TC.pageBackground())
     }
     .hideTitleBar(true)
   }
