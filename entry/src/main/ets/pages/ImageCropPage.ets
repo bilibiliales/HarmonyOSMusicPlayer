@@ -53,7 +53,8 @@ export struct ImageCropPage {
   @State imgHeight: number = 0
   @State fitWidth: number = 0
   @State fitHeight: number = 0
-  @State scale: number = 1
+  /** 注意：不能叫 scale / transform，会和 CustomComponent 内置属性冲突。 */
+  @State zoom: number = 1
   @State offsetX: number = 0
   @State offsetY: number = 0
   @State aspect: number = DecoRatio.FREE
@@ -198,8 +199,8 @@ export struct ImageCropPage {
     this.cropY = (this.editorH - h) / 2
   }
 
-  private dispWidth(): number { return this.fitWidth * this.scale }
-  private dispHeight(): number { return this.fitHeight * this.scale }
+  private dispWidth(): number { return this.fitWidth * this.zoom }
+  private dispHeight(): number { return this.fitHeight * this.zoom }
 
   /** 图片左上角（相对编辑区，vp）。 */
   private imageLeft(): number {
@@ -228,7 +229,7 @@ export struct ImageCropPage {
     this.fitWidth = this.imgWidth * ratio
     this.fitHeight = this.imgHeight * ratio
     this.resetCropBox()
-    this.scale = this.minScale()
+    this.zoom = this.minScale()
     this.offsetX = 0
     this.offsetY = 0
   }
@@ -251,7 +252,7 @@ export struct ImageCropPage {
   /** 裁剪框被拖大后，自动把图片放大到仍能盖住它。 */
   private enforceCover(): void {
     const need = this.minScale()
-    if (this.scale < need) { this.scale = need }
+    if (this.zoom < need) { this.zoom = need }
     this.clampOffset()
   }
 
@@ -272,14 +273,14 @@ export struct ImageCropPage {
     this.ratioIndex = index
     this.discardResult()
     this.resetCropBox()
-    this.scale = Math.max(this.minScale(), Math.min(this.scale, this.maxScale()))
+    this.zoom = Math.max(this.minScale(), Math.min(this.zoom, this.maxScale()))
     this.clampOffset()
   }
 
   private resetView(): void {
     this.discardResult()
     this.resetCropBox()
-    this.scale = this.minScale()
+    this.zoom = this.minScale()
     this.offsetX = 0
     this.offsetY = 0
     this.tip = '双指缩放 / 拖动图片，拖四角改裁剪框'
@@ -371,7 +372,7 @@ export struct ImageCropPage {
   // 旋转与翻转（预处理：生成新图后重新载入）
   // ---------------------------------------------------------------------------
 
-  private async transform(rotateAngle: number, flipH: boolean, flipV: boolean): Promise<void> {
+  private async applyTransform(rotateAngle: number, flipH: boolean, flipV: boolean): Promise<void> {
     if (this.busy || !this.currentPath) { return }
     this.busy = true
     let source: image.ImageSource | undefined = undefined
@@ -659,10 +660,10 @@ export struct ImageCropPage {
         // 旋转 / 翻转
         Scroll() {
           Row({ space: 8 }) {
-            this.ToolChip('左转 90°', () => { this.transform(270, false, false) })
-            this.ToolChip('右转 90°', () => { this.transform(90, false, false) })
-            this.ToolChip('水平翻转', () => { this.transform(0, true, false) })
-            this.ToolChip('垂直翻转', () => { this.transform(0, false, true) })
+            this.ToolChip('左转 90°', () => { this.applyTransform(270, false, false) })
+            this.ToolChip('右转 90°', () => { this.applyTransform(90, false, false) })
+            this.ToolChip('水平翻转', () => { this.applyTransform(0, true, false) })
+            this.ToolChip('垂直翻转', () => { this.applyTransform(0, false, true) })
           }
           .padding({ left: 16, right: 16 })
         }
@@ -709,12 +710,12 @@ export struct ImageCropPage {
               .onActionStart(() => {
                 this.discardResult()
                 this.pinchActive = true
-                this.baseScale = this.scale
+                this.baseScale = this.zoom
               })
               .onActionUpdate((event: GestureEvent) => {
                 const pinch = Number(event.scale)
                 if (Number.isNaN(pinch) || pinch <= 0) { return }
-                this.scale = Math.max(this.minScale(), Math.min(this.baseScale * pinch, this.maxScale()))
+                this.zoom = Math.max(this.minScale(), Math.min(this.baseScale * pinch, this.maxScale()))
                 this.clampOffset()
               })
               .onActionEnd(() => { this.pinchActive = false }),

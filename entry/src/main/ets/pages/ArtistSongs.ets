@@ -32,7 +32,7 @@ export struct ArtistSongsPage {
   @State keyword: string = ''
   @State scrollOffset: number = 0
   @State shareVisible: boolean = false
-  private offset: number = 0
+  private offSet: number = 0
   private readonly pageSize: number = 30
 
   aboutToAppear(): void {
@@ -50,12 +50,12 @@ export struct ArtistSongsPage {
       const response = await ApiClient.get<ArtistSongsResponse>('/artist/songs', [
         { key: 'id', value: this.pageParam.id },
         { key: 'limit', value: this.pageSize.toString() },
-        { key: 'offset', value: this.offset.toString() }
+        { key: 'offset', value: this.offSet.toString() }
       ])
       if (response.code === 200) {
         const incoming = (response.songs || []).map((song: ApiSong) => mapApiSong(song))
         this.songs = this.songs.concat(incoming)
-        this.offset += incoming.length
+        this.offSet += incoming.length
         if (response.total) {
           this.total = response.total
         } else if (!this.total) {
@@ -76,7 +76,7 @@ export struct ArtistSongsPage {
       return this.songs
     }
     return this.songs.filter((song: songItemType) =>
-      `${song.name} ${song.author} ${song.album}`.toLowerCase().includes(key))
+    `${song.name} ${song.author} ${song.album}`.toLowerCase().includes(key))
   }
 
   private async playAt(index: number): Promise<void> {
