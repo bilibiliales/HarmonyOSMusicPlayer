@@ -227,6 +227,92 @@ export struct AlbumDetail {
 
 
 
+  /** 操作行：播放全部 + 收藏 / 评论 / 分享，滚动内容与吸顶浮层共用。 */
+  @Builder
+  private ActionBar() {
+    Row({ space: 10 }) {
+      Button() {
+        Row({ space: 5 }) {
+          SymbolGlyph($r('sys.symbol.play_fill')).fontSize(14).fontColor([TC.textOnAccent()])
+          Text('播放全部').fontSize(13).fontColor(TC.textOnAccent()).fontWeight(FontWeight.Medium)
+        }
+      }
+      .layoutWeight(1)
+      .height(38)
+      .backgroundColor(TC.accent())
+      .borderRadius(19)
+      .type(ButtonType.Normal)
+      .onClick(() => this.playAll())
+
+      Button() {
+        Row({ space: 4 }) {
+          SymbolGlyph(this.isSub ? $r('sys.symbol.heart_fill') : $r('sys.symbol.heart'))
+            .fontSize(14)
+            .fontColor([this.isSub ? TC.accent() : TC.textPrimary()])
+          Text(this.isSub ? '已收藏' : '收藏')
+            .fontSize(12)
+            .fontColor(this.isSub ? TC.accent() : TC.textPrimary())
+        }
+      }
+      .height(38)
+      .backgroundColor(this.isSub ? 'rgba(239,35,60,0.12)' : TC.surfaceInset())
+      .borderRadius(19)
+      .type(ButtonType.Normal)
+      .padding({ left: 14, right: 14 })
+      .onClick(() => this.toggleSub())
+
+      Button() {
+        Row({ space: 4 }) {
+          SymbolGlyph($r('sys.symbol.ellipsis_bubble')).fontSize(14).fontColor([TC.textBody()])
+          Text(this.formatCount(this.commentCount)).fontSize(11).fontColor(TC.textBody())
+        }
+      }
+      .height(38)
+      .backgroundColor(TC.surfaceRaised())
+      .borderRadius(19)
+      .type(ButtonType.Normal)
+      .padding({ left: 12, right: 12 })
+      .onClick(() => this.openCommentSheet())
+
+      Button() {
+        Row({ space: 4 }) {
+          SymbolGlyph($r('sys.symbol.share')).fontSize(14).fontColor([TC.textBody()])
+          Text(this.formatCount(this.shareCount)).fontSize(11).fontColor(TC.textBody())
+        }
+      }
+      .height(38)
+      .backgroundColor(TC.surfaceRaised())
+      .borderRadius(19)
+      .type(ButtonType.Normal)
+      .padding({ left: 12, right: 12 })
+      .onClick(() => this.shareSheetVisible = true)
+    }
+    .width('100%')
+    .padding({ left: 16, right: 16, top: 12, bottom: 8 })
+  }
+
+  /** 头图滚过后（约 266vp）操作行开始渐显接替。 */
+  private pinProgress(): number {
+    const value = (this.scrollOffset - 266) / 60
+    if (value < 0) { return 0 }
+    if (value > 1) { return 1 }
+    return value
+  }
+
+  /** 上滑后固定在标题栏下方，保证页面只留标题 + 播放全部组件。 */
+  @Builder
+  private PinnedActionBar() {
+    Column() {
+      this.ActionBar()
+    }
+    .width('100%')
+    .backgroundColor(Color.Transparent)
+    .backdropBlur(16)
+    .position({ x: 0, y: this.topAvoidHeight + 54 })
+    .opacity(this.pinProgress())
+    .animation({ duration: 160, curve: Curve.EaseOut })
+  }
+
   build() {
     NavDestination() {
       if (this.loading) {
@@ -304,65 +390,7 @@ export struct AlbumDetail {
               .height(320 + this.topAvoidHeight)
               .alignContent(Alignment.Bottom)
 
-              Row({ space: 10 }) {
-                Button() {
-                  Row({ space: 5 }) {
-                    SymbolGlyph($r('sys.symbol.play_fill')).fontSize(14).fontColor([TC.textOnAccent()])
-                    Text('播放全部').fontSize(13).fontColor(TC.textOnAccent()).fontWeight(FontWeight.Medium)
-                  }
-                }
-                .layoutWeight(1)
-                .height(38)
-                .backgroundColor(TC.accent())
-                .borderRadius(19)
-                .type(ButtonType.Normal)
-                .onClick(() => this.playAll())
-
-                Button() {
-                  Row({ space: 4 }) {
-                    SymbolGlyph(this.isSub ? $r('sys.symbol.heart_fill') : $r('sys.symbol.heart'))
-                      .fontSize(14)
-                      .fontColor([this.isSub ? TC.accent() : TC.textPrimary()])
-                    Text(this.isSub ? '已收藏' : '收藏')
-                      .fontSize(12)
-                      .fontColor(this.isSub ? TC.accent() : TC.textPrimary())
-                  }
-                }
-                .height(38)
-                .backgroundColor(this.isSub ? 'rgba(239,35,60,0.12)' : TC.surfaceInset())
-                .borderRadius(19)
-                .type(ButtonType.Normal)
-                .padding({ left: 14, right: 14 })
-                .onClick(() => this.toggleSub())
-
-                Button() {
-                  Row({ space: 4 }) {
-                    SymbolGlyph($r('sys.symbol.ellipsis_bubble')).fontSize(14).fontColor([TC.textBody()])
-                    Text(this.formatCount(this.commentCount)).fontSize(11).fontColor(TC.textBody())
-                  }
-                }
-                .height(38)
-                .backgroundColor(TC.surfaceRaised())
-                .borderRadius(19)
-                .type(ButtonType.Normal)
-                .padding({ left: 12, right: 12 })
-                .onClick(() => this.openCommentSheet())
-
-                Button() {
-                  Row({ space: 4 }) {
-                    SymbolGlyph($r('sys.symbol.share')).fontSize(14).fontColor([TC.textBody()])
-                    Text(this.formatCount(this.shareCount)).fontSize(11).fontColor(TC.textBody())
-                  }
-                }
-                .height(38)
-                .backgroundColor(TC.surfaceRaised())
-                .borderRadius(19)
-                .type(ButtonType.Normal)
-                .padding({ left: 12, right: 12 })
-                .onClick(() => this.shareSheetVisible = true)
-              }
-              .width('100%')
-              .padding({ left: 16, right: 16, top: 12, bottom: 8 })
+              this.ActionBar()
 
               if (this.albumDesc.length > 0) {
                 Column() {
@@ -440,6 +468,10 @@ export struct AlbumDetail {
             scrollOffset: this.scrollOffset,
             onShare: () => this.shareSheetVisible = true
           })
+          // 上滑后由浮层接替滚走的操作行：页面只保留标题 + 播放全部组件
+          if (this.pinProgress() > 0.01) {
+            this.PinnedActionBar()
+          }
           if (this.shareSheetVisible) {
             ShareSheet({
               shareParam: this.shareParam,

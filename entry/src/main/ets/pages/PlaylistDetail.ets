@@ -40,6 +40,8 @@ export struct PlaylistDetail {
   @State searchVisible: boolean = false
   @State keyword: string = ''
   @State scrollOffset: number = 0
+  @State creatorAvatar: string = ''
+  private scroller: Scroller = new Scroller()
   @State shareCount: number = 0
   @State commentCount: number = 0
   @State collectCount: number = 0
@@ -135,6 +137,7 @@ export struct PlaylistDetail {
       ])
       if (response.code === 200 && response.playlist) {
         this.creatorId = response.playlist.creator.userId?.toString() || ''
+        this.creatorAvatar = response.playlist.creator.avatarUrl || ''
         this.playlist = {
           id: response.playlist.id.toString(),
           name: response.playlist.name,
@@ -527,10 +530,83 @@ export struct PlaylistDetail {
     .width('100%').height('100%')
   }
 
+  /** 操作行：播放全部 + 收藏 / 评论 / 分享，滚动内容与吸顶浮层共用。 */
+  @Builder
+  private ActionBar() {
+    Row({ space: 10 }) {
+      Button() {
+        Row({ space: 6 }) {
+          SymbolGlyph($r('sys.symbol.play_fill')).fontSize(15).fontColor([TC.textOnAccent()])
+          Text(`播放全部 ${this.filteredSongs().length}`).fontSize(13).fontWeight(FontWeight.Medium)
+            .fontColor(TC.textOnAccent())
+        }
+      }
+      .layoutWeight(1).height(40).backgroundColor(TC.accent()).borderRadius(20)
+      .type(ButtonType.Normal).enabled(!this.loading && this.filteredSongs().length > 0)
+      .onClick(() => this.playAt(0))
+
+      if (!this.playlist.specialType) {
+        Button() {
+          Row({ space: 4 }) {
+            SymbolGlyph(this.subscribed ? $r('sys.symbol.heart_fill') : $r('sys.symbol.heart'))
+              .fontSize(14).fontColor([this.subscribed ? TC.accent() : TC.textSecondary()])
+            Text(this.formatCount(this.collectCount)).fontSize(10)
+              .fontColor(this.subscribed ? TC.accent() : TC.textSecondary())
+          }
+        }
+        .height(40).backgroundColor(this.subscribed ? 'rgba(239,35,60,0.12)' : TC.surfaceInset())
+        .borderRadius(20).type(ButtonType.Normal).padding({ left: 12, right: 12 })
+        .onClick(() => this.toggleSubscribe())
+
+        Button() {
+          Row({ space: 4 }) {
+            SymbolGlyph($r('sys.symbol.ellipsis_bubble')).fontSize(14).fontColor([TC.textBody()])
+            Text(this.formatCount(this.commentCount)).fontSize(10).fontColor(TC.textBody())
+          }
+        }
+        .height(40).backgroundColor(TC.surfaceRaised()).borderRadius(20).type(ButtonType.Normal)
+        .padding({ left: 12, right: 12 }).onClick(() => this.openComments())
+
+        Button() {
+          Row({ space: 4 }) {
+            SymbolGlyph($r('sys.symbol.share')).fontSize(14).fontColor([TC.textBody()])
+            Text(this.formatCount(this.shareCount)).fontSize(10).fontColor(TC.textBody())
+          }
+        }
+        .height(40).backgroundColor(TC.surfaceRaised()).borderRadius(20).type(ButtonType.Normal)
+        .padding({ left: 12, right: 12 }).onClick(() => this.sharePlaylist())
+      }
+    }
+    .width('100%').height(62).padding({ left: 16, right: 16, top: 10, bottom: 10 })
+  }
+
+  /** 头图滚过后（约 226vp）操作行开始渐显接替。 */
+  private pinProgress(): number {
+    const value = (this.scrollOffset - 226) / 60
+    if (value < 0) { return 0 }
+    if (value > 1) { return 1 }
+    return value
+  }
+
+  /** 上滑后固定在标题栏下方，保证页面只留标题 + 播放全部组件。 */
+  @Builder
+  private PinnedActionBar() {
+    Column() {
+      this.ActionBar()
+    }
+    .width('100%')
+    .backgroundColor(Color.Transparent)
+    .backdropBlur(16)
+    .position({ x: 0, y: this.topAvoidHeight + 54 })
+    .opacity(this.pinProgress())
+    .animation({ duration: 160, curve: Curve.EaseOut })
+  }
+
   build() {
     NavDestination() {
       Stack({ alignContent: Alignment.TopStart }) {
-        Column() {
+        Scroll(this.scroller) {
+          Column() {
           Stack({ alignContent: Alignment.BottomStart }) {
             Image(this.playlist.cover).width('100%').height('100%').objectFit(ImageFit.Cover).blur(48).opacity(0.55)
             Column().width('100%').height('100%')
@@ -572,7 +648,12 @@ export struct PlaylistDetail {
                 Column({ space: 8 }) {
                   Text(this.playlist.name).fontSize(20).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary()).maxLines(3)
                   Row({ space: 5 }) {
-                    SymbolGlyph($r('sys.symbol.person_crop_circle_fill')).fontSize(15).fontColor([TC.textBody()])
+                    if (this.creatorAvatar) {
+                      Image(this.creatorAvatar).width(18).height(18).borderRadius(9)
+                        .objectFit(ImageFit.Cover).backgroundColor(TC.surfaceInset())
+                    } else {
+                      SymbolGlyph($r('sys.symbol.person_crop_circle_fill')).fontSize(15).fontColor([TC.textBody()])
+                    }
                     Text(this.playlist.creator).fontSize(12).fontColor(TC.textBody()).maxLines(1)
                   }
                   .onClick(() => this.openCreatorProfile())
@@ -608,54 +689,10 @@ export struct PlaylistDetail {
             }.width('100%').height(46).padding({ left: 20, right: 20 })
           }
 
-          Row({ space: 10 }) {
-            Button() {
-              Row({ space: 6 }) {
-                SymbolGlyph($r('sys.symbol.play_fill')).fontSize(15).fontColor([TC.textOnAccent()])
-                Text(`播放全部 ${this.filteredSongs().length}`).fontSize(13).fontWeight(FontWeight.Medium)
-                  .fontColor(TC.textOnAccent())
-              }
-            }
-            .layoutWeight(1).height(40).backgroundColor(TC.accent()).borderRadius(20)
-            .type(ButtonType.Normal).enabled(!this.loading && this.filteredSongs().length > 0)
-            .onClick(() => this.playAt(0))
-
-            if (!this.playlist.specialType) {
-            Button() {
-              Row({ space: 4 }) {
-                SymbolGlyph(this.subscribed ? $r('sys.symbol.heart_fill') : $r('sys.symbol.heart'))
-                  .fontSize(14).fontColor([this.subscribed ? TC.accent() : TC.textSecondary()])
-                Text(this.formatCount(this.collectCount)).fontSize(10)
-                  .fontColor(this.subscribed ? TC.accent() : TC.textSecondary())
-              }
-            }
-            .height(40).backgroundColor(this.subscribed ? 'rgba(239,35,60,0.12)' : TC.surfaceInset())
-            .borderRadius(20).type(ButtonType.Normal).padding({ left: 12, right: 12 })
-            .onClick(() => this.toggleSubscribe())
-
-            Button() {
-              Row({ space: 4 }) {
-                SymbolGlyph($r('sys.symbol.ellipsis_bubble')).fontSize(14).fontColor([TC.textBody()])
-                Text(this.formatCount(this.commentCount)).fontSize(10).fontColor(TC.textBody())
-              }
-            }
-            .height(40).backgroundColor(TC.surfaceRaised()).borderRadius(20).type(ButtonType.Normal)
-            .padding({ left: 12, right: 12 }).onClick(() => this.openComments())
-
-            Button() {
-              Row({ space: 4 }) {
-                SymbolGlyph($r('sys.symbol.share')).fontSize(14).fontColor([TC.textBody()])
-                Text(this.formatCount(this.shareCount)).fontSize(10).fontColor(TC.textBody())
-              }
-            }
-            .height(40).backgroundColor(TC.surfaceRaised()).borderRadius(20).type(ButtonType.Normal)
-            .padding({ left: 12, right: 12 }).onClick(() => this.sharePlaylist())
-            }
-          }
-          .width('100%').height(62).padding({ left: 16, right: 16, top: 10, bottom: 10 })
+          this.ActionBar()
 
           if (this.loading) {
-            LoadingProgress().layoutWeight(1).width(46).color(TC.accent())
+            LoadingProgress().width(46).height(46).color(TC.accent()).margin({ top: 80 })
           } else if (this.message && this.songList.length === 0) {
             Column({ space: 12 }) {
               Text(this.message).fontSize(12).fontColor(TC.textTertiary())
@@ -666,7 +703,7 @@ export struct PlaylistDetail {
                   this.loadDetail()
                 })
             }
-            .layoutWeight(1).justifyContent(FlexAlign.Center)
+            .width('100%').height(160).justifyContent(FlexAlign.Center)
           } else {
             List() {
               ForEach(this.filteredSongs(), (item: songItemType, index: number) => {
@@ -704,16 +741,20 @@ export struct PlaylistDetail {
                 }
               }
             }
-            .layoutWeight(1).backgroundColor(TC.pageBackground())
-            .onScrollIndex((start: number) => { this.scrollOffset = start * 62 })
+            .width('100%').backgroundColor(TC.pageBackground())
           }
 
           if (this.message && this.songList.length > 0) {
             Text(this.message).width('100%').fontSize(10).fontColor(TC.accentSoft())
               .textAlign(TextAlign.Center).padding({ bottom: 6 })
           }
+          }
+          .width('100%')
         }
-        .width('100%').height('100%').backgroundColor(TC.pageBackground())
+        .width('100%').height('100%')
+        .backgroundColor(TC.pageBackground())
+        .scrollBar(BarState.Off)
+        .onDidScroll(() => { this.scrollOffset = this.scroller.currentOffset().yOffset })
 
         DetailTopBar({
           title: '歌单',
@@ -741,6 +782,11 @@ export struct PlaylistDetail {
             .justifyContent(FlexAlign.Center)
             .onClick(() => this.ownerMenuVisible = true)
           }
+        }
+
+        // 上滑后由浮层接替滚走的操作行：页面只保留标题 + 播放全部组件
+        if (this.pinProgress() > 0.01) {
+          this.PinnedActionBar()
         }
 
         if (this.ownerMenuVisible) {

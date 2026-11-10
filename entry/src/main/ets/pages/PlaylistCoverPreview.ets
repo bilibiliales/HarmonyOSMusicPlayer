@@ -129,8 +129,12 @@ export struct PlaylistCoverPreview {
           Column().width('100%').height(this.topAvoidHeight)
           // 顶部导航栏
           Row() {
-            SymbolGlyph($r('sys.symbol.chevron_left')).fontSize(24).fontColor([TC.textPrimary()])
-              .onClick(() => this.pageStack.pop())
+            Row() {
+              SymbolGlyph($r('sys.symbol.chevron_left')).fontSize(22).fontColor([TC.textOnMedia()])
+            }
+            .width(36).height(36).borderRadius(18).backgroundColor('rgba(0,0,0,0.35)')
+            .justifyContent(FlexAlign.Center)
+            .onClick(() => this.pageStack.pop())
             Text(this.pageParam.contentType === 'style' ? '曲风介绍' : '封面预览').layoutWeight(1).fontSize(17).fontWeight(FontWeight.Bold)
               .fontColor(TC.textPrimary()).textAlign(TextAlign.Center)
             // 添加更多选项按钮（留空占位）

@@ -5,8 +5,8 @@ import { TC } from '../services/ThemeColors'
  *
  * 视觉基准来自专辑页：36×36 圆形半透明按钮、悬浮在头图之上、无常驻标题。
  * 在此基础上补两点：
- *  - 页面下滑时渐显「毛玻璃 + 导航底色」的背景，并淡出顶部暗化渐变；
- *  - 标题随下滑渐显，保证顶栏按钮与文字在任何背景下都清晰。
+ *  - 页面下滑时渐显「纯毛玻璃」背景（只模糊、不叠深/浅色底），并淡出顶部暗化渐变；
+ *  - 标题随下滑「上浮 + 渐显」，滚动后只留下标题与按钮。
  *
  * 宿主只需把自身 Scroller 的 currentOffset().yOffset 传给 scrollOffset；
  * 分享统一由 onShare 回调打开 ShareSheet，避免各页各写一套分享。
@@ -27,9 +27,14 @@ export struct DetailTopBar {
   @Prop searchMode: boolean = false
   @Prop searchText: string = ''
   @Prop searchPlaceholder: string = '搜索'
+  /** 标题上方的小字副标题（曲风页的父级曲风名）。 */
+  @Prop subtitle: string = ''
+  /** 标题旁显示下拉箭头，配合 onTitleClick 做切换器。 */
+  @Prop titleDropdown: boolean = false
   onShare: () => void = () => {}
   onSearchToggle: () => void = () => {}
   onSearchTextChange: (value: string) => void = () => {}
+  onTitleClick: () => void = () => {}
 
   @Builder
   private emptyTrailing() {
@@ -63,13 +68,13 @@ export struct DetailTopBar {
 
   build() {
     Stack({ alignContent: Alignment.TopStart }) {
-      // 1. 下滑渐显的毛玻璃底板：模糊背后内容，同时铺一层导航底色
+      // 1. 下滑渐显的纯毛玻璃：只做背景模糊，不叠深色/浅色底
       Column()
         .width('100%')
         .height('100%')
-        .backgroundColor(TC.navBackground())
+        .backgroundColor(Color.Transparent)
         .backdropBlur(16)
-        .opacity(this.progress() * 0.92)
+        .opacity(this.progress())
         .animation({ duration: 160, curve: Curve.EaseOut })
         .hitTestBehavior(HitTestMode.None)
 
@@ -99,16 +104,36 @@ export struct DetailTopBar {
               .padding({ left: 12, right: 12 })
               .onChange((value: string) => this.onSearchTextChange(value))
           } else if (this.title.length > 0) {
-            Text(this.title)
-              .layoutWeight(1)
-              .fontSize(16)
-              .fontWeight(FontWeight.Bold)
-              .fontColor(TC.textPrimary())
-              .textAlign(TextAlign.Center)
-              .maxLines(1)
-              .textOverflow({ overflow: TextOverflow.Ellipsis })
-              .opacity(this.progress())
-              .animation({ duration: 160, curve: Curve.EaseOut })
+            // 标题上浮 + 渐显：贴顶时下沉 12vp 且全透明
+            Column({ space: 2 }) {
+              if (this.subtitle.length > 0) {
+                Text(this.subtitle)
+                  .fontSize(10)
+                  .fontColor(TC.textBody())
+                  .maxLines(1)
+                  .textOverflow({ overflow: TextOverflow.Ellipsis })
+              }
+              Row({ space: 6 }) {
+                Text(this.title)
+                  .layoutWeight(1)
+                  .fontSize(16)
+                  .fontWeight(FontWeight.Bold)
+                  .fontColor(TC.textPrimary())
+                  .textAlign(TextAlign.Center)
+                  .maxLines(1)
+                  .textOverflow({ overflow: TextOverflow.Ellipsis })
+                if (this.titleDropdown) {
+                  SymbolGlyph($r('sys.symbol.chevron_down')).fontSize(12).fontColor([TC.textBody()])
+                }
+              }
+              .width('100%')
+              .justifyContent(FlexAlign.Center)
+            }
+            .layoutWeight(1)
+            .opacity(this.progress())
+            .translate({ y: (1 - this.progress()) * 12 })
+            .animation({ duration: 200, curve: Curve.EaseOut })
+            .onClick(() => this.onTitleClick())
           } else {
             Column().layoutWeight(1)
           }

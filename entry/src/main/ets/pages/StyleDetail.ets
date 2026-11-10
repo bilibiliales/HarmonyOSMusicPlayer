@@ -28,6 +28,7 @@ import { BubbleTip } from '../services/BubbleTip'
 import { resizeImageUrl } from '../services/ImageUrl'
 import { playerController } from '../services/PlayerController'
 import { TC } from '../services/ThemeColors'
+import { DetailTopBar } from '../components/DetailTopBar'
 
 class StyleResourceState {
   cursor: string = '0'
@@ -74,7 +75,7 @@ export struct StyleDetailPage {
   @State expandedTags: number[] = []
   @State pickerQuery: string = ''
   @State preparingShare: boolean = false
-  @State headerCollapsed: boolean = false
+  @State scrollOffset: number = 0
   @State reviewVisible: boolean = false
   @State reviewKind: string = 'review'
   @State reviewCardWidth: number = 310
@@ -455,30 +456,6 @@ export struct StyleDetailPage {
   }
 
   @Builder
-  private NavigationBar() {
-    Column() {
-      Column().width('100%').height(this.topAvoidHeight)
-      Row({ space: 6 }) {
-        SymbolGlyph($r('sys.symbol.chevron_left')).fontSize(24).fontColor([TC.textPrimary()])
-          .width(44).height(44).onClick(() => this.pageStack.pop())
-        Column({ space: 2 }) {
-          if (this.parentName()) {
-            Text(this.parentName()).fontSize(10).fontColor(TC.textBody()).maxLines(1)
-          }
-          Row({ space: 7 }) {
-            Text(this.name()).fontSize(17).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary())
-              .maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis }).constraintSize({ maxWidth: '80%' })
-            SymbolGlyph($r('sys.symbol.chevron_down')).fontSize(12).fontColor([TC.textBody()])
-          }.justifyContent(FlexAlign.Center)
-        }.layoutWeight(1).onClick(() => this.openPicker())
-        SymbolGlyph($r('sys.symbol.share')).fontSize(23).fontColor([TC.textPrimary()])
-          .width(44).height(44).enabled(!this.preparingShare && !!this.detail).onClick(() => this.shareStyle())
-      }.height(54).width('100%').padding({ left: 6, right: 6 })
-    }.width('100%').backgroundColor(this.headerCollapsed ? TC.pageBackground() : Color.Transparent)
-      .linearGradient({ angle: 180, colors: [['rgba(0,0,0,0.45)', 0], ['rgba(0,0,0,0)', 1]] })
-  }
-
-  @Builder
   private PickerRow(tag: StyleTag, depth: number) {
     Row({ space: 8 }) {
       Text(tag.tagName).fontSize(depth === 0 ? 17 : 14)
@@ -774,8 +751,16 @@ export struct StyleDetailPage {
           }.width('100%')
         }.width('100%').height('100%').scrollBar(BarState.Off)
           .onReachEnd(() => this.loadCurrentResources())
-          .onDidScroll(() => this.headerCollapsed = this.scroller.currentOffset().yOffset > 220)
-        this.NavigationBar()
+          .onDidScroll(() => { this.scrollOffset = this.scroller.currentOffset().yOffset })
+        DetailTopBar({
+          title: this.name(),
+          subtitle: this.parentName(),
+          titleDropdown: true,
+          onTitleClick: () => this.openPicker(),
+          scrollOffset: this.scrollOffset,
+          shareEnabled: !this.preparingShare && !!this.detail,
+          onShare: () => { this.shareStyle() }
+        })
       }.width('100%').height('100%').backgroundColor(TC.pageBackground())
         .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP])
         .bindSheet(this.pickerVisible, this.StylePicker(), {

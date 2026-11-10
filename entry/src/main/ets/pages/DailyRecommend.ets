@@ -69,10 +69,10 @@ export struct DailyRecommendPage {
           }
           .padding({ left: 20, bottom: 22 })
           Row() {
-            SymbolGlyph($r('sys.symbol.chevron_left')).fontSize(22).fontColor([TC.textPrimary()])
+            SymbolGlyph($r('sys.symbol.chevron_left')).fontSize(22).fontColor([TC.textOnMedia()])
           }
-          .width(42).height(42).borderRadius(21).backgroundColor('rgba(0,0,0,0.35)')
-          .justifyContent(FlexAlign.Center).position({ left: 14, top: this.topAvoidHeight + 14 })
+          .width(36).height(36).borderRadius(18).backgroundColor('rgba(0,0,0,0.35)')
+          .justifyContent(FlexAlign.Center).position({ left: 16, top: this.topAvoidHeight + 9 })
           .onClick(() => this.pageStack.pop())
         }
         .width('100%').height(220 + this.topAvoidHeight)
