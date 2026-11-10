@@ -66,6 +66,8 @@ import { DecoKeys } from '../services/DecorationRuntime'
 import { DecorationCenterPage } from './DecorationCenter'
 import { DecorationEditorPage, DecorationEditorParam } from './DecorationEditor'
 import { ArtistSongsPage } from './ArtistSongs'
+import { ImageCropPage } from './ImageCropPage'
+import { ImageCropPageParam } from '../models/decoration'
 import { AuthStore } from '../stores/AuthStore'
 import { PlayerStore } from '../stores/PlayerStore'
 import { playerController } from '../services/PlayerController'
@@ -260,6 +262,8 @@ struct HomeIndex {
       DecorationCenterPage()
     } else if (name === 'DecorationEditorPage') {
       DecorationEditorPage({ pageParam: param as DecorationEditorParam })
+    } else if (name === 'ImageCropPage') {
+      ImageCropPage({ pageParam: param as ImageCropPageParam })
     }
   }
 

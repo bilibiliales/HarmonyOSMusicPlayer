@@ -5,6 +5,7 @@ import { DecorationStore } from '../services/DecorationStore'
 import {
   DecoMember,
   DecoKind,
+  DecoRatio,
   DecorationItem,
   DockConfig,
   HeartConfig,
@@ -16,7 +17,8 @@ import {
   SkinConfig,
   StartupConfig,
   SuitConfig,
-  VipBadgeConfig
+  VipBadgeConfig,
+  ImageCropPageParam
 } from '../models/decoration'
 import { TC } from '../services/ThemeColors'
 import { DecoColor } from '../services/DecorationColor'
@@ -517,20 +519,32 @@ export struct DecorationEditorPage {
       const context = this.getUIContext().getHostContext() as common.UIAbilityContext
       const path = await DecorationMedia.pickImage(context)
       if (!path) { return }
-      const layer = new PlayerLayer()
-      layer.id = `layer_${Date.now()}`
-      layer.src = path
-      layer.x = 30
-      layer.y = 30
-      layer.w = 40
-      layer.h = 40
-      layer.rotation = 0
-      layer.opacity = 100
-      this.playerLayers = this.playerLayers.concat([layer])
-      this.selectedLayerId = layer.id
+      // 图层是自由叠图，默认给 1:1，裁剪页里可随时换成原图或其它比例
+      const param: ImageCropPageParam = {
+        sourcePath: path,
+        aspect: DecoRatio.SQUARE,
+        title: '新增图层',
+        discardSource: true,
+        onComplete: (cropped: string) => this.appendLayer(cropped)
+      }
+      this.pageStack.pushPathByName('ImageCropPage', param)
     } catch (_error) {
       BubbleTip.show(this.getUIContext(), '选择图片失败')
     }
+  }
+
+  private appendLayer(path: string): void {
+    const layer = new PlayerLayer()
+    layer.id = `layer_${Date.now()}`
+    layer.src = path
+    layer.x = 30
+    layer.y = 30
+    layer.w = 40
+    layer.h = 40
+    layer.rotation = 0
+    layer.opacity = 100
+    this.playerLayers = this.playerLayers.concat([layer])
+    this.selectedLayerId = layer.id
   }
 
   private cloneLayer(src: PlayerLayer): PlayerLayer {
@@ -818,6 +832,7 @@ export struct DecorationEditorPage {
           label: '页面背景图',
           value: this.skinBgImage,
           mediaType: 'image',
+          cropAspect: DecoRatio.SCREEN,
           onChange: (path: string) => this.skinBgImage = path
         })
         DecoSlider({
@@ -1164,6 +1179,7 @@ export struct DecorationEditorPage {
       DecoCard({ title: '全屏背景', hint: '支持图片、GIF 与视频（视频自动循环、静音）；视频优先于图片' }) {
         DecoMediaPicker({
           label: '背景图片 / 动图', value: this.playerBgImage, mediaType: 'image',
+          cropAspect: DecoRatio.SCREEN,
           onChange: (path: string) => this.playerBgImage = path
         })
         DecoMediaPicker({
@@ -1216,6 +1232,7 @@ export struct DecorationEditorPage {
       DecoCard({ title: '黑胶唱片', hint: '可替换唱片底图，独立调整直径、位置与透明度' }) {
         DecoMediaPicker({
           label: '唱片底图', value: this.vinylImage, mediaType: 'image',
+          cropAspect: DecoRatio.SQUARE,
           onChange: (path: string) => this.vinylImage = path
         })
         DecoSlider({
@@ -1287,18 +1304,22 @@ export struct DecorationEditorPage {
       DecoCard({ title: '导航图标', hint: '依次对应：推荐 / 发现 / 动态 / 我的；不选则用默认图标' }) {
         DecoMediaPicker({
           label: '推荐页图标', value: this.dockIcons[0], mediaType: 'image',
+          cropAspect: DecoRatio.SQUARE,
           onChange: (path: string) => this.setDockIcon(0, path)
         })
         DecoMediaPicker({
           label: '发现页图标', value: this.dockIcons[1], mediaType: 'image',
+          cropAspect: DecoRatio.SQUARE,
           onChange: (path: string) => this.setDockIcon(1, path)
         })
         DecoMediaPicker({
           label: '动态页图标', value: this.dockIcons[2], mediaType: 'image',
+          cropAspect: DecoRatio.SQUARE,
           onChange: (path: string) => this.setDockIcon(2, path)
         })
         DecoMediaPicker({
           label: '我的页图标', value: this.dockIcons[3], mediaType: 'image',
+          cropAspect: DecoRatio.SQUARE,
           onChange: (path: string) => this.setDockIcon(3, path)
         })
       }
@@ -1330,6 +1351,7 @@ export struct DecorationEditorPage {
         })
         DecoMediaPicker({
           label: '底板背景图片（优先于底板色）', value: this.dockBgImage, mediaType: 'image',
+          cropAspect: DecoRatio.WIDE,
           onChange: (path: string) => this.dockBgImage = path
         })
         if (this.dockBgImage) {
@@ -1407,6 +1429,7 @@ export struct DecorationEditorPage {
       DecoCard({ title: '侧边栏背景', hint: '背景图会铺在侧边栏整块区域，模糊与不透明度可调' }) {
         DecoMediaPicker({
           label: '背景图片 / 动图', value: this.sideBgImage, mediaType: 'image',
+          cropAspect: DecoRatio.PORTRAIT,
           onChange: (path: string) => this.sideBgImage = path
         })
         DecoSlider({
@@ -1446,6 +1469,7 @@ export struct DecorationEditorPage {
     DecoCard({ title: '个人主页背景', hint: '只影响我的页顶部头图区域；可与头像框、等级贴图叠加' }) {
       DecoMediaPicker({
         label: '头图', value: this.homeImage, mediaType: 'image',
+        cropAspect: DecoRatio.PORTRAIT,
         onChange: (path: string) => this.homeImage = path
       })
       DecoSlider({
@@ -1517,6 +1541,7 @@ export struct DecorationEditorPage {
         label: this.startupType === 'video' ? '启动视频' : '启动图片',
         value: this.startupMedia,
         mediaType: this.startupType,
+        cropAspect: DecoRatio.SCREEN,
         onChange: (path: string) => this.startupMedia = path
       })
       DecoSlider({
@@ -1544,6 +1569,7 @@ export struct DecorationEditorPage {
         label: this.kind === DecoKind.AVATAR_FRAME ? '头像框' : (this.kind === DecoKind.VIP_CARD ? '会员卡底图' : '应用图标'),
         value: this.singleImage,
         mediaType: 'image',
+        cropAspect: this.kind === DecoKind.VIP_CARD ? DecoRatio.CARD : DecoRatio.SQUARE,
         onChange: (path: string) => this.singleImage = path
       })
       if (this.singleImage) {
@@ -1566,6 +1592,7 @@ export struct DecorationEditorPage {
             label: `Lv.${level} 贴图`,
             value: level <= this.badgeImages.length ? this.badgeImages[level - 1] : '',
             mediaType: 'image',
+            cropAspect: DecoRatio.SQUARE,
             onChange: (path: string) => this.setBadge(level - 1, path)
           })
         }, (level: number) => `badge_${level}`)

@@ -40,10 +40,7 @@ export class DecorationMedia {
   /** 把相册 URI 复制进沙箱，返回新路径；失败返回原 URI（至少本次会话可用）。 */
   static copyToSandbox(context: common.Context, uri: string, fallbackKind: string): string {
     try {
-      const dir = `${context.filesDir}/${DecorationMedia.DIR}`
-      if (!fileIo.accessSync(dir)) {
-        fileIo.mkdirSync(dir)
-      }
+      const dir = DecorationMedia.ensureDir(context)
       const ext = DecorationMedia.extensionOf(uri, fallbackKind)
       const dest = `${dir}/deco_${Date.now()}_${Math.floor(Math.random() * 1000)}${ext}`
       const source = fileIo.openSync(uri, fileIo.OpenMode.READ_ONLY)
@@ -58,6 +55,40 @@ export class DecorationMedia {
       return dest
     } catch (_error) {
       return uri
+    }
+  }
+
+  private static ensureDir(context: common.Context): string {
+    const dir = `${context.filesDir}/${DecorationMedia.DIR}`
+    if (!fileIo.accessSync(dir)) {
+      fileIo.mkdirSync(dir)
+    }
+    return dir
+  }
+
+  /** 把裁剪/编码后的图片字节写入沙箱，返回持久路径。 */
+  static saveCropped(context: common.Context, data: ArrayBuffer, ext: string = '.png'): string {
+    const dir = DecorationMedia.ensureDir(context)
+    const dest = `${dir}/crop_${Date.now()}_${Math.floor(Math.random() * 1000)}${ext}`
+    const file = fileIo.openSync(dest,
+      fileIo.OpenMode.READ_WRITE | fileIo.OpenMode.CREATE | fileIo.OpenMode.TRUNC)
+    try {
+      fileIo.writeSync(file.fd, data)
+    } finally {
+      fileIo.closeSync(file)
+    }
+    return dest
+  }
+
+  /** 丢弃一次不满意的裁剪结果，避免沙箱里堆积中间文件。 */
+  static removeFile(path: string): void {
+    if (!path) { return }
+    try {
+      if (fileIo.accessSync(path)) {
+        fileIo.unlinkSync(path)
+      }
+    } catch (_error) {
+      // 临时文件清理失败不影响主流程
     }
   }
 

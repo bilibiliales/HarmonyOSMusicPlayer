@@ -1,6 +1,7 @@
 import { common } from '@kit.AbilityKit'
 import { DecorationMedia } from '../services/DecorationMedia'
 import { DecoColor } from '../services/DecorationColor'
+import { ImageCropPageParam } from '../models/decoration'
 import { TC } from '../services/ThemeColors'
 
 /**
@@ -312,12 +313,39 @@ export struct DecoColorPicker {
 @Component
 export struct DecoMediaPicker {
   @StorageProp('skinVersion') skinVersionObs: number = 0
+  @Consume('pageStack') pageStack: NavPathStack
   @Prop label: string = ''
   @Prop value: string = ''
   /** image | video */
   @Prop mediaType: string = 'image'
+  /** 推荐裁剪比例（宽/高）；0 = 选完直接用，不进裁剪页。视频始终不裁剪。 */
+  @Prop cropAspect: number = 0
   onChange: (path: string) => void = () => {}
   @State private busy: boolean = false
+
+  private canCrop(): boolean {
+    return this.cropAspect > 0 && this.mediaType !== 'video'
+  }
+
+  /** 打开裁剪页，裁剪完成（或用户选「使用原图」）后才回传路径。 */
+  private openCrop(path: string, discardSource: boolean): void {
+    const param: ImageCropPageParam = {
+      sourcePath: path,
+      aspect: this.cropAspect,
+      title: this.label,
+      discardSource: discardSource,
+      onComplete: (cropped: string) => this.onChange(cropped)
+    }
+    this.pageStack.pushPathByName('ImageCropPage', param)
+  }
+
+  private emit(path: string): void {
+    if (path && this.canCrop()) {
+      this.openCrop(path, true)
+    } else {
+      this.onChange(path)
+    }
+  }
 
   private async pick(): Promise<void> {
     if (this.busy) { return }
@@ -328,7 +356,7 @@ export struct DecoMediaPicker {
         ? await DecorationMedia.pickVideo(context)
         : await DecorationMedia.pickImage(context)
       if (path) {
-        this.onChange(path)
+        this.emit(path)
       }
     } catch (_error) {
       // 用户取消或系统拒绝：保持原值
@@ -412,6 +440,16 @@ export struct DecoMediaPicker {
           .padding({ left: 14, right: 14 })
           .borderRadius(16)
           .onClick(() => this.pick())
+      }
+
+      if (this.value && this.canCrop()) {
+        Text('裁剪')
+          .fontSize(11)
+          .fontColor(TC.accent())
+          .padding({ left: 9, right: 9, top: 7, bottom: 7 })
+          .borderRadius(14)
+          .backgroundColor(TC.accentContainer())
+          .onClick(() => this.openCrop(this.value, false))
       }
 
       if (this.value) {

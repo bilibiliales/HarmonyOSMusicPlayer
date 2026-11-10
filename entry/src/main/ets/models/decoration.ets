@@ -8,6 +8,41 @@
  *  - 新增一类装扮只需：加一个 Config 类 + 在 DecoKind.META 里加一行 + 在编辑器里加一段 UI。
  */
 
+/**
+ * 各类装扮素材的「推荐裁剪比例」（宽 / 高）。
+ *
+ * 只是裁剪框的初始建议，用户在裁剪页里随时可以切换成别的比例或原图比例；
+ * 最终贴到页面上仍是 100% 铺满 + 居中（ImageFit.Cover），所以裁剪只是帮用户
+ * 先把主体摆到不会被裁掉的位置。
+ */
+export class DecoRatio {
+  /** 0：在 cropAspect 里表示「不进裁剪页」；在裁剪页里表示「按原图宽高比」（仍锁比例）。 */
+  static readonly FREE: number = 0
+  /** 头像框、图标、黑胶、徽章、图层。 */
+  static readonly SQUARE: number = 1
+  /** 侧边栏背景、个人主页头图：竖图。 */
+  static readonly PORTRAIT: number = 3 / 4
+  /** 皮肤背景、播放器背景、启动图：手机竖屏。 */
+  static readonly SCREEN: number = 9 / 16
+  /** 底部导航底板：横条。 */
+  static readonly WIDE: number = 16 / 3
+  /** 会员卡底图：长条卡片。 */
+  static readonly CARD: number = 3
+}
+
+/** 图片裁剪页入参：裁剪完成后把新沙箱路径回传给调用方。 */
+export interface ImageCropPageParam {
+  /** 已落在沙箱里的原图路径。 */
+  sourcePath: string
+  /** 推荐裁剪比例（宽 / 高），0 表示自由。 */
+  aspect: number
+  title: string
+  /** 返回裁剪后（或用户选择「使用原图」时未经裁剪）的沙箱路径。 */
+  onComplete: (path: string) => void
+  /** 源图是本次新选的临时副本：取消或改用裁剪结果时可安全删除；重裁已保存的图时传 false。 */
+  discardSource?: boolean
+}
+
 /** 装扮类型（12 类）。 */
 export class DecoKind {
   static readonly SKIN: string = 'skin'
