@@ -38,6 +38,7 @@ import { TC } from '../services/ThemeColors'
 import { DetailTopBar } from '../components/DetailTopBar'
 import { ShareSheet } from '../components/ShareSheet'
 import { NoMoreFooter } from '../components/NoMoreFooter'
+import { ImagePreviewPageParam } from './ImagePreviewPage'
 
 @Component
 export struct UserProfilePage {
@@ -604,10 +605,8 @@ export struct UserProfilePage {
     if (!url) {
       return
     }
-    this.pageStack.pushPathByName('ImagePreviewPage', {
-      url: url,
-      name: this.detail?.profile.nickname || '头像'
-    })
+    const param: ImagePreviewPageParam = { url: url, name: this.detail?.profile.nickname || '头像' }
+    this.pageStack.pushPathByName('ImagePreviewPage', param)
   }
 
   build() {

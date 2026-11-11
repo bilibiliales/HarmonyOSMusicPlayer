@@ -17,10 +17,10 @@ export struct ImagePreviewPage {
   @Consume('topAvoidHeight') topAvoidHeight: number
   @State pageParam: ImagePreviewPageParam = {} as ImagePreviewPageParam
   @State saving: boolean = false
-  @State scale: number = 1
+  @State zoom: number = 1
   @State offsetX: number = 0
   @State offsetY: number = 0
-  private baseScale: number = 1
+  private baseZoom: number = 1
 
   aboutToAppear(): void {
     if (!this.pageParam) {
@@ -122,18 +122,18 @@ export struct ImagePreviewPage {
                 .width('100%')
                 .height('100%')
                 .objectFit(ImageFit.Contain)
-                .scale({ x: this.scale, y: this.scale })
+                .scale({ x: this.zoom, y: this.zoom })
                 .offset({ x: this.offsetX, y: this.offsetY })
-                .animation({ duration: this.scale === 1 ? 200 : 0 })
+                .animation({ duration: this.zoom === 1 ? 200 : 0 })
                 .gesture(
                   PinchGesture({ fingers: 2 })
-                    .onActionStart(() => { this.baseScale = this.scale })
+                    .onActionStart(() => { this.baseZoom = this.zoom })
                     .onActionUpdate((event: GestureEvent) => {
-                      this.scale = Math.min(4, Math.max(1, this.baseScale * event.scale))
+                      this.zoom = Math.min(4, Math.max(1, this.baseZoom * event.scale))
                     })
                     .onActionEnd(() => {
-                      if (this.scale <= 1.01) {
-                        this.scale = 1
+                      if (this.zoom <= 1.01) {
+                        this.zoom = 1
                         this.offsetX = 0
                         this.offsetY = 0
                       }
@@ -142,15 +142,15 @@ export struct ImagePreviewPage {
                 .gesture(
                   PanGesture()
                     .onActionUpdate((event: GestureEvent) => {
-                      if (this.scale > 1) {
+                      if (this.zoom > 1) {
                         this.offsetX = event.offsetX
                         this.offsetY = event.offsetY
                       }
                     })
                 )
                 .onClick(() => {
-                  if (this.scale > 1) {
-                    this.scale = 1
+                  if (this.zoom > 1) {
+                    this.zoom = 1
                     this.offsetX = 0
                     this.offsetY = 0
                   }
@@ -163,29 +163,27 @@ export struct ImagePreviewPage {
             }
           }
           .width('100%').layoutWeight(1)
+
+          Row() {
+            Button() {
+              Row({ space: 8 }) {
+                if (this.saving) {
+                  LoadingProgress().width(18).height(18).color(TC.textOnAccent())
+                } else {
+                  SymbolGlyph($r('sys.symbol.arrow_down_circle')).fontSize(18).fontColor([TC.textOnAccent()])
+                }
+                Text(this.saving ? '正在保存…' : '保存图片')
+                  .fontColor(TC.textOnAccent()).fontSize(16).fontWeight(FontWeight.Medium)
+              }
+            }
+            .width(200).height(44).backgroundColor(TC.accent()).borderRadius(22)
+            .enabled(!this.saving && (this.pageParam.url || '').length > 0)
+            .onClick(() => this.saveToGallery())
+          }
+          .width('100%').justifyContent(FlexAlign.Center)
+          .padding({ top: 12, bottom: 16 })
         }
         .width('100%').height('100%').padding({ left: 18, right: 18 })
-
-        Row() {
-          Button() {
-            Row({ space: 8 }) {
-              if (this.saving) {
-                LoadingProgress().width(18).height(18).color(TC.textOnAccent())
-              } else {
-                SymbolGlyph($r('sys.symbol.arrow_down_circle')).fontSize(18).fontColor([TC.textOnAccent()])
-              }
-              Text(this.saving ? '正在保存…' : '保存图片')
-                .fontColor(TC.textOnAccent()).fontSize(16).fontWeight(FontWeight.Medium)
-            }
-          }
-          .width(200).height(44).backgroundColor(TC.accent()).borderRadius(22)
-          .enabled(!this.saving && (this.pageParam.url || '').length > 0)
-          .onClick(() => this.saveToGallery())
-        }
-        .width('100%').justifyContent(FlexAlign.Center)
-        .position({ x: 0, y: '100%' })
-        .translate({ y: -72 - this.topAvoidHeight })
-        .padding({ bottom: 16 })
       }
       .width('100%').height('100%').backgroundColor(TC.pageBackground())
     }

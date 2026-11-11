@@ -41,6 +41,7 @@ import { PlaylistEditorPageParam } from './PlaylistEditor'
 import { ProfileEditorPageParam } from './ProfileEditor'
 import { TC } from '../services/ThemeColors'
 import { DecoKeys } from '../services/DecorationRuntime'
+import { ImagePreviewPageParam } from './ImagePreviewPage'
 
 interface SubTabItem {
   name: string
@@ -762,10 +763,8 @@ export struct Mine {
     if (!url) {
       return
     }
-    this.pageStack.pushPathByName('ImagePreviewPage', {
-      url: url,
-      name: this.userProfile.nickName || '头像'
-    })
+    const param: ImagePreviewPageParam = { url: url, name: this.userProfile.nickName || '头像' }
+    this.pageStack.pushPathByName('ImagePreviewPage', param)
   }
 
   build() {
