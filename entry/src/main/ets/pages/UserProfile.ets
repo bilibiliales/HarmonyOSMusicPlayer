@@ -37,6 +37,7 @@ import { RelationshipPageParam } from './RelationshipList'
 import { TC } from '../services/ThemeColors'
 import { DetailTopBar } from '../components/DetailTopBar'
 import { ShareSheet } from '../components/ShareSheet'
+import { NoMoreFooter } from '../components/NoMoreFooter'
 
 @Component
 export struct UserProfilePage {
@@ -684,7 +685,9 @@ export struct UserProfilePage {
                   }
                   .padding({ left: 16, right: 16, bottom: 28 })
                 }
+                NoMoreFooter()
               }
+              .width('100%').constraintSize({ minHeight: 640 })
             }
             .layoutWeight(1).scrollBar(BarState.Off)
             .onDidScroll(() => { this.scrollOffset = this.scroller.currentOffset().yOffset })

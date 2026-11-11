@@ -31,6 +31,8 @@ export struct DetailTopBar {
   @Prop subtitle: string = ''
   /** 标题旁显示下拉箭头，配合 onTitleClick 做切换器。 */
   @Prop titleDropdown: boolean = false
+  /** 顶栏常驻毛玻璃（内容不滚到顶栏后面的页面用）。 */
+  @Prop alwaysBlur: boolean = false
   onShare: () => void = () => {}
   onSearchToggle: () => void = () => {}
   onSearchTextChange: (value: string) => void = () => {}
@@ -45,6 +47,7 @@ export struct DetailTopBar {
 
   /** 0（贴顶）→ 1（下滑约 160vp 后完全展开）。 */
   private progress(): number {
+    if (this.alwaysBlur) { return 1 }
     const value = this.scrollOffset / 160
     if (value < 0) { return 0 }
     if (value > 1) { return 1 }
@@ -73,7 +76,7 @@ export struct DetailTopBar {
         .width('100%')
         .height('100%')
         .backgroundColor(Color.Transparent)
-        .backdropBlur(16)
+        .backdropBlur(30)
         .opacity(this.progress())
         .animation({ duration: 160, curve: Curve.EaseOut })
         .hitTestBehavior(HitTestMode.None)

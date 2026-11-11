@@ -949,18 +949,18 @@ export struct Mine {
 
       if (this.authStore.loggedIn) {
         Stack() {
-          SymbolGlyph($r('sys.symbol.square_and_pencil')).fontSize(19).fontColor([TC.textPrimary()])
+          SymbolGlyph($r('sys.symbol.square_and_pencil')).fontSize(19).fontColor([TC.textOnMedia()])
         }
-        .width(40).height(40).borderRadius(14).backgroundColor('rgba(20,20,25,0.55)')
+        .width(36).height(36).borderRadius(18).backgroundColor('rgba(0,0,0,0.35)')
         .position({ right: 18, top: this.topAvoidHeight + 28 }).onClick(() => this.openProfileEditor())
       }
 
-      // 右上角菜单：展开侧边栏（登录态下与编辑资料按钮并排）
+      // 左上角菜单：展开侧边栏（常白图标 + 半透明圆底，浅色模式同样清晰）
       Stack() {
-        SymbolGlyph($r('sys.symbol.line_3_horizontal')).fontSize(19).fontColor(['#FFFFFF'])
+        SymbolGlyph($r('sys.symbol.line_3_horizontal')).fontSize(19).fontColor([TC.textOnMedia()])
       }
-      .width(40).height(40).borderRadius(14).backgroundColor('rgba(20,20,25,0.55)')
-      .position({ right: this.authStore.loggedIn ? 66 : 18, top: this.topAvoidHeight + 28 })
+      .width(36).height(36).borderRadius(18).backgroundColor('rgba(0,0,0,0.35)')
+      .position({ left: 18, top: this.topAvoidHeight + 28 })
       .onClick(() => this.onMenuClick())
     }
     .width('100%')
@@ -1037,7 +1037,6 @@ export struct Mine {
     .width('100%')
     .height(48)
     .justifyContent(FlexAlign.Center)
-    .backgroundColor('rgba(18,18,21,0.65)')
   }
 
   @Builder
@@ -1105,7 +1104,7 @@ export struct Mine {
           Button('去登录')
             .fontSize(12)
             .backgroundColor(TC.accent())
-            .borderRadius(16)
+            .borderRadius(20)
             .onClick(() => this.pageStack.pushPathByName('LoginPage', null))
         }
         .width('100%')
@@ -1337,7 +1336,7 @@ export struct Mine {
           Button('去登录')
             .fontSize(12)
             .backgroundColor(TC.accent())
-            .borderRadius(16)
+            .borderRadius(20)
             .onClick(() => this.pageStack.pushPathByName('LoginPage', null))
         }
         .width('100%')
@@ -1759,7 +1758,7 @@ export struct Mine {
             .fontSize(40).fontColor([TC.textQuaternary()])
           Text('登录后查看订阅电台').fontSize(13).fontColor(TC.textTertiary())
           Button('去登录').fontSize(12).fontColor(TC.textOnAccent()).backgroundColor(TC.accent())
-            .borderRadius(16).onClick(() => this.pageStack.pushPathByName('LoginPage', null))
+            .borderRadius(20).onClick(() => this.pageStack.pushPathByName('LoginPage', null))
         }
         .width('100%').height(200).justifyContent(FlexAlign.Center)
       } else if (this.djLoading && this.djRadios.length === 0) {
@@ -1821,7 +1820,7 @@ export struct Mine {
             .fontSize(40).fontColor([TC.textQuaternary()])
           Text('登录后查看笔记').fontSize(13).fontColor(TC.textTertiary())
           Button('去登录').fontSize(12).fontColor(TC.textOnAccent()).backgroundColor(TC.accent())
-            .borderRadius(16).onClick(() => this.pageStack.pushPathByName('LoginPage', null))
+            .borderRadius(20).onClick(() => this.pageStack.pushPathByName('LoginPage', null))
         }
         .width('100%').height(200).justifyContent(FlexAlign.Center)
       } else if (this.eventsLoading && this.userEvents.length === 0) {

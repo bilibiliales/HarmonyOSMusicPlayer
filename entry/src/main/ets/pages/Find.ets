@@ -279,7 +279,7 @@ struct Find {
       Stack() {
         SymbolGlyph($r('sys.symbol.magnifyingglass')).fontSize(19).fontColor([TC.textBody()])
       }
-      .width(42).height(42).borderRadius(14).backgroundColor(TC.surfaceCardAlt())
+      .width(42).height(42).borderRadius(21).backgroundColor(TC.surfaceCardAlt())
       .onClick(() => this.pageStack.pushPathByName('SearchPage', null))
     }
     .width('100%').padding({ left: 16, right: 16, top: 14, bottom: 5 })
@@ -416,7 +416,7 @@ struct Find {
                   Image(resizeImageUrl(item.pic, 720, 292)).width('100%').height('100%')
                     .sourceSize({ width: 720, height: 292 }).borderRadius(18).objectFit(ImageFit.Cover)
                   if (item.typeTitle && item.typeTitle.length > 0) {
-                    Text(item.typeTitle).fontSize(10).fontColor(TC.textPrimary())
+                    Text(item.typeTitle).fontSize(10).fontColor(TC.textOnMedia())
                       .padding({ left: 9, right: 9, top: 5, bottom: 5 })
                       .backgroundColor(item.titleColor === 'red' ? '#d9364f' : '#3f67a5')
                       .borderRadius({ topLeft: 10, bottomRight: 18 })

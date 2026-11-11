@@ -29,6 +29,7 @@ import { resizeImageUrl } from '../services/ImageUrl'
 import { playerController } from '../services/PlayerController'
 import { TC } from '../services/ThemeColors'
 import { DetailTopBar } from '../components/DetailTopBar'
+import { NoMoreFooter } from '../components/NoMoreFooter'
 
 class StyleResourceState {
   cursor: string = '0'
@@ -607,6 +608,37 @@ export struct StyleDetailPage {
     }
   }
 
+  /** 简介区高度（横向评测卡 166+16 / 最喜爱歌曲 58+22+13），用于算二级菜单原始 y。 */
+  private descriptionHeight(): number {
+    let h = 0
+    if (this.reviewText('review') || this.reviewText('portrait')) { h += 182 }
+    if (this.detail?.favouriteSong?.favouriteSong) { h += 93 }
+    return h
+  }
+
+  private tabsBaseY(): number {
+    return 300 + this.topAvoidHeight + 54 + this.descriptionHeight()
+  }
+
+  /** 二级菜单滚到顶栏下沿后冻结，和歌单/专辑的播放全部行同款。 */
+  private tabsStickyOffset(): number {
+    const threshold = this.tabsBaseY() - this.topAvoidHeight - 54
+    return Math.max(0, this.scrollOffset - threshold)
+  }
+
+  @Builder
+  private StickyResourceTabs() {
+    Column() {
+      this.ResourceTabs()
+    }
+    .width('100%')
+    .position({ x: 0, y: this.tabsBaseY() })
+    .offset({ y: -this.scrollOffset + this.tabsStickyOffset() })
+    .backgroundColor(Color.Transparent)
+    .backdropBlur(this.tabsStickyOffset() > 0 ? 30 : 0)
+    .zIndex(3)
+  }
+
   @Builder
   private ResourceTabs() {
     Row() {
@@ -723,7 +755,7 @@ export struct StyleDetailPage {
               Button('重试').backgroundColor(TC.surfaceRaised()).onClick(() => this.loadPage())
             } else {
               this.Description()
-              this.ResourceTabs()
+              Column().width('100%').height(48)
               this.ResourceActions()
               if (this.currentTab === 'songs') {
                 this.SongsContent()
@@ -747,8 +779,8 @@ export struct StyleDetailPage {
                   .onClick(() => this.loadCurrentResources())
               }
             }
-            Blank().height(30)
-          }.width('100%')
+            NoMoreFooter()
+          }.width('100%').constraintSize({ minHeight: 640 })
         }.width('100%').height('100%').scrollBar(BarState.Off)
           .onReachEnd(() => this.loadCurrentResources())
           .onDidScroll(() => { this.scrollOffset = this.scroller.currentOffset().yOffset })
@@ -761,6 +793,7 @@ export struct StyleDetailPage {
           shareEnabled: !this.preparingShare && !!this.detail,
           onShare: () => { this.shareStyle() }
         })
+        this.StickyResourceTabs()
       }.width('100%').height('100%').backgroundColor(TC.pageBackground())
         .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP])
         .bindSheet(this.pickerVisible, this.StylePicker(), {

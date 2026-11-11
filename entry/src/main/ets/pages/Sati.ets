@@ -280,9 +280,9 @@ export struct SatiPage {
                 Column().width(220).height(78).borderRadius({ bottomLeft: 19, bottomRight: 19 })
                   .linearGradient({ angle: 180, colors: [['rgba(0,0,0,0)', 0], ['rgba(0,0,0,0.84)', 1]] })
                 Row({ space: 7 }) {
-                  Text(item.name).layoutWeight(1).fontSize(14).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary())
+                  Text(item.name).layoutWeight(1).fontSize(14).fontWeight(FontWeight.Bold).fontColor(TC.textOnMedia())
                     .maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
-                  SymbolGlyph($r('sys.symbol.play_circle_fill')).fontSize(25).fontColor([TC.textPrimary()])
+                  SymbolGlyph($r('sys.symbol.play_circle_fill')).fontSize(25).fontColor([TC.textOnMedia()])
                 }.width(202).margin({ left: 9, bottom: 10 })
               }.width(220).height(138).onClick(() => this.playResource(item, this.sceneResources))
             }, (item: SatiResource) => item.id.toString())
@@ -321,7 +321,7 @@ export struct SatiPage {
         }.width(34).height(34).borderRadius(17).backgroundColor('rgba(0,0,0,0.48)').margin(7)
           .onClick(() => this.toggleSubscription(item))
         Stack({ alignContent: Alignment.Center }) {
-          SymbolGlyph($r('sys.symbol.play_fill')).fontSize(20).fontColor([TC.textPrimary()])
+          SymbolGlyph($r('sys.symbol.play_fill')).fontSize(20).fontColor([TC.textOnMedia()])
         }.width(34).height(34).borderRadius(22).backgroundColor('rgba(239,35,60,0.9)').margin(7)
           .align(Alignment.Center).onClick(() => this.playResource(item, source))
       }.width('100%').aspectRatio(1)
@@ -374,7 +374,7 @@ export struct SatiPage {
                   Stack({ alignContent: Alignment.Center }) {
                     Image(resizeImageUrl(item.pic, 260, 260)).width(112).height(112)
                       .sourceSize({ width: 260, height: 260 }).borderRadius(16).objectFit(ImageFit.Cover)
-                    SymbolGlyph($r('sys.symbol.play_circle_fill')).fontSize(29).fontColor([TC.textPrimary()])
+                    SymbolGlyph($r('sys.symbol.play_circle_fill')).fontSize(29).fontColor([TC.textOnMedia()])
                   }
                   Text(item.name).width(112).fontSize(10).fontColor(TC.textBody()).maxLines(1)
                     .textOverflow({ overflow: TextOverflow.Ellipsis })

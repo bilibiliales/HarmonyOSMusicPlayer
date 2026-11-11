@@ -575,9 +575,9 @@ struct Recommend {
                 Column().width(104).height(70).borderRadius({ bottomLeft: 15, bottomRight: 15 })
                   .linearGradient({ angle: 180, colors: [['rgba(0,0,0,0)', 0], ['rgba(0,0,0,0.82)', 1]] })
                 Column({ space: 2 }) {
-                  Text(ranking.name).width(92).fontSize(13).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary())
+                  Text(ranking.name).width(92).fontSize(13).fontWeight(FontWeight.Bold).fontColor(TC.textOnMedia())
                     .maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
-                  Text(ranking.updateFrequency).width(92).fontSize(9).fontColor(TC.textBody()).maxLines(1)
+                  Text(ranking.updateFrequency).width(92).fontSize(9).fontColor(TC.textOnMediaSecondary()).maxLines(1)
                 }.margin({ left: 7, bottom: 8 }).alignItems(HorizontalAlign.Start)
               }.onClick(() => this.openRanking(ranking.id, ranking.name, ranking.cover))
               Column({ space: 3 }) {
@@ -629,7 +629,7 @@ struct Recommend {
               Stack({ alignContent: Alignment.TopStart }) {
                 Image(artist.picUrl || artist.img1v1Url || '').width(88).height(88).borderRadius(44)
                   .objectFit(ImageFit.Cover)
-                Text(`${index + 1}`).fontSize(11).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary())
+                Text(`${index + 1}`).fontSize(11).fontWeight(FontWeight.Bold).fontColor(index < 3 ? TC.textOnAccent() : TC.textPrimary())
                   .width(27).height(27).textAlign(TextAlign.Center).backgroundColor(index < 3 ? TC.accent() : TC.surfaceInset())
                   .borderRadius(14).margin({ left: -3, top: -3 })
               }
@@ -706,7 +706,7 @@ struct Recommend {
             Stack() {
               SymbolGlyph($r('sys.symbol.line_3_horizontal')).fontSize(21).fontColor([TC.textBody()])
             }
-            .width(42).height(42).borderRadius(14).backgroundColor(TC.surfaceCardAlt())
+            .width(42).height(42).borderRadius(21).backgroundColor(TC.surfaceCardAlt())
             .onClick(() => this.onMenuClick())
 
             Row({ space: 8 }) {
@@ -714,7 +714,7 @@ struct Recommend {
               Text('搜索歌曲、歌手、专辑').layoutWeight(1).fontSize(13).fontColor(TC.textTertiary())
             }
             .layoutWeight(1).height(42).padding({ left: 14, right: 14 })
-            .backgroundColor(TC.surfaceCardAlt()).borderRadius(14)
+            .backgroundColor(TC.surfaceCardAlt()).borderRadius(21)
             .onClick(() => this.pageStack.pushPathByName('SearchPage', null))
           }
           .width('100%').padding({ left: 14, right: 14, top: 12 })
@@ -770,7 +770,7 @@ struct Recommend {
                     }
                   } else {
                     Column({ space: 5 }) {
-                      SymbolGlyph($r('sys.symbol.heart_fill')).fontSize(42).fontColor([TC.textPrimary()])
+                      SymbolGlyph($r('sys.symbol.heart_fill')).fontSize(42).fontColor([TC.textOnMedia()])
                     }
                   }
                 }.width(132).height(132).borderRadius(17).clip(true)
@@ -794,7 +794,7 @@ struct Recommend {
                   Stack({ alignContent: Alignment.TopEnd }) {
                     Image(item.cover).width(132).height(132).borderRadius(17).objectFit(ImageFit.Cover)
                     if (item.count > 0) {
-                      Text(`${this.formatCount(item.count)}首`).fontSize(9).fontColor(TC.textPrimary())
+                      Text(`${this.formatCount(item.count)}首`).fontSize(9).fontColor(TC.textOnMedia())
                         .padding({ left: 6, right: 6, top: 3, bottom: 3 })
                         .backgroundColor('rgba(0,0,0,0.42)').borderRadius(8).margin(7)
                     }
@@ -840,8 +840,8 @@ struct Recommend {
                 Stack({ alignContent: Alignment.BottomStart }) {
                   Image(item.cover).width(200).height(120).borderRadius(18).objectFit(ImageFit.Cover)
                   Column({ space: 3 }) {
-                    Text(item.title).fontSize(17).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary())
-                    Text(item.subtitle).fontSize(9).fontColor(TC.textBody()).maxLines(1)
+                    Text(item.title).fontSize(17).fontWeight(FontWeight.Bold).fontColor(TC.textOnMedia())
+                    Text(item.subtitle).fontSize(9).fontColor(TC.textOnMediaSecondary()).maxLines(1)
                   }
                   .width('60%').padding(12)
                   .linearGradient({ angle: 0, colors: [['rgba(0,0,0,0.72)', 0], ['rgba(0,0,0,0)', 1]] })

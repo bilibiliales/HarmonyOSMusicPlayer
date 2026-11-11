@@ -17,6 +17,7 @@ import { playerController } from '../services/PlayerController'
 import { AuthStore } from '../stores/AuthStore'
 import { ShareSheet } from '../components/ShareSheet'
 import { DetailTopBar } from '../components/DetailTopBar'
+import { NoMoreFooter } from '../components/NoMoreFooter'
 import { PlaylistCoverPreviewPageParam } from './PlaylistCoverPreview'
 import { TC } from '../services/ThemeColors'
 
@@ -291,26 +292,29 @@ export struct AlbumDetail {
     .padding({ left: 16, right: 16, top: 12, bottom: 8 })
   }
 
-  /** 头图滚过后（约 266vp）操作行开始渐显接替。 */
-  private pinProgress(): number {
-    const value = (this.scrollOffset - 266) / 60
-    if (value < 0) { return 0 }
-    if (value > 1) { return 1 }
-    return value
+  /** 操作行在内容流里的原始 y（头图高度）。 */
+  private actionBarBaseY(): number {
+    return 320 + this.topAvoidHeight
   }
 
-  /** 上滑后固定在标题栏下方，保证页面只留标题 + 播放全部组件。 */
+  /** 超过阈值后反向补偿滚动量，把操作行锁在标题栏下沿（Excel 冻结行）。 */
+  private stickyOffset(): number {
+    const threshold = this.actionBarBaseY() - this.topAvoidHeight - 54
+    return Math.max(0, this.scrollOffset - threshold)
+  }
+
+  /** 全局只有这一份 ActionBar：未吸顶时随内容滚，吸顶后固定不动。 */
   @Builder
-  private PinnedActionBar() {
+  private StickyActionBar() {
     Column() {
       this.ActionBar()
     }
     .width('100%')
+    .position({ x: 0, y: this.actionBarBaseY() })
+    .offset({ y: -this.scrollOffset + this.stickyOffset() })
     .backgroundColor(Color.Transparent)
-    .backdropBlur(16)
-    .position({ x: 0, y: this.topAvoidHeight + 54 })
-    .opacity(this.pinProgress())
-    .animation({ duration: 160, curve: Curve.EaseOut })
+    .backdropBlur(this.stickyOffset() > 0 ? 30 : 0)
+    .zIndex(3)
   }
 
   build() {
@@ -390,7 +394,7 @@ export struct AlbumDetail {
               .height(320 + this.topAvoidHeight)
               .alignContent(Alignment.Bottom)
 
-              this.ActionBar()
+              Column().width('100%').height(58)
 
               if (this.albumDesc.length > 0) {
                 Column() {
@@ -398,9 +402,9 @@ export struct AlbumDetail {
                     .fontSize(12)
                     .fontColor(TC.textSecondary())
                     .lineHeight(18)
-                    .maxLines(this.descExpanded ? 100 : 2)
+                    .maxLines(this.descExpanded ? 100 : 3)
                     .textOverflow({ overflow: TextOverflow.Ellipsis })
-                  if (this.albumDesc.length > 60) {
+                  if (this.albumDesc.length > 30) {
                     Text(this.descExpanded ? '收起' : '展开')
                       .fontSize(11)
                       .fontColor(TC.accent())
@@ -455,8 +459,10 @@ export struct AlbumDetail {
                 })
               }
               .width('100%')
+              NoMoreFooter()
             }
             .width('100%')
+            .constraintSize({ minHeight: 640 })
           }
           .width('100%')
           .layoutWeight(1)
@@ -468,10 +474,8 @@ export struct AlbumDetail {
             scrollOffset: this.scrollOffset,
             onShare: () => this.shareSheetVisible = true
           })
-          // 上滑后由浮层接替滚走的操作行：页面只保留标题 + 播放全部组件
-          if (this.pinProgress() > 0.01) {
-            this.PinnedActionBar()
-          }
+          // 唯一的 ActionBar：随内容滚到顶栏下沿后冻结
+          this.StickyActionBar()
           if (this.shareSheetVisible) {
             ShareSheet({
               shareParam: this.shareParam,

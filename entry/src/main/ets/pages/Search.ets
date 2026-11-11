@@ -26,6 +26,8 @@ import { playlistType, songItemType } from '../models/music'
 import { RadioPageParam } from '../models/radio'
 import { ApiClient } from '../services/ApiClient'
 import { playerController } from '../services/PlayerController'
+import { SearchHistory } from '../services/SearchHistory'
+import { common } from '@kit.AbilityKit'
 import { TC } from '../services/ThemeColors'
 
 @Component
@@ -46,6 +48,9 @@ export struct SearchPage {
   @State suggestionLoading: boolean = false
   @State searchedKeyword: string = ''
   @State discoveryLoading: boolean = true
+  @State historyWords: string[] = []
+  @State historyExpanded: boolean = false
+  @State longPressedWord: string = ''
   private suggestTimer: number = -1
   private suggestRequestToken: number = 0
   private searchRequestToken: number = 0
@@ -65,7 +70,44 @@ export struct SearchPage {
   ]
 
   aboutToAppear(): void {
+    try {
+      this.historyWords = SearchHistory.load(this.getUIContext().getHostContext() as common.UIAbilityContext)
+    } catch (_error) {
+      this.historyWords = []
+    }
     this.loadSearchDiscovery()
+  }
+
+  private historyContext(): common.Context {
+    return this.getUIContext().getHostContext() as common.UIAbilityContext
+  }
+
+  /** 收起时只露两行左右，展开显示全部。 */
+  private visibleHistory(): string[] {
+    return this.historyExpanded ? this.historyWords : this.historyWords.slice(0, 8)
+  }
+
+  private confirmClearHistory(): void {
+    this.getUIContext().showAlertDialog({
+      title: '清空历史记录',
+      message: '确定清空历史记录？',
+      primaryButton: { value: '取消', action: () => {} },
+      secondaryButton: {
+        value: '清空', fontColor: TC.accent(), action: () => {
+          this.historyWords = []
+          this.historyExpanded = false
+          this.longPressedWord = ''
+          SearchHistory.save(this.historyContext(), [])
+        }
+      }
+    })
+  }
+
+  /** 长按气泡里的删除：立即删除，不弹窗。 */
+  private deleteHistoryWord(word: string): void {
+    this.historyWords = this.historyWords.filter((item: string) => item !== word)
+    this.longPressedWord = ''
+    SearchHistory.save(this.historyContext(), this.historyWords)
   }
 
   aboutToDisappear(): void {
@@ -277,6 +319,9 @@ export struct SearchPage {
     this.suggestionSongQueue = []
     this.suggestionLoading = false
     this.searchedKeyword = keyword
+    // 所有搜索入口（回车、搜索按钮、热搜、历史气泡）统一在这里落历史
+    this.historyWords = SearchHistory.add(this.historyWords, keyword)
+    SearchHistory.save(this.historyContext(), this.historyWords)
     const requestToken = ++this.searchRequestToken
     this.loading = true
     this.message = ''
@@ -674,25 +719,78 @@ export struct SearchPage {
     .onClick(() => this.openItem(item))
   }
 
+  /** 长按历史气泡时在上方浮出的删除按钮，点击立即删除、不弹窗。 */
+  @Builder
+  private DeleteBubble(word: string) {
+    Row({ space: 6 }) {
+      SymbolGlyph($r('sys.symbol.trash')).fontSize(14).fontColor([TC.accent()])
+      Text('删除').fontSize(12).fontColor(TC.accent())
+    }
+    .padding({ left: 14, right: 14, top: 9, bottom: 9 })
+    .onClick(() => this.deleteHistoryWord(word))
+  }
+
+  /** 搜索历史：本地保存、气泡展示、可展开/收起、可清空。 */
+  @Builder
+  private HistorySection() {
+    Column({ space: 10 }) {
+      Row() {
+        Text('搜索历史').fontSize(17).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary())
+        Blank()
+        if (this.historyWords.length > 0) {
+          SymbolGlyph(this.historyExpanded ? $r('sys.symbol.chevron_up') : $r('sys.symbol.chevron_down'))
+            .fontSize(16).fontColor([TC.textTertiary()])
+            .padding({ left: 10, right: 10, top: 6, bottom: 6 })
+            .onClick(() => this.historyExpanded = !this.historyExpanded)
+          SymbolGlyph($r('sys.symbol.trash')).fontSize(16).fontColor([TC.textTertiary()])
+            .padding({ left: 10, right: 4, top: 6, bottom: 6 })
+            .onClick(() => this.confirmClearHistory())
+        }
+      }
+      .width('100%')
+
+      if (this.historyWords.length === 0) {
+        Text('还没有搜索记录').width('100%').height(72).fontSize(12)
+          .fontColor(TC.textQuaternary()).textAlign(TextAlign.Center)
+      } else {
+        Flex({ wrap: FlexWrap.Wrap }) {
+          ForEach(this.visibleHistory(), (word: string) => {
+            Text(word)
+              .fontSize(12)
+              .fontColor(TC.textBody())
+              .padding({ left: 14, right: 14, top: 8, bottom: 8 })
+              .backgroundColor(TC.chipBackground())
+              .borderRadius(18)
+              .margin({ right: 8, bottom: 8 })
+              .onClick(() => this.runKeyword(word))
+              .gesture(
+                LongPressGesture({ fingers: 1, repeat: false, duration: 500 })
+                  .onAction(() => { this.longPressedWord = word })
+              )
+              .bindPopup(this.longPressedWord === word, {
+                builder: () => { this.DeleteBubble(word) },
+                placement: Placement.Top,
+                popupColor: TC.surfaceCard(),
+                onStateChange: (event) => {
+                  if (!event.isVisible && this.longPressedWord === word) {
+                    this.longPressedWord = ''
+                  }
+                }
+              })
+          }, (word: string) => word)
+        }
+        .width('100%')
+      }
+    }
+    .width('100%')
+    .padding({ left: 16, right: 16, top: 12, bottom: 16 })
+    .alignItems(HorizontalAlign.Start)
+  }
+
   @Builder
   private SearchDiscovery() {
     Column() {
-      if (this.defaultKeyword.length > 0) {
-        Column({ space: 9 }) {
-          Text('搜索发现').width('100%').fontSize(17).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary())
-          Row({ space: 8 }) {
-            SymbolGlyph($r('sys.symbol.magnifyingglass')).fontSize(15).fontColor([TC.accentSoft()])
-            Text(this.defaultKeyword).layoutWeight(1).fontSize(13).fontColor(TC.textBody()).maxLines(1)
-              .textOverflow({ overflow: TextOverflow.Ellipsis })
-            SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(13).fontColor([TC.textQuaternary()])
-          }
-          .width('100%').height(46).padding({ left: 13, right: 13 })
-          .backgroundColor(TC.surfaceCardAlt()).borderRadius(14)
-          .onClick(() => this.runKeyword(this.defaultKeyword))
-        }
-        .width('100%').padding({ left: 16, right: 16, top: 12, bottom: 16 })
-        .alignItems(HorizontalAlign.Start)
-      }
+      this.HistorySection()
 
       Row() {
         Text('当前热搜').layoutWeight(1).fontSize(18).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary())
@@ -809,8 +907,12 @@ export struct SearchPage {
       Column() {
         Column().width('100%').height(this.topAvoidHeight)
         Row({ space: 10 }) {
-          SymbolGlyph($r('sys.symbol.chevron_left')).fontSize(24).fontColor([TC.textPrimary()])
-            .onClick(() => this.pageStack.pop())
+          Row() {
+            SymbolGlyph($r('sys.symbol.chevron_left')).fontSize(22).fontColor([TC.textOnMedia()])
+          }
+          .width(36).height(36).borderRadius(18).backgroundColor('rgba(0,0,0,0.35)')
+          .justifyContent(FlexAlign.Center)
+          .onClick(() => this.pageStack.pop())
           Row({ space: 8 }) {
             SymbolGlyph($r('sys.symbol.magnifyingglass')).fontSize(18).fontColor([TC.textTertiary()])
             TextInput({ text: this.keyword,
@@ -827,7 +929,7 @@ export struct SearchPage {
             }
           }
           .layoutWeight(1).height(42).padding({ left: 12, right: 12 })
-          .backgroundColor(TC.surfaceCardAlt()).borderRadius(14)
+          .backgroundColor(TC.surfaceCardAlt()).borderRadius(21)
           Button('搜索').fontSize(13).fontColor(TC.accentSoft()).backgroundColor(Color.Transparent)
             .onClick(() => this.search())
         }

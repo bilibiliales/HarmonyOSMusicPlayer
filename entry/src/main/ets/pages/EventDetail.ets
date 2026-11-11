@@ -1,5 +1,6 @@
 import { ShareSheet } from '../components/ShareSheet'
 import { DetailTopBar } from '../components/DetailTopBar'
+import { NoMoreFooter } from '../components/NoMoreFooter'
 import { EventImages } from '../components/EventImages'
 import { ResourceComments } from '../components/ResourceComments'
 import { CommentResource } from '../models/CommentResource'
@@ -409,10 +410,10 @@ export struct EventDetailPage {
     NavDestination() {
       Stack({ alignContent: Alignment.TopStart }) {
         Column() {
-          // 顶栏由 DetailTopBar 悬浮绘制，这里保留等高占位
-          Column().width('100%').height(this.topAvoidHeight + 54)
           Scroll(this.scroller) {
             Column({ space: 14 }) {
+            // 占位放进滚动内容里，让内容能滚到顶栏后面，常驻模糊才有效果
+            Column().width('100%').height(this.topAvoidHeight + 54)
             Row({ space: 11 }) {
               Image(this.event.user.avatarUrl).width(46).height(46)
                 .sourceSize({ width: 96, height: 96 }).borderRadius(23).objectFit(ImageFit.Cover)
@@ -498,7 +499,9 @@ export struct EventDetailPage {
                   .fontColor(this.event.info.liked ? TC.accent() : TC.textTertiary())
               }.layoutWeight(1).justifyContent(FlexAlign.Center).onClick(() => this.toggleEventLike())
             }.width('100%').height(50).backgroundColor(TC.surfaceCard()).borderRadius(14)
+            NoMoreFooter()
             }.padding({ left: 16, right: 16, top: 16, bottom: 28 })
+            .constraintSize({ minHeight: 640 })
           }.layoutWeight(1).scrollBar(BarState.Off)
             .onDidScroll(() => { this.scrollOffset = this.scroller.currentOffset().yOffset })
         }.width('100%').height('100%').backgroundColor(TC.pageBackground())
@@ -509,7 +512,8 @@ export struct EventDetailPage {
         DetailTopBar({
           title: '动态详情',
           scrollOffset: this.scrollOffset,
-          onShare: () => this.openShare()
+          alwaysBlur: true,
+          shareEnabled: false
         }) {
           Row() {
             SymbolGlyph($r('sys.symbol.ellipsis_circle')).fontSize(18).fontColor([TC.textOnMedia()])

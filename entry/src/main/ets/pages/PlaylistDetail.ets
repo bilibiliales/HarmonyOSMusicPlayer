@@ -18,6 +18,7 @@ import { playerController } from '../services/PlayerController'
 import { AuthStore } from '../stores/AuthStore'
 import { ShareSheet } from '../components/ShareSheet'
 import { DetailTopBar } from '../components/DetailTopBar'
+import { NoMoreFooter } from '../components/NoMoreFooter'
 import { PlaylistCoverPreviewPageParam } from './PlaylistCoverPreview'
 import { PlaylistEditorPageParam } from './PlaylistEditor'
 import { PlaylistSongManagerPageParam } from './PlaylistSongManager'
@@ -580,26 +581,29 @@ export struct PlaylistDetail {
     .width('100%').height(62).padding({ left: 16, right: 16, top: 10, bottom: 10 })
   }
 
-  /** 头图滚过后（约 226vp）操作行开始渐显接替。 */
-  private pinProgress(): number {
-    const value = (this.scrollOffset - 226) / 60
-    if (value < 0) { return 0 }
-    if (value > 1) { return 1 }
-    return value
+  /** 操作行在内容流里的原始 y（头图 + 听歌排行切换条）。 */
+  private actionBarBaseY(): number {
+    return 280 + this.topAvoidHeight + (this.playlist.specialType === 'record' ? 46 : 0)
   }
 
-  /** 上滑后固定在标题栏下方，保证页面只留标题 + 播放全部组件。 */
+  /** 超过阈值后反向补偿滚动量，把操作行锁在标题栏下沿（Excel 冻结行）。 */
+  private stickyOffset(): number {
+    const threshold = this.actionBarBaseY() - this.topAvoidHeight - 54
+    return Math.max(0, this.scrollOffset - threshold)
+  }
+
+  /** 全局只有这一份 ActionBar：未吸顶时随内容滚，吸顶后固定不动。 */
   @Builder
-  private PinnedActionBar() {
+  private StickyActionBar() {
     Column() {
       this.ActionBar()
     }
     .width('100%')
+    .position({ x: 0, y: this.actionBarBaseY() })
+    .offset({ y: -this.scrollOffset + this.stickyOffset() })
     .backgroundColor(Color.Transparent)
-    .backdropBlur(16)
-    .position({ x: 0, y: this.topAvoidHeight + 54 })
-    .opacity(this.pinProgress())
-    .animation({ duration: 160, curve: Curve.EaseOut })
+    .backdropBlur(this.stickyOffset() > 0 ? 30 : 0)
+    .zIndex(3)
   }
 
   build() {
@@ -689,7 +693,7 @@ export struct PlaylistDetail {
             }.width('100%').height(46).padding({ left: 20, right: 20 })
           }
 
-          this.ActionBar()
+          Column().width('100%').height(62)
 
           if (this.loading) {
             LoadingProgress().width(46).height(46).color(TC.accent()).margin({ top: 80 })
@@ -748,7 +752,9 @@ export struct PlaylistDetail {
             Text(this.message).width('100%').fontSize(10).fontColor(TC.accentSoft())
               .textAlign(TextAlign.Center).padding({ bottom: 6 })
           }
+          NoMoreFooter()
           }
+          .constraintSize({ minHeight: 640 })
           .width('100%')
         }
         .width('100%').height('100%')
@@ -784,10 +790,8 @@ export struct PlaylistDetail {
           }
         }
 
-        // 上滑后由浮层接替滚走的操作行：页面只保留标题 + 播放全部组件
-        if (this.pinProgress() > 0.01) {
-          this.PinnedActionBar()
-        }
+        // 唯一的 ActionBar：随内容滚到顶栏下沿后冻结
+        this.StickyActionBar()
 
         if (this.ownerMenuVisible) {
           this.MenuSheetOverlay('owner')

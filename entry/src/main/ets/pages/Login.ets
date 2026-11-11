@@ -314,7 +314,7 @@ export struct Login {
       .fontColor(TC.textPrimary())
       .placeholderColor(TC.textQuaternary())
       .backgroundColor(TC.surfaceCardAlt())
-      .borderRadius(14)
+      .borderRadius(26)
       .padding({ left: 16, right: 16 })
       .onChange(onChange)
   }
@@ -329,7 +329,7 @@ export struct Login {
         .fontColor(TC.textPrimary())
         .placeholderColor(TC.textQuaternary())
         .backgroundColor(TC.surfaceCardAlt())
-        .borderRadius(14)
+        .borderRadius(26)
         .padding({ left: 16, right: 16 })
         .onChange((value: string) => this.captcha = value)
       Button(this.countdown > 0 ? `${this.countdown}s` : '获取验证码')
@@ -337,7 +337,7 @@ export struct Login {
         .fontSize(13)
         .fontColor(TC.accentSoft())
         .backgroundColor(TC.accentContainer())
-        .borderRadius(14)
+        .borderRadius(26)
         .enabled(this.countdown <= 0)
         .onClick(() => this.sendCaptcha(!this.registrationMode))
     }
@@ -383,7 +383,7 @@ export struct Login {
               Row() {
                 ForEach(this.methods, (item: LoginMethodItem) => this.MethodTab(item))
               }
-              .width('100%').backgroundColor(TC.surfaceCardAlt()).borderRadius(14)
+              .width('100%').backgroundColor(TC.surfaceCardAlt()).borderRadius(25)
             }
 
             if (this.registrationMode) {
@@ -399,7 +399,7 @@ export struct Login {
                       this.message = ''
                     })
                 }
-                .width('100%').padding(16).backgroundColor(TC.surfaceCardAlt()).borderRadius(14)
+                .width('100%').padding(16).backgroundColor(TC.surfaceCardAlt()).borderRadius(25)
                 this.CaptchaField()
                 this.Field(this.nickname, '设置昵称', InputType.Normal, (value: string) => this.nickname = value)
                 this.Field(this.password, '设置密码（至少 6 位）', InputType.Password,

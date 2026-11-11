@@ -474,7 +474,7 @@ struct Moment {
         }
         .layoutWeight(1).alignItems(HorizontalAlign.Start)
         if (this.currentTab === 'following' && !this.authStore.loggedIn) {
-          Button('登录').fontSize(12).fontColor(TC.textOnAccent()).backgroundColor(TC.accent())
+          Button('登录').fontSize(12).fontColor(TC.textOnAccent()).backgroundColor(TC.accent()).height(40).borderRadius(20)
             .onClick(() => this.pageStack.pushPathByName('LoginPage', null))
         }
       }

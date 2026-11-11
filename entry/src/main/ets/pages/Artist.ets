@@ -29,6 +29,7 @@ import { TC } from '../services/ThemeColors'
 import { DetailTopBar } from '../components/DetailTopBar'
 import { ShareSheet } from '../components/ShareSheet'
 import { EventCard } from '../components/EventCard'
+import { NoMoreFooter } from '../components/NoMoreFooter'
 import { RelationshipPageParam } from './RelationshipList'
 
 @Component
@@ -799,9 +800,10 @@ export struct ArtistPage {
               } else {
                 this.EventsTab()
               }
+              NoMoreFooter()
               }
             }
-            .width('100%')
+            .width('100%').constraintSize({ minHeight: 640 })
           }
           .width('100%').height('100%').scrollBar(BarState.Off)
           .onDidScroll(() => { this.scrollOffset = this.scroller.currentOffset().yOffset })

@@ -237,9 +237,9 @@ export struct RankingPage {
                 Column().width(104).height(70).borderRadius({ bottomLeft: 15, bottomRight: 15 })
                   .linearGradient({ angle: 180, colors: [['rgba(0,0,0,0)', 0], ['rgba(0,0,0,0.82)', 1]] })
                 Column({ space: 2 }) {
-                  Text(ranking.name).width(92).fontSize(13).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary())
+                  Text(ranking.name).width(92).fontSize(13).fontWeight(FontWeight.Bold).fontColor(TC.textOnMedia())
                     .maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
-                  Text(ranking.updateFrequency).width(92).fontSize(9).fontColor(TC.textBody()).maxLines(1)
+                  Text(ranking.updateFrequency).width(92).fontSize(9).fontColor(TC.textOnMediaSecondary()).maxLines(1)
                 }.margin({ left: 7, bottom: 8 }).alignItems(HorizontalAlign.Start)
               }.onClick(() => this.openRanking(ranking.id, ranking.name, ranking.cover))
               Column({ space: 3 }) {
@@ -294,7 +294,7 @@ export struct RankingPage {
                   .width(88).height(88).sourceSize({ width: 180, height: 180 }).borderRadius(44)
                   .objectFit(ImageFit.Cover)
                 Text(`${index + 1}`).fontSize(11).fontWeight(FontWeight.Bold)
-                  .fontColor(TC.textPrimary())
+                  .fontColor(index < 3 ? TC.textOnAccent() : TC.textPrimary())
                   .width(27).height(27).textAlign(TextAlign.Center)
                   .backgroundColor(index < 3 ? TC.accent() : TC.surfaceInset())
                   .borderRadius(14).margin({ left: -3, top: -3 })
@@ -331,7 +331,7 @@ export struct RankingPage {
                 .objectFit(ImageFit.Cover)
               Column().width('100%').height(50).borderRadius({ bottomLeft: 14, bottomRight: 14 })
                 .linearGradient({ angle: 180, colors: [['rgba(0,0,0,0)', 0], ['rgba(0,0,0,0.78)', 1]] })
-              Text(item.updateFrequency || '').width('90%').fontSize(8).fontColor(TC.textBody())
+              Text(item.updateFrequency || '').width('90%').fontSize(8).fontColor(TC.textOnMediaSecondary())
                 .margin({ left: 7, bottom: 7 }).maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
             }
             Text(item.name).width('100%').fontSize(11).fontColor(TC.textBody()).maxLines(2)

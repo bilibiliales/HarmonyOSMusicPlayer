@@ -202,8 +202,8 @@ export struct StylePage {
               Column().width(142).height(92).borderRadius({ bottomLeft: 17, bottomRight: 17 })
                 .linearGradient({ angle: 180, colors: [['rgba(0,0,0,0)', 0], ['rgba(0,0,0,0.88)', 1]] })
               Column({ space: 3 }) {
-                Text(item.tagName).fontSize(17).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary())
-                Text(`偏好 ${item.ratio}%`).fontSize(10).fontColor(TC.textBody())
+                Text(item.tagName).fontSize(17).fontWeight(FontWeight.Bold).fontColor(TC.textOnMedia())
+                Text(`偏好 ${item.ratio}%`).fontSize(10).fontColor(TC.textOnMediaSecondary())
               }.margin({ left: 11, bottom: 11 }).alignItems(HorizontalAlign.Start)
             }.width(142).height(172).onClick(() => this.openPreference(item))
           }, (item: StyleTagPreference) => item.tagId.toString())
@@ -230,8 +230,8 @@ export struct StylePage {
         Column().width('100%').height(62).borderRadius({ bottomLeft: 15, bottomRight: 15 })
           .linearGradient({ angle: 180, colors: [['rgba(0,0,0,0)', 0], ['rgba(0,0,0,0.82)', 1]] })
         Column({ space: 2 }) {
-          Text(tag.tagName).fontSize(15).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary()).maxLines(1)
-          Text(tag.enName || '').fontSize(9).fontColor(TC.textBody()).maxLines(1)
+          Text(tag.tagName).fontSize(15).fontWeight(FontWeight.Bold).fontColor(TC.textOnMedia()).maxLines(1)
+          Text(tag.enName || '').fontSize(9).fontColor(TC.textOnMediaSecondary()).maxLines(1)
         }.margin({ left: 10, right: 8, bottom: 9 }).alignItems(HorizontalAlign.Start)
       }.width('100%').height(112)
       Text(this.tagDescription(tag)).width('100%').fontSize(10).fontColor(TC.textTertiary()).maxLines(1)
