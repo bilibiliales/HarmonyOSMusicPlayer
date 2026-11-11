@@ -757,6 +757,17 @@ export struct Mine {
     await Promise.all(requests)
   }
 
+  private openAvatarPreview(): void {
+    const url = this.userProfile.avatar || ''
+    if (!url) {
+      return
+    }
+    this.pageStack.pushPathByName('ImagePreviewPage', {
+      url: url,
+      name: this.userProfile.nickName || '头像'
+    })
+  }
+
   build() {
     Stack({ alignContent: Alignment.BottomEnd }) {
       Column() {
@@ -859,6 +870,7 @@ export struct Mine {
               .borderRadius(36)
               .objectFit(ImageFit.Cover)
               .border({ width: 2, color: '#ffffff' })
+              .onClick(() => this.openAvatarPreview())
           } else {
             Stack() {
               SymbolGlyph($r('sys.symbol.person_crop_circle_fill'))

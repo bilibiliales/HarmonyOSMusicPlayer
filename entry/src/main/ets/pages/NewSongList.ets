@@ -85,8 +85,7 @@ export struct NewSongListPage {
       this.PlayAllRow()
     }
     .width('100%')
-    .position({ x: 0, y: this.actionBarBaseY() })
-    .offset({ y: -this.scrollOffset + this.stickyOffset() })
+    .position({ x: 0, y: Math.max(this.topAvoidHeight + 54, this.actionBarBaseY() - this.scrollOffset) })
     .backgroundColor(Color.Transparent)
     .backdropBlur(this.stickyOffset() > 0 ? 30 : 0)
     .zIndex(3)

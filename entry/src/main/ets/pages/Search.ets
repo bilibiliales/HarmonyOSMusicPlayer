@@ -762,7 +762,7 @@ export struct SearchPage {
               .backgroundColor(TC.chipBackground())
               .borderRadius(18)
               .margin({ right: 8, bottom: 8 })
-              .onClick(() => this.runKeyword(word))
+              .onClick(() => this.onKeywordChange(word))
               .gesture(
                 LongPressGesture({ fingers: 1, repeat: false, duration: 500 })
                   .onAction(() => { this.longPressedWord = word })
@@ -839,7 +839,7 @@ export struct SearchPage {
                 SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(13).fontColor([TC.textQuaternary()])
               }
               .height(62).padding({ left: 12, right: 16 })
-              .onClick(() => this.runKeyword(item.searchWord))
+              .onClick(() => this.onKeywordChange(item.searchWord))
             }
           })
         }

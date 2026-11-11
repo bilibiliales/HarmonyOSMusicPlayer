@@ -484,6 +484,7 @@ export struct UserProfilePage {
           Image(resizeImageUrl(this.detail?.profile.avatarUrl || '', 180, 180))
             .width(88).height(88).sourceSize({ width: 180, height: 180 }).borderRadius(90).objectFit(ImageFit.Cover)
             .border({ width: 2, color: 'rgba(255,255,255,0.8)' })
+            .onClick(() => this.openAvatarPreview())
           if (this.detail?.profile.userType === 4) {
             Image($r('app.media.ic_singer')).width(26).height(26).borderRadius(13)
           }
@@ -596,6 +597,17 @@ export struct UserProfilePage {
       }
     }
     .width('100%').padding(24)
+  }
+
+  private openAvatarPreview(): void {
+    const url = this.detail?.profile.avatarUrl || ''
+    if (!url) {
+      return
+    }
+    this.pageStack.pushPathByName('ImagePreviewPage', {
+      url: url,
+      name: this.detail?.profile.nickname || '头像'
+    })
   }
 
   build() {

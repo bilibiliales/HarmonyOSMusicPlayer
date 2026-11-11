@@ -85,8 +85,8 @@ export struct DecorationEditorPage {
   @State private playerProgressColor: string = ''
   @State private playerIconColor: string = ''
   @State private playerTextColor: string = ''
-  @State private stageW: number = 0
-  @State private stageH: number = 0
+  @State private stageW: number = 360
+  @State private stageH: number = 580
   private dragStartX: number = 0
   private dragStartY: number = 0
 

@@ -632,8 +632,7 @@ export struct StyleDetailPage {
       this.ResourceTabs()
     }
     .width('100%')
-    .position({ x: 0, y: this.tabsBaseY() })
-    .offset({ y: -this.scrollOffset + this.tabsStickyOffset() })
+    .position({ x: 0, y: Math.max(this.topAvoidHeight + 54, this.tabsBaseY() - this.scrollOffset) })
     .backgroundColor(Color.Transparent)
     .backdropBlur(this.tabsStickyOffset() > 0 ? 30 : 0)
     .zIndex(3)

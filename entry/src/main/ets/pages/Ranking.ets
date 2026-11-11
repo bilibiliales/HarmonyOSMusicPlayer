@@ -308,11 +308,7 @@ export struct RankingPage {
           }, (artist: ArtistToplistArtist) => artist.id.toString())
         }.padding({ left: 17, right: 17, top: 4 })
       }.width('100%').scrollable(ScrollDirection.Horizontal).scrollBar(BarState.Off)
-        .onScrollEdge((side: Edge) => {
-          if (side === Edge.End) {
-            this.revealMoreArtists()
-          }
-        })
+        .onReachEnd(() => this.revealMoreArtists())
     }
   }
 

@@ -717,9 +717,9 @@ export struct ArtistPage {
           .width('100%')
         }
         Text(this.artistDetail.briefDesc || '').width('100%').fontSize(13).fontColor(TC.textBody())
-          .lineHeight(22).maxLines(this.bioExpanded ? 100 : 6)
+          .lineHeight(22).maxLines(this.bioExpanded ? 100 : 3)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
-        if ((this.artistDetail.briefDesc || '').length > 160) {
+        if ((this.artistDetail.briefDesc || '').length > 75) {
           Text(this.bioExpanded ? '收起' : '展开全部').fontSize(12).fontColor(TC.accentSoft())
             .onClick(() => this.bioExpanded = !this.bioExpanded)
         }

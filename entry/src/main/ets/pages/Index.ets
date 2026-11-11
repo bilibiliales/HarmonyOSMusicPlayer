@@ -46,6 +46,7 @@ import { DigitalAlbumPage } from './DigitalAlbum'
 import { DigitalAlbumDetailPage } from './DigitalAlbumDetail'
 import { SatiPage } from './Sati'
 import { PlaylistCoverPreview, PlaylistCoverPreviewPageParam } from './PlaylistCoverPreview'
+import { ImagePreviewPage, ImagePreviewPageParam } from './ImagePreviewPage'
 import {
   AlbumPageParam,
   ArtistPageParam,
@@ -264,6 +265,8 @@ struct HomeIndex {
       DecorationEditorPage({ pageParam: param as DecorationEditorParam })
     } else if (name === 'ImageCropPage') {
       ImageCropPage({ pageParam: param as ImageCropPageParam })
+    } else if (name === 'ImagePreviewPage') {
+      ImagePreviewPage({ pageParam: param as ImagePreviewPageParam })
     }
   }
 

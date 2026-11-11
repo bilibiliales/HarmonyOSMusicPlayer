@@ -18,7 +18,7 @@ export struct ListeningPlaylistCard {
         }
         Column().width('100%').height('100%').backgroundColor('rgba(0,0,0,0.28)')
         SymbolGlyph(this.playlist.specialType === 'recent' ? $r('sys.symbol.clock') : $r('sys.symbol.sort'))
-          .fontSize(26).fontColor([TC.textPrimary()])
+          .fontSize(26).fontColor([TC.textOnMedia()])
       }.width(56).height(56).backgroundColor(TC.surfaceRaised()).borderRadius(10).clip(true)
       Column({ space: 5 }) {
         Text(this.playlist.name).fontSize(14).fontWeight(FontWeight.Medium).fontColor(TC.textBody())
