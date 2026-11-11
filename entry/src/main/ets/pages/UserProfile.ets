@@ -698,10 +698,17 @@ export struct UserProfilePage {
                 }
                 NoMoreFooter()
               }
-              .width('100%').constraintSize({ minHeight: 640 })
+              .width('100%').constraintSize({ minHeight: '100%' })
             }
             .layoutWeight(1).scrollBar(BarState.Off)
-            .onDidScroll(() => { this.scrollOffset = this.scroller.currentOffset().yOffset })
+            .onDidScroll(() => {
+              const y = this.scroller.currentOffset().yOffset
+              // 顶栏只用到 0~160 这段做渐显，钳住后长列表滚动时不再逐帧刷新页面
+              const barOffset = y > 170 ? 170 : y
+              if (barOffset !== this.scrollOffset) {
+                this.scrollOffset = barOffset
+              }
+            })
           }
         }
         .width('100%').height('100%')

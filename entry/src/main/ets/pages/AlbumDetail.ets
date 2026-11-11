@@ -48,6 +48,8 @@ export struct AlbumDetail {
   @State commentSheetVisible: boolean = false
   @State shareSheetVisible: boolean = false
   @State scrollOffset: number = 0
+  /** 操作行是否已冻结在顶栏下沿（只在跨阈值时翻转，避免逐帧驱动布局）。 */
+  @State private frozen: boolean = false
   private scroller: Scroller = new Scroller()
   private shareParam: SharePageParam = { type: 'album', id: '', name: '', img: '' }
 
@@ -297,22 +299,34 @@ export struct AlbumDetail {
     return 320 + this.topAvoidHeight
   }
 
-  /** 超过阈值后反向补偿滚动量，把操作行锁在标题栏下沿（Excel 冻结行）。 */
-  private stickyOffset(): number {
-    const threshold = this.actionBarBaseY() - this.topAvoidHeight - 54
-    return Math.max(0, this.scrollOffset - threshold)
+  /** 冻结阈值：操作行顶端撞到顶栏下沿时的滚动量。 */
+  private freezeThreshold(): number {
+    return this.actionBarBaseY() - this.topAvoidHeight - 54
   }
 
-  /** 全局只有这一份 ActionBar：未吸顶时随内容滚，吸顶后固定不动。 */
+  /**
+   * 跟随阶段：操作行直接放在内容流里，由原生滚动 1:1 带走。
+   * 不参与任何逐帧计算，所以绝对跟手、不掉帧。
+   */
   @Builder
-  private StickyActionBar() {
+  private FlowActionBar() {
     Column() {
       this.ActionBar()
     }
     .width('100%')
-    .position({ x: 0, y: Math.max(this.topAvoidHeight + 54, this.actionBarBaseY() - this.scrollOffset) })
+    .opacity(this.frozen ? 0 : 1)
+  }
+
+  /** 冻结阶段：撞到顶栏下沿后由浮层接管，位置固定、只在跨阈值时切换一次。 */
+  @Builder
+  private FrozenActionBar() {
+    Column() {
+      this.ActionBar()
+    }
+    .width('100%')
     .backgroundColor(Color.Transparent)
-    .backdropBlur(this.stickyOffset() > 0 ? 30 : 0)
+    .backdropBlur(30)
+    .position({ x: 0, y: this.topAvoidHeight + 54 })
     .zIndex(3)
   }
 
@@ -393,7 +407,8 @@ export struct AlbumDetail {
               .height(320 + this.topAvoidHeight)
               .alignContent(Alignment.Bottom)
 
-              Column().width('100%').height(58)
+              // 操作行本身就在内容流里（跟随阶段零 JS 参与）
+              this.FlowActionBar()
 
               if (this.albumDesc.length > 0) {
                 Column() {
@@ -403,7 +418,9 @@ export struct AlbumDetail {
                     .lineHeight(18)
                     .maxLines(this.descExpanded ? 100 : 3)
                     .textOverflow({ overflow: TextOverflow.Ellipsis })
-                  if (this.albumDesc.length > 30) {
+                    // 收起态高度固定为 3 行（18×3），与文字多少无关
+                    .constraintSize({ minHeight: this.descExpanded ? 0 : 54 })
+                  if (this.albumDesc.length > 78) {
                     Text(this.descExpanded ? '收起' : '展开')
                       .fontSize(11)
                       .fontColor(TC.accent())
@@ -461,20 +478,33 @@ export struct AlbumDetail {
               NoMoreFooter()
             }
             .width('100%')
-            .constraintSize({ minHeight: 640 })
+            .constraintSize({ minHeight: '100%' })
           }
           .width('100%')
           .layoutWeight(1)
           .scrollBar(BarState.Off)
-          .onDidScroll(() => { this.scrollOffset = this.scroller.currentOffset().yOffset })
+          .onDidScroll(() => {
+            const y = this.scroller.currentOffset().yOffset
+            // 顶栏只用到 0~160 这段做渐显，钳住后长列表滚动时不再逐帧刷新页面
+            const barOffset = y > 170 ? 170 : y
+            if (barOffset !== this.scrollOffset) {
+              this.scrollOffset = barOffset
+            }
+            const f = y >= this.freezeThreshold()
+            if (f !== this.frozen) {
+              this.frozen = f
+            }
+          })
 
           DetailTopBar({
             title: this.albumName || '专辑',
             scrollOffset: this.scrollOffset,
             onShare: () => this.shareSheetVisible = true
           })
-          // 唯一的 ActionBar：随内容滚到顶栏下沿后冻结
-          this.StickyActionBar()
+          // 冻结后由浮层接管，未冻结时不构建（省掉无谓的模糊开销）
+          if (this.frozen) {
+            this.FrozenActionBar()
+          }
           if (this.shareSheetVisible) {
             ShareSheet({
               shareParam: this.shareParam,

@@ -31,6 +31,7 @@ import { ShareSheet } from '../components/ShareSheet'
 import { EventCard } from '../components/EventCard'
 import { NoMoreFooter } from '../components/NoMoreFooter'
 import { RelationshipPageParam } from './RelationshipList'
+import { ImagePreviewPageParam } from './ImagePreviewPage'
 
 @Component
 export struct ArtistPage {
@@ -434,6 +435,16 @@ export struct ArtistPage {
     this.pageStack.pushPathByName('MvPlayerPage', param)
   }
 
+  /** 头像点开：与专辑封面同款的全屏预览 + 保存。 */
+  private openAvatarPreview(): void {
+    const url = this.avatarImage()
+    if (url.length === 0) {
+      return
+    }
+    const param: ImagePreviewPageParam = { url: url, name: this.displayName() }
+    this.pageStack.pushPathByName('ImagePreviewPage', param)
+  }
+
   @Builder
   private ArtistHeader() {
     Stack({ alignContent: Alignment.Bottom }) {
@@ -448,6 +459,7 @@ export struct ArtistPage {
             .width(104).height(104).sourceSize({ width: 220, height: 220 })
             .borderRadius(52).objectFit(ImageFit.Cover)
             .border({ width: 2, color: 'rgba(255,255,255,0.78)' })
+            .onClick(() => this.openAvatarPreview())
           if (this.verified && this.verifyIcon) {
             Image(this.verifyIcon).width(22).height(22).borderRadius(11)
               .objectFit(ImageFit.Cover).border({ width: 1.5, color: '#FFFFFF' })
@@ -719,6 +731,8 @@ export struct ArtistPage {
         Text(this.artistDetail.briefDesc || '').width('100%').fontSize(13).fontColor(TC.textBody())
           .lineHeight(22).maxLines(this.bioExpanded ? 100 : 3)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
+          // 收起态高度固定为 3 行（22×3），不随文字多少变化
+          .constraintSize({ minHeight: this.bioExpanded ? 0 : 66 })
         if ((this.artistDetail.briefDesc || '').length > 75) {
           Text(this.bioExpanded ? '收起' : '展开全部').fontSize(12).fontColor(TC.accentSoft())
             .onClick(() => this.bioExpanded = !this.bioExpanded)
@@ -803,10 +817,17 @@ export struct ArtistPage {
               NoMoreFooter()
               }
             }
-            .width('100%').constraintSize({ minHeight: 640 })
+            .width('100%').constraintSize({ minHeight: '100%' })
           }
           .width('100%').height('100%').scrollBar(BarState.Off)
-          .onDidScroll(() => { this.scrollOffset = this.scroller.currentOffset().yOffset })
+          .onDidScroll(() => {
+            const y = this.scroller.currentOffset().yOffset
+            // 顶栏只用到 0~160 这段做渐显，钳住后长列表滚动时不再逐帧刷新页面
+            const barOffset = y > 170 ? 170 : y
+            if (barOffset !== this.scrollOffset) {
+              this.scrollOffset = barOffset
+            }
+          })
           .onReachEnd(() => {
             if (this.currentTab === 'albums') {
               this.loadAllAlbums()

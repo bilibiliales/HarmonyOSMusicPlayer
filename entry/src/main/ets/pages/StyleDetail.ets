@@ -77,6 +77,8 @@ export struct StyleDetailPage {
   @State pickerQuery: string = ''
   @State preparingShare: boolean = false
   @State scrollOffset: number = 0
+  /** 二级菜单是否已冻结在顶栏下沿（只在跨阈值时翻转，避免逐帧驱动布局）。 */
+  @State private frozen: boolean = false
   @State reviewVisible: boolean = false
   @State reviewKind: string = 'review'
   @State reviewCardWidth: number = 310
@@ -620,21 +622,31 @@ export struct StyleDetailPage {
     return 300 + this.topAvoidHeight + 54 + this.descriptionHeight()
   }
 
-  /** 二级菜单滚到顶栏下沿后冻结，和歌单/专辑的播放全部行同款。 */
-  private tabsStickyOffset(): number {
-    const threshold = this.tabsBaseY() - this.topAvoidHeight - 54
-    return Math.max(0, this.scrollOffset - threshold)
+  /** 冻结阈值：二级菜单顶端撞到顶栏下沿时的滚动量。 */
+  private freezeThreshold(): number {
+    return this.tabsBaseY() - this.topAvoidHeight - 54
   }
 
+  /** 跟随阶段：二级菜单在内容流里，由原生滚动 1:1 带走（零 JS 参与）。 */
   @Builder
-  private StickyResourceTabs() {
+  private FlowResourceTabs() {
     Column() {
       this.ResourceTabs()
     }
     .width('100%')
-    .position({ x: 0, y: Math.max(this.topAvoidHeight + 54, this.tabsBaseY() - this.scrollOffset) })
+    .opacity(this.frozen ? 0 : 1)
+  }
+
+  /** 冻结阶段：撞到顶栏下沿后由浮层接管，位置固定、只在跨阈值时切换一次。 */
+  @Builder
+  private FrozenResourceTabs() {
+    Column() {
+      this.ResourceTabs()
+    }
+    .width('100%')
     .backgroundColor(Color.Transparent)
-    .backdropBlur(this.tabsStickyOffset() > 0 ? 30 : 0)
+    .backdropBlur(30)
+    .position({ x: 0, y: this.topAvoidHeight + 54 })
     .zIndex(3)
   }
 
@@ -754,7 +766,8 @@ export struct StyleDetailPage {
               Button('重试').backgroundColor(TC.surfaceRaised()).onClick(() => this.loadPage())
             } else {
               this.Description()
-              Column().width('100%').height(48)
+              // 二级菜单本身就在内容流里（跟随阶段零 JS 参与）
+              this.FlowResourceTabs()
               this.ResourceActions()
               if (this.currentTab === 'songs') {
                 this.SongsContent()
@@ -779,10 +792,21 @@ export struct StyleDetailPage {
               }
             }
             NoMoreFooter()
-          }.width('100%').constraintSize({ minHeight: 640 })
+          }.width('100%').constraintSize({ minHeight: '100%' })
         }.width('100%').height('100%').scrollBar(BarState.Off)
           .onReachEnd(() => this.loadCurrentResources())
-          .onDidScroll(() => { this.scrollOffset = this.scroller.currentOffset().yOffset })
+          .onDidScroll(() => {
+            const y = this.scroller.currentOffset().yOffset
+            // 顶栏只用到 0~160 这段做渐显，钳住后长列表滚动时不再逐帧刷新页面
+            const barOffset = y > 170 ? 170 : y
+            if (barOffset !== this.scrollOffset) {
+              this.scrollOffset = barOffset
+            }
+            const f = y >= this.freezeThreshold()
+            if (f !== this.frozen) {
+              this.frozen = f
+            }
+          })
         DetailTopBar({
           title: this.name(),
           subtitle: this.parentName(),
@@ -792,7 +816,10 @@ export struct StyleDetailPage {
           shareEnabled: !this.preparingShare && !!this.detail,
           onShare: () => { this.shareStyle() }
         })
-        this.StickyResourceTabs()
+        // 冻结后由浮层接管
+        if (this.frozen) {
+          this.FrozenResourceTabs()
+        }
       }.width('100%').height('100%').backgroundColor(TC.pageBackground())
         .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP])
         .bindSheet(this.pickerVisible, this.StylePicker(), {

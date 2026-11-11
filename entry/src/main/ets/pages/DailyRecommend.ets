@@ -14,6 +14,8 @@ export struct DailyRecommendPage {
   @State loading: boolean = true
   @State message: string = ''
   @State scrollOffset: number = 0
+  /** 播放全部行是否已冻结在顶栏下沿（只在跨阈值时翻转）。 */
+  @State private frozen: boolean = false
   private todayDate: string = new Date().getDate().toString()
   private scroller: Scroller = new Scroller()
 
@@ -52,8 +54,8 @@ export struct DailyRecommendPage {
     return 220 + this.topAvoidHeight
   }
 
-  private stickyOffset(): number {
-    return Math.max(0, this.scrollOffset - (this.actionBarBaseY() - this.topAvoidHeight - 54))
+  private freezeThreshold(): number {
+    return this.actionBarBaseY() - this.topAvoidHeight - 54
   }
 
   @Builder
@@ -71,16 +73,26 @@ export struct DailyRecommendPage {
     .height(56).padding({ left: 18, right: 18 }).onClick(() => this.playAt(0))
   }
 
-  /** 唯一的播放全部行：滚到顶栏下沿后冻结（Excel 冻结行）。 */
+  /** 跟随阶段：播放全部行在内容流里，由原生滚动 1:1 带走（零 JS 参与）。 */
   @Builder
-  private StickyPlayAllRow() {
+  private FlowPlayAllRow() {
     Column() {
       this.PlayAllRow()
     }
     .width('100%')
-    .position({ x: 0, y: Math.max(this.topAvoidHeight + 54, this.actionBarBaseY() - this.scrollOffset) })
+    .opacity(this.frozen ? 0 : 1)
+  }
+
+  /** 冻结阶段：撞到顶栏下沿后由浮层接管，位置固定、只在跨阈值时切换一次。 */
+  @Builder
+  private FrozenPlayAllRow() {
+    Column() {
+      this.PlayAllRow()
+    }
+    .width('100%')
     .backgroundColor(Color.Transparent)
-    .backdropBlur(this.stickyOffset() > 0 ? 30 : 0)
+    .backdropBlur(30)
+    .position({ x: 0, y: this.topAvoidHeight + 54 })
     .zIndex(3)
   }
 
@@ -113,8 +125,8 @@ export struct DailyRecommendPage {
             }
             .width('100%').height(220 + this.topAvoidHeight)
 
-            // 播放全部行由 StickyPlayAllRow 绘制，这里只留等高占位
-            Column().width('100%').height(56)
+            // 播放全部行本身就放在内容流里（跟随阶段零 JS 参与）
+            this.FlowPlayAllRow()
 
             if (this.loading) {
               Column({ space: 12 }) {
@@ -162,17 +174,31 @@ export struct DailyRecommendPage {
             }
             NoMoreFooter()
           }
-          .width('100%').constraintSize({ minHeight: 640 })
+          .width('100%').constraintSize({ minHeight: '100%' })
         }
         .width('100%').height('100%').scrollBar(BarState.Off)
-        .onDidScroll(() => { this.scrollOffset = this.scroller.currentOffset().yOffset })
+        .onDidScroll(() => {
+          const y = this.scroller.currentOffset().yOffset
+          // 顶栏只用到 0~160 这段做渐显，钳住后长列表滚动时不再逐帧刷新页面
+          const barOffset = y > 170 ? 170 : y
+          if (barOffset !== this.scrollOffset) {
+            this.scrollOffset = barOffset
+          }
+          const f = y >= this.freezeThreshold()
+          if (f !== this.frozen) {
+            this.frozen = f
+          }
+        })
 
         DetailTopBar({
           title: '每日推荐',
           scrollOffset: this.scrollOffset,
           shareEnabled: false
         })
-        this.StickyPlayAllRow()
+        // 冻结后由浮层接管
+        if (this.frozen) {
+          this.FrozenPlayAllRow()
+        }
       }
       .width('100%').height('100%').backgroundColor(TC.pageBackground())
     }

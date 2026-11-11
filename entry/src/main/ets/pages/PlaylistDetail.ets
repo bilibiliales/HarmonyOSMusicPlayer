@@ -41,6 +41,8 @@ export struct PlaylistDetail {
   @State searchVisible: boolean = false
   @State keyword: string = ''
   @State scrollOffset: number = 0
+  /** 操作行是否已冻结在顶栏下沿（只在跨阈值时翻转，避免逐帧驱动布局）。 */
+  @State private frozen: boolean = false
   @State creatorAvatar: string = ''
   private scroller: Scroller = new Scroller()
   @State shareCount: number = 0
@@ -586,22 +588,31 @@ export struct PlaylistDetail {
     return 280 + this.topAvoidHeight + (this.playlist.specialType === 'record' ? 46 : 0)
   }
 
-  /** 超过阈值后反向补偿滚动量，把操作行锁在标题栏下沿（Excel 冻结行）。 */
-  private stickyOffset(): number {
-    const threshold = this.actionBarBaseY() - this.topAvoidHeight - 54
-    return Math.max(0, this.scrollOffset - threshold)
+  /** 冻结阈值：操作行顶端撞到顶栏下沿时的滚动量。 */
+  private freezeThreshold(): number {
+    return this.actionBarBaseY() - this.topAvoidHeight - 54
   }
 
-  /** 全局只有这一份 ActionBar：未吸顶时随内容滚，吸顶后固定不动。 */
+  /** 跟随阶段：操作行在内容流里，由原生滚动 1:1 带走（零 JS 参与）。 */
   @Builder
-  private StickyActionBar() {
+  private FlowActionBar() {
     Column() {
       this.ActionBar()
     }
     .width('100%')
-    .position({ x: 0, y: Math.max(this.topAvoidHeight + 54, this.actionBarBaseY() - this.scrollOffset) })
+    .opacity(this.frozen ? 0 : 1)
+  }
+
+  /** 冻结阶段：撞到顶栏下沿后由浮层接管，位置固定、只在跨阈值时切换一次。 */
+  @Builder
+  private FrozenActionBar() {
+    Column() {
+      this.ActionBar()
+    }
+    .width('100%')
     .backgroundColor(Color.Transparent)
-    .backdropBlur(this.stickyOffset() > 0 ? 30 : 0)
+    .backdropBlur(30)
+    .position({ x: 0, y: this.topAvoidHeight + 54 })
     .zIndex(3)
   }
 
@@ -692,7 +703,8 @@ export struct PlaylistDetail {
             }.width('100%').height(46).padding({ left: 20, right: 20 })
           }
 
-          Column().width('100%').height(62)
+          // 操作行本身就在内容流里（跟随阶段零 JS 参与）
+          this.FlowActionBar()
 
           if (this.loading) {
             LoadingProgress().width(46).height(46).color(TC.accent()).margin({ top: 80 })
@@ -753,13 +765,24 @@ export struct PlaylistDetail {
           }
           NoMoreFooter()
           }
-          .constraintSize({ minHeight: 640 })
+          .constraintSize({ minHeight: '100%' })
           .width('100%')
         }
         .width('100%').height('100%')
         .backgroundColor(TC.pageBackground())
         .scrollBar(BarState.Off)
-        .onDidScroll(() => { this.scrollOffset = this.scroller.currentOffset().yOffset })
+        .onDidScroll(() => {
+          const y = this.scroller.currentOffset().yOffset
+          // 顶栏只用到 0~160 这段做渐显，钳住后长列表滚动时不再逐帧刷新页面
+          const barOffset = y > 170 ? 170 : y
+          if (barOffset !== this.scrollOffset) {
+            this.scrollOffset = barOffset
+          }
+          const f = y >= this.freezeThreshold()
+          if (f !== this.frozen) {
+            this.frozen = f
+          }
+        })
 
         DetailTopBar({
           title: '歌单',
@@ -789,8 +812,10 @@ export struct PlaylistDetail {
           }
         }
 
-        // 唯一的 ActionBar：随内容滚到顶栏下沿后冻结
-        this.StickyActionBar()
+        // 冻结后由浮层接管
+        if (this.frozen) {
+          this.FrozenActionBar()
+        }
 
         if (this.ownerMenuVisible) {
           this.MenuSheetOverlay('owner')
