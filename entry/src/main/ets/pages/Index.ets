@@ -154,6 +154,18 @@ struct HomeIndex {
     this.openExternalAudio(uri)
   }
 
+  /** 外部 uri 可能是沙箱 uri、公共目录 uri 或裸路径，按「uri → 路径」依次尝试。 */
+  private openAudioSource(uri: string): fileIo.File {
+    try {
+      return fileIo.openSync(uri, fileIo.OpenMode.READ_ONLY)
+    } catch (error) {
+      if (uri.startsWith('file://')) {
+        return fileIo.openSync(new fileUri.FileUri(uri).path, fileIo.OpenMode.READ_ONLY)
+      }
+      throw error as Error
+    }
+  }
+
   /** 把外部传入的音频复制到沙箱后直接播放（避免临时授权失效）。 */
   private async openExternalAudio(uri: string): Promise<void> {
     const context = this.getUIContext().getHostContext() as common.UIAbilityContext
@@ -172,15 +184,15 @@ struct HomeIndex {
     const dest = `${dir}/${Date.now()}_${safe}`
     let playable = false
     try {
-      const src = fileIo.openSync(uri, fileIo.OpenMode.READ_ONLY)
+      const src = this.openAudioSource(uri)
       const dst = fileIo.openSync(dest,
         fileIo.OpenMode.READ_WRITE | fileIo.OpenMode.CREATE | fileIo.OpenMode.TRUNC)
       try {
         const chunk = new ArrayBuffer(256 * 1024)
         while (true) {
-          const count = fileIo.readSync(src, chunk)
+          const count = fileIo.readSync(src.fd, chunk)
           if (count <= 0) { break }
-          fileIo.writeSync(dst, chunk.slice(0, count))
+          fileIo.writeSync(dst.fd, chunk.slice(0, count))
         }
         playable = true
       } finally {

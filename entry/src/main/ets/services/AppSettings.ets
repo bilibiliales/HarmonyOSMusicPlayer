@@ -5,7 +5,6 @@ import { preferences } from '@kit.ArkData'
 import { fileIo } from '@kit.CoreFileKit'
 import { formBindingData, formProvider } from '@kit.FormKit'
 import { ApiClient } from './ApiClient'
-import { DeviceService } from './DeviceService'
 import { AuthStore } from '../stores/AuthStore'
 import { PlayerStore } from '../stores/PlayerStore'
 import { PlayMode, songItemType } from '../models/music'
@@ -167,8 +166,11 @@ export class AppSettings {
   }
 
   // 把本机别名上报到设备中心：/deviceinfo/center/upload?deviceName=XXXXX
+  // 直接走 ApiClient，避免与 DeviceService 形成循环依赖。
   static async reportDeviceName(): Promise<void> {
-    await DeviceService.uploadDeviceName(AppSettings.deviceAlias)
+    await ApiClient.get<Object>('/deviceinfo/center/upload', [
+      { key: 'deviceName', value: AppSettings.deviceAlias }
+    ])
   }
 
   static async loadAuth(authStore: AuthStore): Promise<void> {
