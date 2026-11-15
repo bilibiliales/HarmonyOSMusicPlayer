@@ -337,7 +337,7 @@ export struct SettingsPage {
               Row({ space: 12 }) {
                 Column({ space: 6 }) {
                   Text('流式加载播放').fontSize(14).fontColor(TC.textPrimary())
-                  Text('开启后按需分段拉取，内存占用与文件大小无关；关闭则整曲下载到内存后再播放（兼容旧设备）。')
+                  Text('开启后按需分段拉取，减少内存占用；关闭则整曲下载到内存后再播放。')
                     .fontSize(11).fontColor(TC.textSecondary()).width('100%')
                 }.layoutWeight(1).alignItems(HorizontalAlign.Start)
                 Toggle({ type: ToggleType.Switch, isOn: this.streamingPlaybackEnabled })

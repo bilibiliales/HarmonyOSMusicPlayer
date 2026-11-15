@@ -35,6 +35,17 @@ export default class EntryAbility extends UIAbility {
     }
   }
 
+  /** 应用被系统的「打开方式」拉起时，把音频 URI 交给界面层播放。 */
+  private handleOpenAudioWant(want: Want): void {
+    const uri = want.uri;
+    if (!uri || uri.length === 0) { return; }
+    if (want.action !== 'ohos.want.action.viewData') { return; }
+    AppStorage.setOrCreate<string>('openAudioUri', uri);
+    const seq = AppStorage.get<number>('openAudioSeq') ?? 0;
+    AppStorage.setOrCreate<number>('openAudioSeq', seq + 1);
+    hilog.info(DOMAIN, 'testTag', 'Open audio request: %{public}s', uri);
+  }
+
   onCreate(want: Want, launchParam: AbilityConstant.LaunchParam): void {
     // 读取持久化的深浅色偏好与皮肤覆盖，并在首帧前生效，避免启动闪屏
     ThemeService.init(this.context);
@@ -44,6 +55,7 @@ export default class EntryAbility extends UIAbility {
     AppSettings.context = this.context;
     SystemShareService.bindAbility(this.context);
     this.handlePlaybackWant(want);
+    this.handleOpenAudioWant(want);
     hilog.info(DOMAIN, 'testTag', '%{public}s', 'Ability onCreate');
   }
 
@@ -84,6 +96,7 @@ export default class EntryAbility extends UIAbility {
 
   onNewWant(want: Want, launchParam: AbilityConstant.LaunchParam): void {
     this.handlePlaybackWant(want);
+    this.handleOpenAudioWant(want);
   }
 
   onConfigurationUpdate(newConfig: Configuration): void {

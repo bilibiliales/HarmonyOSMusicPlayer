@@ -1,5 +1,7 @@
 export interface songItemType {
   img: string
+  /** 线上封面地址（本地音乐匹配后保留，供播控等系统界面使用）。 */
+  remoteImg?: string
   name: string
   author: string
   url: string

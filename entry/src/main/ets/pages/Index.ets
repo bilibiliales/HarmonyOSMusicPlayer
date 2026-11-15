@@ -15,6 +15,7 @@ import { SongWiki } from './SongWiki'
 import { SearchPage } from './Search'
 import { SettingsPage } from './Settings'
 import { DeviceManagementPage } from './DeviceManagementPage'
+import { DeviceDetailPage, DeviceDetailParam } from './DeviceDetailPage'
 import { FanClubListPage } from './FanClubListPage'
 import { FanClubDetailPage } from './FanClubDetailPage'
 import { FanClubDetailParam } from '../services/FanClubService'
@@ -47,6 +48,7 @@ import { DigitalAlbumDetailPage } from './DigitalAlbumDetail'
 import { SatiPage } from './Sati'
 import { PlaylistCoverPreview, PlaylistCoverPreviewPageParam } from './PlaylistCoverPreview'
 import { ImagePreviewPage, ImagePreviewPageParam } from './ImagePreviewPage'
+import { RingtonePage, RingtonePageParam } from './RingtonePage'
 import {
   AlbumPageParam,
   ArtistPageParam,
@@ -74,6 +76,7 @@ import { PlayerStore } from '../stores/PlayerStore'
 import { playerController } from '../services/PlayerController'
 import { AppSettings } from '../services/AppSettings'
 import { common } from '@kit.AbilityKit'
+import { fileIo, fileUri } from '@kit.CoreFileKit'
 import { window } from '@kit.ArkUI'
 import { TC } from '../services/ThemeColors'
 
@@ -81,6 +84,8 @@ import { TC } from '../services/ThemeColors'
 @Component
 struct HomeIndex {
   @StorageProp('skinVersion') skinVersionObs: number = 0
+  @StorageLink('openAudioUri') openAudioUri: string = ''
+  @StorageLink('openAudioSeq') @Watch('onExternalAudio') openAudioSeq: number = 0
   @Provide('pageStack') pageStack: NavPathStack = new NavPathStack()
   @Provide('authStore') authStore: AuthStore = new AuthStore()
   @Provide('playerStore') playerStore: PlayerStore = new PlayerStore()
@@ -133,6 +138,76 @@ struct HomeIndex {
     await AppSettings.loadAuth(this.authStore)
     if (this.authStore.loggedIn) {
       this.authStore.refreshAccount()
+    }
+    if (this.openAudioUri) {
+      const uri = this.openAudioUri
+      this.openAudioUri = ''
+      this.openExternalAudio(uri)
+    }
+  }
+
+  /** 热启动时系统再次以「打开方式」拉起应用。 */
+  onExternalAudio(): void {
+    if (!this.openAudioUri) { return }
+    const uri = this.openAudioUri
+    this.openAudioUri = ''
+    this.openExternalAudio(uri)
+  }
+
+  /** 把外部传入的音频复制到沙箱后直接播放（避免临时授权失效）。 */
+  private async openExternalAudio(uri: string): Promise<void> {
+    const context = this.getUIContext().getHostContext() as common.UIAbilityContext
+    const dir = `${context.cacheDir}/opened_audio`
+    try {
+      fileIo.mkdirSync(dir, true)
+    } catch (_error) {
+    }
+    const rawName = uri.slice(uri.lastIndexOf('/') + 1)
+    let name = rawName
+    try {
+      name = decodeURIComponent(rawName)
+    } catch (_error) {
+    }
+    const safe = (name || `audio_${Date.now()}`).replace(/[\\/:*?"<>|]+/g, '_')
+    const dest = `${dir}/${Date.now()}_${safe}`
+    let playable = false
+    try {
+      const src = fileIo.openSync(uri, fileIo.OpenMode.READ_ONLY)
+      const dst = fileIo.openSync(dest,
+        fileIo.OpenMode.READ_WRITE | fileIo.OpenMode.CREATE | fileIo.OpenMode.TRUNC)
+      try {
+        const chunk = new ArrayBuffer(256 * 1024)
+        while (true) {
+          const count = fileIo.readSync(src, chunk)
+          if (count <= 0) { break }
+          fileIo.writeSync(dst, chunk.slice(0, count))
+        }
+        playable = true
+      } finally {
+        fileIo.closeSync(src)
+        fileIo.closeSync(dst)
+      }
+    } catch (error) {
+      console.error(`[HomeIndex] copy opened audio failed: ${JSON.stringify(error)}`)
+    }
+    const dot = safe.lastIndexOf('.')
+    const song: songItemType = {
+      id: `local:${Date.now()}`,
+      name: dot > 0 ? safe.slice(0, dot) : safe,
+      author: '本地音乐',
+      img: '',
+      url: '',
+      localUri: playable ? fileUri.getUriFromPath(dest) : uri,
+      localManaged: playable,
+      localFormat: dot > 0 ? safe.slice(dot + 1).toLowerCase() : ''
+    }
+    try {
+      await playerController.setQueue([song], 0, true)
+      setTimeout(() => {
+        this.pageStack.pushPathByName('PlayPage', null)
+      }, 240)
+    } catch (error) {
+      console.error(`[HomeIndex] play opened audio failed: ${JSON.stringify(error)}`)
     }
   }
 
@@ -197,6 +272,8 @@ struct HomeIndex {
       SettingsPage()
     } else if (name === 'DeviceManagementPage') {
       DeviceManagementPage()
+    } else if (name === 'DeviceDetailPage') {
+      DeviceDetailPage({ pageParam: param as DeviceDetailParam })
     } else if (name === 'FanClubListPage') {
       FanClubListPage()
     } else if (name === 'FanClubDetailPage') {
@@ -267,6 +344,8 @@ struct HomeIndex {
       ImageCropPage({ pageParam: param as ImageCropPageParam })
     } else if (name === 'ImagePreviewPage') {
       ImagePreviewPage({ pageParam: param as ImagePreviewPageParam })
+    } else if (name === 'RingtonePage') {
+      RingtonePage({ pageParam: param as RingtonePageParam })
     }
   }
 
@@ -371,7 +450,8 @@ struct HomeIndex {
       }
       .width('100%')
       .onAreaChange((_old: Area, area: Area) => {
-        this.pageHeight = px2vp(Number(area.height))
+        // Area.height 已是 vp，再 px2vp 会让 Dock 背景图跑到屏幕中部
+        this.pageHeight = Number(area.height)
       })
       .height('100%')
       .backgroundColor(TC.pageBackground())

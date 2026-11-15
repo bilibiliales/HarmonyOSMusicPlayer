@@ -87,10 +87,39 @@ export struct ImageCropPage {
   private readonly pngFormat: string = 'image/png'
 
   async aboutToAppear(): Promise<void> {
-    this.currentPath = this.pageParam.sourcePath
+    this.currentPath = await this.prepareSource(this.pageParam.sourcePath)
     this.aspect = this.pageParam.aspect
     this.buildPresets()
     await this.loadImage()
+  }
+
+  /**
+   * 相册 picker 返回的是 file://media/Photo/... 这类媒体库 URI，
+   * Image 组件无法直接渲染（表现就是只剩裁剪框、没有画面）。
+   * 先按 fd 读字节落成沙箱普通文件，显示与后续裁剪都用这个真实路径。
+   */
+  private async prepareSource(source: string): Promise<string> {
+    if (!source.startsWith('file://')) { return source }
+    try {
+      const context = this.getUIContext().getHostContext() as common.UIAbilityContext
+      const dir = `${context.cacheDir}/crop_src`
+      if (!fileIo.accessSync(dir)) { fileIo.mkdirSync(dir) }
+      const extMatch = source.match(/\.(png|jpe?g|webp|gif|bmp|heic)(?:\?|$)/i)
+      const ext = extMatch ? `.${extMatch[1].toLowerCase()}` : '.jpg'
+      const dest = `${dir}/src_${Date.now()}${ext}`
+      const buffer = await this.readBytes(source)
+      const target = await fileIo.open(dest,
+        fileIo.OpenMode.READ_WRITE | fileIo.OpenMode.CREATE | fileIo.OpenMode.TRUNC)
+      try {
+        await fileIo.write(target.fd, buffer)
+      } finally {
+        await fileIo.close(target)
+      }
+      this.workingCopies.push(dest)
+      return dest
+    } catch (_error) {
+      return source
+    }
   }
 
   aboutToDisappear(): void {
@@ -257,8 +286,10 @@ export struct ImageCropPage {
   }
 
   private onEditorArea(area: Area): void {
-    const w = px2vp(Number(area.width))
-    const h = px2vp(Number(area.height))
+    // Area.width/height 已经是 vp，不能再 px2vp（会把编辑区缩小约 3 倍，
+    // 裁剪框与图片都会挤到左上角）
+    const w = Number(area.width)
+    const h = Number(area.height)
     if (w <= 0 || h <= 0) { return }
     if (Math.abs(w - this.editorW) < 0.5 && Math.abs(h - this.editorH) < 0.5) { return }
     this.editorW = w

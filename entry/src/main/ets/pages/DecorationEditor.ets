@@ -1092,9 +1092,14 @@ export struct DecorationEditorPage {
       .borderRadius(16)
       .clip(true)
       .onAreaChange((_old: Area, area: Area) => {
-        // onAreaChange 返回 px，position/offset 用 vp，统一换算
-        this.stageW = px2vp(Number(area.width))
-        this.stageH = px2vp(Number(area.height))
+        // Area 的 width/height 已经是 vp；再做 px2vp 会把舞台缩小约 3 倍，
+        // 导致黑胶 / 控制区全挤在左上角、下面一大片空白。
+        const w = Number(area.width)
+        const h = Number(area.height)
+        if (w > 0 && h > 0) {
+          this.stageW = w
+          this.stageH = h
+        }
       })
 
       Text('点选图层后可拖动；滑杆可精调位置与大小')

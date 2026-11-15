@@ -38,6 +38,7 @@ import { ShareSheet } from '../components/ShareSheet'
 import { VinylRecord } from '../components/VinylRecord'
 import { PlayerBackdrop } from '../components/PlayerBackdrop'
 import { HeartBurst } from '../components/HeartBurst'
+import { RingtonePageParam } from './RingtonePage'
 import { PlayerStyleConfig } from '../models/decoration'
 import { DecoKeys } from '../services/DecorationRuntime'
 import { DecoColor } from '../services/DecorationColor'
@@ -1682,7 +1683,27 @@ export struct Play {
       .width('100%').height(68).padding({ left: 20, right: 20 })
       .enabled(!this.simiInserting && this.playerStore.currentSong.id.length > 0)
       .onClick(() => this.insertSimilarSong())
+      Row({ space: 14 }) {
+        SymbolGlyph($r('sys.symbol.bell_fill')).fontSize(22).fontColor([TC.textPrimary()])
+        Column({ space: 4 }) {
+          Text('设为铃声').fontSize(15).fontColor(TC.textPrimary())
+          Text('裁剪一段作为闹钟、短信、通知或来电铃声').fontSize(11).fontColor(TC.textTertiary())
+        }
+        .layoutWeight(1).alignItems(HorizontalAlign.Start)
+        SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(16).fontColor([TC.textTertiary()])
+      }
+      .width('100%').height(68).padding({ left: 20, right: 20 })
+      .enabled(this.playerStore.currentSong.id.length > 0)
+      .onClick(() => this.openRingtonePage())
     }
+  }
+
+  private openRingtonePage(): void {
+    const song = this.playerStore.currentSong
+    if (!song || !song.id) { return }
+    this.activeSheet = ''
+    const param: RingtonePageParam = { song: song }
+    this.pageStack.pushPathByName('RingtonePage', param)
   }
 
 
@@ -1847,7 +1868,7 @@ export struct Play {
         }
       }
       .width('100%')
-      .height(this.activeSheet === 'quality' || this.activeSheet === 'downloadQuality' ? '62%' : this.activeSheet === 'more' ? '38%' : '68%')
+      .height(this.activeSheet === 'quality' || this.activeSheet === 'downloadQuality' ? '62%' : this.activeSheet === 'more' ? '56%' : '68%')
       .backgroundColor(TC.surfaceCard())
       .borderRadius({ topLeft: 28, topRight: 28 })
       .shadow({ radius: 28, color: 'rgba(0,0,0,0.45)', offsetY: -5 })

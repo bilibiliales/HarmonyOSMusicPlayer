@@ -2,12 +2,13 @@ import { fileIo, fileUri } from '@kit.CoreFileKit'
 import { http } from '@kit.NetworkKit'
 import { AppSettings } from './AppSettings'
 import { ApiClient } from './ApiClient'
-import { LyricResponse } from '../models/api'
+import { LyricResponse, mapApiSong, SongDetailResponse } from '../models/api'
 import { songItemType } from '../models/music'
 import { SystemLrc } from './SystemLrc'
 
 export class SongMetadataCache {
   private static pending: Map<string, Promise<LyricResponse>> = new Map()
+  private static coverUrls: Map<string, string> = new Map()
 
   static lrc(response: LyricResponse): string {
     const standard = SystemLrc.normalize(response.lrc?.lyric || '')
@@ -23,11 +24,16 @@ export class SongMetadataCache {
   }
 
   static async lyrics(song: songItemType): Promise<LyricResponse> {
+    const catalog = /^\d+$/.test(song.id)
     if (song.localLrc || song.localYrc) {
-      return { code: 200, lrc: { version: 1, lyric: song.localLrc || '' }, yrc: { version: 1, lyric: song.localYrc || '' },
-        tlyric: { version: 1, lyric: song.localTranslation || '' } }
+      const local: LyricResponse = {
+        code: 200, lrc: { version: 1, lyric: song.localLrc || '' }, yrc: { version: 1, lyric: song.localYrc || '' },
+        tlyric: { version: 1, lyric: song.localTranslation || '' }
+      }
+      // 本地歌词能解析成系统 LRC 就直接用；解析不出时间戳（纯文本）时才回落线上。
+      if (!catalog || SongMetadataCache.lrc(local).length > 0) { return local }
     }
-    if (!/^\d+$/.test(song.id)) { return { code: 200, nolyric: true } }
+    if (!catalog) { return { code: 200, nolyric: true } }
     const path = AppSettings.context ? AppSettings.context.filesDir + '/lyrics_' + song.id + '.json' : ''
     if (path) {
       try {
@@ -35,13 +41,21 @@ export class SongMetadataCache {
         if (cached.code === 200 && (cached.lrc?.lyric || cached.yrc?.lyric)) { return cached }
       } catch (_error) {}
     }
-    // Local playback never waits on the network; matching/download caches metadata explicitly.
-    if (song.localUri) { return { code: 200, nolyric: true } }
+    // 已匹配到线上歌曲的本地音乐同样可以补歌词（此前在这里直接返回「暂无歌词」，
+    // 导致本地播放时播控拿不到 lyric）。
     const existing = SongMetadataCache.pending.get(song.id)
     if (existing) { return await existing }
     const job = SongMetadataCache.fetch(song.id, path)
     SongMetadataCache.pending.set(song.id, job)
-    try { return await job } finally { if (SongMetadataCache.pending.get(song.id) === job) { SongMetadataCache.pending.delete(song.id) } }
+    try {
+      return await job
+    } catch (error) {
+      // 本地播放不因联网失败中断：当作「暂无歌词」。
+      if (song.localUri) { return { code: 200, nolyric: true } }
+      throw new Error(error instanceof Error ? error.message : '歌词获取失败')
+    } finally {
+      if (SongMetadataCache.pending.get(song.id) === job) { SongMetadataCache.pending.delete(song.id) }
+    }
   }
 
   private static async fetch(id: string, path: string): Promise<LyricResponse> {
@@ -54,6 +68,26 @@ export class SongMetadataCache {
       } catch (_error) {}
     }
     return result
+  }
+
+  /**
+   * 按歌曲 id 取线上封面地址（本地音乐只存了沙箱封面文件时，
+   * 播控需要一份系统可访问的网图地址做兜底）。
+   */
+  static async remoteCover(id: string): Promise<string> {
+    if (!/^\d+$/.test(id)) { return '' }
+    const cached = SongMetadataCache.coverUrls.get(id)
+    if (cached !== undefined) { return cached }
+    try {
+      const response = await ApiClient.get<SongDetailResponse>('/song/detail', [{ key: 'ids', value: id }])
+      const songs = response.songs
+      const url = songs && songs.length > 0 ? mapApiSong(songs[0]).img : ''
+      const value = /^https?:\/\//.test(url) ? url : ''
+      SongMetadataCache.coverUrls.set(id, value)
+      return value
+    } catch (_error) {
+      return ''
+    }
   }
 
   static async cover(id: string, url: string): Promise<string> {

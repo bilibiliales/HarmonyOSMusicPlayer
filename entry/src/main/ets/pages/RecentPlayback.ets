@@ -100,8 +100,21 @@ export struct RecentPlaybackPage {
           }.width('100%').height(46).scrollable(ScrollDirection.Horizontal).scrollBar(BarState.Off)
         }
         if (this.canPlayAll()) {
-          Button(`播放全部 ${this.songs.length}`).backgroundColor(TC.accent()).fontColor(TC.textPrimary())
-            .margin(12).enabled(!this.loading && this.songs.length > 0).onClick(() => this.play(0))
+          Row() {
+            Row({ space: 8 }) {
+              SymbolGlyph($r('sys.symbol.play_fill')).fontSize(18).fontColor([TC.textPrimary()])
+              Text(`播放全部${this.songs.length > 0 ? ` (${this.songs.length})` : ''}`)
+                .fontSize(14).fontWeight(FontWeight.Medium).fontColor(TC.textPrimary())
+            }
+            .layoutWeight(1)
+            SymbolGlyph($r('sys.symbol.arrow_clockwise')).fontSize(20).fontColor([TC.textSecondary()])
+              .onClick(() => this.load())
+          }
+          .width('100%')
+          .height(56)
+          .padding({ left: 18, right: 18 })
+          .enabled(!this.loading && this.songs.length > 0)
+          .onClick(() => this.play(0))
         }
         if (!this.authStore.loggedIn || this.owner !== this.authStore.userId) {
           Text('请登录查看自己的最近播放').fontColor(TC.textTertiary())

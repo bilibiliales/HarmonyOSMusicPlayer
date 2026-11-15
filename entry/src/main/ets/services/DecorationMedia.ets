@@ -21,7 +21,7 @@ export class DecorationMedia {
     if (result.photoUris.length === 0) {
       return ''
     }
-    return DecorationMedia.copyToSandbox(context, result.photoUris[0], 'image')
+    return await DecorationMedia.copyToSandbox(context, result.photoUris[0], 'image')
   }
 
   /** 选一个视频，返回沙箱路径；取消返回空串。 */
@@ -34,23 +34,35 @@ export class DecorationMedia {
     if (result.photoUris.length === 0) {
       return ''
     }
-    return DecorationMedia.copyToSandbox(context, result.photoUris[0], 'video')
+    return await DecorationMedia.copyToSandbox(context, result.photoUris[0], 'video')
+  }
+
+  /** 相册 URI 只读 fd 读成字节；copyFileSync(fd,fd) 在部分机型上会失败，改用读写字节。 */
+  private static async readAll(uri: string): Promise<ArrayBuffer> {
+    const file = await fileIo.open(uri, fileIo.OpenMode.READ_ONLY)
+    try {
+      const size = (await fileIo.stat(file.fd)).size
+      const buffer = new ArrayBuffer(size)
+      await fileIo.read(file.fd, buffer)
+      return buffer
+    } finally {
+      await fileIo.close(file)
+    }
   }
 
   /** 把相册 URI 复制进沙箱，返回新路径；失败返回原 URI（至少本次会话可用）。 */
-  static copyToSandbox(context: common.Context, uri: string, fallbackKind: string): string {
+  static async copyToSandbox(context: common.Context, uri: string, fallbackKind: string): Promise<string> {
     try {
       const dir = DecorationMedia.ensureDir(context)
       const ext = DecorationMedia.extensionOf(uri, fallbackKind)
       const dest = `${dir}/deco_${Date.now()}_${Math.floor(Math.random() * 1000)}${ext}`
-      const source = fileIo.openSync(uri, fileIo.OpenMode.READ_ONLY)
-      const target = fileIo.openSync(dest,
+      const buffer = await DecorationMedia.readAll(uri)
+      const target = await fileIo.open(dest,
         fileIo.OpenMode.READ_WRITE | fileIo.OpenMode.CREATE | fileIo.OpenMode.TRUNC)
       try {
-        fileIo.copyFileSync(source.fd, target.fd)
+        await fileIo.write(target.fd, buffer)
       } finally {
-        fileIo.closeSync(source)
-        fileIo.closeSync(target)
+        await fileIo.close(target)
       }
       return dest
     } catch (_error) {

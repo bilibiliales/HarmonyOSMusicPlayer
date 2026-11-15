@@ -15,7 +15,7 @@ import { ApiClient } from '../services/ApiClient'
 import { AuthStore } from '../stores/AuthStore'
 import {
   buildListeningPeriod, ListeningDay, ListeningPeriod, listeningDayBackground, listeningDayColor,
-  listeningPeriodEnd, listeningPeriodOffsetLabel, listeningPeriodStart, listeningPeriodTitle
+  listeningPeriodEnd, listeningPeriodOffsetLabel, listeningPeriodTitle, listeningTimeValue
 } from '../services/ListeningFootprint'
 import { TC } from '../services/ThemeColors'
 
@@ -40,6 +40,9 @@ export struct ListeningStatsPage {
   @State weekOffset: number = 0
   @State monthOffset: number = 0
   @State switching: boolean = false
+  /** 不带 endTime 请求返回的 endTime，作为所有翻页的唯一基准（毫秒）。 */
+  @State weekBaseEnd: number = 0
+  @State monthBaseEnd: number = 0
 
   /** 已翻过的周期缓存，来回切换不再重复请求。 */
   private reportCache: Map<string, ListenReportData> = new Map<string, ListenReportData>()
@@ -48,6 +51,29 @@ export struct ListeningStatsPage {
   private cacheKey(period: string, offset: number): string { return `${period}:${offset}` }
   private offsetFor(period: string): number { return period === 'week' ? this.weekOffset : this.monthOffset }
   private activeOffset(): number { return this.offsetFor(this.currentPeriod) }
+  private baseEndFor(period: string): number { return period === 'week' ? this.weekBaseEnd : this.monthBaseEnd }
+
+  /** 只用接口基准递减，offset=0 不传 endTime。 */
+  private endTimeFor(period: string, offset: number): number {
+    return listeningPeriodEnd(period, this.baseEndFor(period), offset)
+  }
+
+  /** 首次（不传 endTime）成功后记录基准；缺 endTime 时用 startTime 补算。 */
+  private calibrateBase(period: string, data: ListenReportData): void {
+    let end = listeningTimeValue(data.endTime)
+    const start = listeningTimeValue(data.startTime)
+    if (end <= 0 && start > 0) {
+      if (period === 'week') {
+        end = start + 6 * 24 * 60 * 60 * 1000
+      } else {
+        const d = new Date(start)
+        const days = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate()
+        end = start + (days - 1) * 24 * 60 * 60 * 1000
+      }
+    }
+    if (end <= 0) { return }
+    if (period === 'week') { this.weekBaseEnd = end } else { this.monthBaseEnd = end }
+  }
 
   private activeReport(): ListenReportData | null { return this.currentPeriod === 'week' ? this.weekReport : this.monthReport }
   private activeChart(): ListeningPeriod | null { return this.currentPeriod === 'week' ? this.weekChart : this.monthChart }
@@ -55,7 +81,8 @@ export struct ListeningStatsPage {
 
   private activeChartTitle(): string {
     const chart = this.activeChart()
-    return chart ? chart.title : listeningPeriodTitle(this.currentPeriod, this.activeOffset())
+    return chart ? chart.title :
+      listeningPeriodTitle(this.currentPeriod, this.baseEndFor(this.currentPeriod), this.activeOffset())
   }
 
   /** 下一周期：最多回到最新的本周/本月，不能翻到未来。 */
@@ -65,7 +92,7 @@ export struct ListeningStatsPage {
   private canGoOlder(): boolean {
     const next = this.activeOffset() - 1
     if (this.currentPeriod === 'week' ? next < -104 : next < -60) { return false }
-    return listeningPeriodEnd(this.currentPeriod, next) > 0
+    return this.endTimeFor(this.currentPeriod, next) > 0
   }
 
   private switchPeriod(period: string): void {
@@ -103,12 +130,9 @@ export struct ListeningStatsPage {
     // 异步返回时用户可能已翻到别的周期，此时结果只留在缓存里，不覆盖当前展示
     if (this.offsetFor(period) !== offset) { return }
     const monthly = period === 'month'
-    // 当前周期仍按接口 startTime 对齐；历史周期用本地锚点，避免短日期被解析到当前月
+    // 日期网格与标题一律以接口返回的 startTime 为准，不再用本地日期推算
     let chart: ListeningPeriod | null = null
-    if (data) {
-      chart = offset === 0 ? buildListeningPeriod(data, monthly) :
-        buildListeningPeriod(data, monthly, new Date(), listeningPeriodStart(period, offset))
-    }
+    if (data) { chart = buildListeningPeriod(data, monthly) }
     if (period === 'week') {
       this.weekReport = data
       this.weekChart = chart
@@ -130,7 +154,7 @@ export struct ListeningStatsPage {
       this.applyReport(period, offset, null, this.emptyCache.get(key) || '暂无该周期的听歌足迹')
       return
     }
-    const endTime = listeningPeriodEnd(period, offset)
+    const endTime = this.endTimeFor(period, offset)
     try {
       let response = await this.fetchReport(period, endTime, false)
       // 时间戳单位自适应：某些部署的 endTime 只认秒级，毫秒无数据时再试一次
@@ -141,6 +165,14 @@ export struct ListeningStatsPage {
       if (response.code !== 200 || !data) {
         throw new Error(response.message || '暂无该周期的听歌足迹')
       }
+      // 防止接口忽略 endTime 又返回默认周期：返回的 endTime 必须与请求的周期标识一致
+      if (endTime > 0) {
+        const returnedEnd = listeningTimeValue(data.endTime)
+        if (returnedEnd > 0 && Math.abs(returnedEnd - endTime) > 3 * 24 * 60 * 60 * 1000) {
+          throw new Error('该周期暂无听歌足迹')
+        }
+      }
+      if (offset === 0) { this.calibrateBase(period, data) }
       this.reportCache.set(key, data)
       this.applyReport(period, offset, data, '')
     } catch (error) {
@@ -262,12 +294,12 @@ export struct ListeningStatsPage {
   }
 
   @Builder
-  private TopSongSection(report: ListenReportData | null) {
+  private TopSongSection(report: ListenReportData | null, label: string) {
     if (report?.topSongBlock?.sections?.length) {
       Column({ space: 18 }) {
         Row({ space: 18 }) {
           Column({ space: 16 }) {
-            this.CardHeading(`${this.periodLabel()}\n单曲`)
+            this.CardHeading(`${label}\n单曲`)
             Text('TOP').fontSize(15).fontWeight(FontWeight.Bold).fontColor(TC.accentSoft())
             Text(report.topSongBlock.sections[0].text || '').fontSize(30).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary())
             Text(report.topSongBlock.sections[0].songName || '').fontSize(23).fontWeight(FontWeight.Bold)
@@ -292,12 +324,12 @@ export struct ListeningStatsPage {
   }
 
   @Builder
-  private TopArtistSection(report: ListenReportData | null) {
+  private TopArtistSection(report: ListenReportData | null, label: string) {
     if (report?.topArtistBlock?.sections?.length) {
       Column({ space: 18 }) {
         Row({ space: 18 }) {
           Column({ space: 14 }) {
-            this.CardHeading(`${this.periodLabel()}\n音乐人`)
+            this.CardHeading(`${label}\n音乐人`)
             Text('TOP').fontSize(15).fontColor(TC.accentSoft()).fontWeight(FontWeight.Bold)
             Text(report.topArtistBlock.sections[0].text || '').fontSize(28).fontColor(TC.textPrimary()).fontWeight(FontWeight.Bold)
             Text(report.topArtistBlock.sections[0].artistName || '').fontSize(22).fontColor(TC.textBody()).maxLines(2)
@@ -319,10 +351,10 @@ export struct ListeningStatsPage {
   }
 
   @Builder
-  private StyleSection(report: ListenReportData | null) {
+  private StyleSection(report: ListenReportData | null, label: string) {
     if (report?.topStyleBlock?.sections?.length) {
       Column({ space: 18 }) {
-        this.CardHeading(`${this.periodLabel()}曲风`)
+        this.CardHeading(`${label}曲风`)
         Column({ space: 6 }) {
           Text('TOP').fontSize(15).fontColor(TC.accentSoft()).fontWeight(FontWeight.Bold)
           Text(report.topStyleBlock.genreName || report.topStyleBlock.sections[0].genreName || '')
@@ -343,10 +375,10 @@ export struct ListeningStatsPage {
   }
 
   @Builder
-  private AgeSection(report: ListenReportData | null) {
+  private AgeSection(report: ListenReportData | null, label: string) {
     if (report?.topAgeBlock?.sections?.length) {
       Column({ space: 22 }) {
-        this.CardHeading(`${this.periodLabel()}听歌年代`)
+        this.CardHeading(`${label}听歌年代`)
         ForEach(report.topAgeBlock.sections, (section: ListenReportAgeSection) => {
           Row({ space: 16 }) {
             Text(section.age || '').width(72).fontSize(19).fontWeight(FontWeight.Bold).fontColor(TC.textBody())
@@ -363,10 +395,10 @@ export struct ListeningStatsPage {
   }
 
   @Builder
-  private LanguageSection(report: ListenReportData | null) {
+  private LanguageSection(report: ListenReportData | null, label: string) {
     if (report?.topLanguageBlock?.sections?.length) {
       Column({ space: 20 }) {
-        this.CardHeading(`${this.periodLabel()}听歌语言`)
+        this.CardHeading(`${label}听歌语言`)
         Row({ space: 12 }) {
           ForEach(report.topLanguageBlock.sections.slice(0, 3), (section: ListenReportLanguageSection, index: number) => {
             Column({ space: 7 }) {
@@ -398,7 +430,7 @@ export struct ListeningStatsPage {
   }
 
   @Builder
-  private TimeDistributionSection(report: ListenReportData | null) {
+  private TimeDistributionSection(report: ListenReportData | null, label: string) {
     if (report?.listenTimeBlock?.circleTimePeriodDurations?.length) {
       Column({ space: 20 }) {
         this.CardHeading('听歌时段分布')
@@ -560,9 +592,9 @@ export struct ListeningStatsPage {
   }
 
   @Builder
-  private DurationCard(chart: ListeningPeriod) {
+  private DurationCard(chart: ListeningPeriod, label: string) {
     Column({ space: 12 }) {
-      this.CardHeading(`${this.periodLabel()}收听时长`)
+      this.CardHeading(`${label}收听时长`)
       Text() {
         if (chart.totalMinutes >= 60) {
           Span(Math.floor(chart.totalMinutes / 60).toString()).fontSize(44).fontWeight(FontWeight.Bold)
@@ -592,14 +624,14 @@ export struct ListeningStatsPage {
   }
 
   @Builder
-  private ReportDetail(report: ListenReportData | null) {
+  private ReportDetail(report: ListenReportData | null, label: string) {
     Column({ space: 12 }) {
-      this.TopSongSection(report)
-      this.TopArtistSection(report)
-      this.StyleSection(report)
-      this.AgeSection(report)
-      this.LanguageSection(report)
-      this.TimeDistributionSection(report)
+      this.TopSongSection(report, label)
+      this.TopArtistSection(report, label)
+      this.StyleSection(report, label)
+      this.AgeSection(report, label)
+      this.LanguageSection(report, label)
+      this.TimeDistributionSection(report, label)
     }
   }
 
@@ -638,15 +670,13 @@ export struct ListeningStatsPage {
             Column({ space: 16 }) {
 
               if (this.activeChart()) {
-                Text(this.activeChart()!.title).width('100%').fontSize(16).fontWeight(FontWeight.Medium)
-                  .fontColor(TC.textBody()).textAlign(TextAlign.Center).margin({ top: 4, bottom: 4 })
-                // Distinct branches recreate value-parameter builders when the period changes.
+                // 周期标题只保留导航条那一份；label 随周期变化，强制有参 builder 重建
                 if (this.currentPeriod === 'week' && this.weekChart) {
-                  this.DurationCard(this.weekChart)
-                  this.ReportDetail(this.weekReport)
+                  this.DurationCard(this.weekChart, this.periodLabel())
+                  this.ReportDetail(this.weekReport, this.periodLabel())
                 } else if (this.currentPeriod === 'month' && this.monthChart) {
-                  this.DurationCard(this.monthChart)
-                  this.ReportDetail(this.monthReport)
+                  this.DurationCard(this.monthChart, this.periodLabel())
+                  this.ReportDetail(this.monthReport, this.periodLabel())
                 }
               } else {
                 Text(this.activeMessage() || '暂无该周期的听歌数据').width('100%').fontSize(13)
