@@ -1,4 +1,5 @@
 import { LocalMusicPage } from './LocalMusic'
+import { DecorationMedia } from '../services/DecorationMedia'
 import { YunbeiPage } from './Yunbei'
 import { songItemType, TabClass, playlistType } from '../models'
 import { tabsData } from '../constants'
@@ -410,7 +411,7 @@ struct HomeIndex {
 
         // 底部导航背景图：画在 Tabs 之下，Tab 栏背景改透明透出
         if (this.dockBgImage) {
-          Image(this.dockBgImage)
+          Image(DecorationMedia.displayUri(this.dockBgImage))
             .width('100%')
             .height(60)
             .objectFit(ImageFit.Cover)

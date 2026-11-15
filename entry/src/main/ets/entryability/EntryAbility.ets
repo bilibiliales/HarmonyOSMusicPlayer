@@ -35,11 +35,22 @@ export default class EntryAbility extends UIAbility {
     }
   }
 
-  /** 应用被系统的「打开方式」拉起时，把音频 URI 交给界面层播放。 */
+  /** 应用被系统的「打开方式 / FileOpen」拉起时，把音频 URI 交给界面层播放。 */
   private handleOpenAudioWant(want: Want): void {
-    const uri = want.uri;
+    // 文件管理器既可能只给 action，也可能只给 linkFeature 或 UTD type，
+    // 三种都要认，否则注册成功也收不到文件。
+    const params = want.parameters;
+    const feature = params ? params['linkFeature'] : undefined;
+    const isFileOpen = want.action === 'ohos.want.action.viewData' ||
+      (typeof feature === 'string' && feature === 'FileOpen') ||
+      (typeof want.type === 'string' && want.type.indexOf('audio') >= 0);
+    if (!isFileOpen) { return; }
+    let uri: string = want.uri || '';
+    if (!uri && params) {
+      const alt = params['uri'];
+      if (typeof alt === 'string') { uri = alt; }
+    }
     if (!uri || uri.length === 0) { return; }
-    if (want.action !== 'ohos.want.action.viewData') { return; }
     AppStorage.setOrCreate<string>('openAudioUri', uri);
     const seq = AppStorage.get<number>('openAudioSeq') ?? 0;
     AppStorage.setOrCreate<number>('openAudioSeq', seq + 1);

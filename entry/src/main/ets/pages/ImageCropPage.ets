@@ -1,5 +1,5 @@
 import { common } from '@kit.AbilityKit'
-import { fileIo } from '@kit.CoreFileKit'
+import { fileIo, fileUri } from '@kit.CoreFileKit'
 import { image } from '@kit.ImageKit'
 import { DecoRatio, ImageCropPageParam } from '../models/decoration'
 import { DecorationMedia } from '../services/DecorationMedia'
@@ -66,6 +66,8 @@ export struct ImageCropPage {
   @State cropW: number = 0
   @State cropH: number = 0
   @State currentPath: string = ''
+  /** Image 组件用的地址（沙箱裸路径要转 file:// URI），与 currentPath 分离。 */
+  @State displayPath: string = ''
   @State resultPath: string = ''
   @State resultSize: string = ''
   @State tip: string = '正在读取图片…'
@@ -95,31 +97,42 @@ export struct ImageCropPage {
 
   /**
    * 相册 picker 返回的是 file://media/Photo/... 这类媒体库 URI，
-   * Image 组件无法直接渲染（表现就是只剩裁剪框、没有画面）。
-   * 先按 fd 读字节落成沙箱普通文件，显示与后续裁剪都用这个真实路径。
+   * Image 组件和 ImageKit 都不能稳定直接读（表现就是只剩裁剪框、没有画面）。
+   * 先按 fd 循环读字节落成沙箱普通文件，显示与后续裁剪都用这个真实路径。
    */
   private async prepareSource(source: string): Promise<string> {
-    if (!source.startsWith('file://')) { return source }
-    try {
-      const context = this.getUIContext().getHostContext() as common.UIAbilityContext
-      const dir = `${context.cacheDir}/crop_src`
-      if (!fileIo.accessSync(dir)) { fileIo.mkdirSync(dir) }
-      const extMatch = source.match(/\.(png|jpe?g|webp|gif|bmp|heic)(?:\?|$)/i)
-      const ext = extMatch ? `.${extMatch[1].toLowerCase()}` : '.jpg'
-      const dest = `${dir}/src_${Date.now()}${ext}`
-      const buffer = await this.readBytes(source)
-      const target = await fileIo.open(dest,
-        fileIo.OpenMode.READ_WRITE | fileIo.OpenMode.CREATE | fileIo.OpenMode.TRUNC)
-      try {
-        await fileIo.write(target.fd, buffer)
-      } finally {
-        await fileIo.close(target)
-      }
-      this.workingCopies.push(dest)
-      return dest
-    } catch (_error) {
+    if (!source || source.length === 0) { return '' }
+    if (!/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(source)) {
+      this.displayPath = DecorationMedia.displayUri(source)
       return source
     }
+    const context = this.getUIContext().getHostContext() as common.UIAbilityContext
+    const attempts: string[] = [source]
+    if (source.startsWith('file://')) {
+      try {
+        attempts.push(new fileUri.FileUri(source).path)
+      } catch (_error) {
+      }
+    }
+    let lastError: string = ''
+    for (const candidate of attempts) {
+      try {
+        const path = await DecorationMedia.materialize(context, candidate)
+        if (path && path !== source) {
+          this.workingCopies.push(path)
+        }
+        this.displayPath = DecorationMedia.displayUri(path)
+        console.info(`[ImageCrop] source materialized: ${path}`)
+        return path
+      } catch (error) {
+        lastError = error instanceof Error ? error.message : '未知错误'
+      }
+    }
+    // 落地失败时仍把原 URI 交给 Image 搏一次，并把原因显示出来便于定位
+    this.displayPath = DecorationMedia.displayUri(source)
+    this.tip = `图片读取失败：${lastError || '无法复制所选图片'}`
+    console.error(`[ImageCrop] materialize failed: ${lastError}`)
+    return source
   }
 
   aboutToDisappear(): void {
@@ -151,13 +164,23 @@ export struct ImageCropPage {
     this.ratioIndex = index
   }
 
+  /** 一次 read 不保证读满，大图被截断会让 ImageSource 解不出尺寸 → 空白页。 */
   private async readBytes(path: string): Promise<ArrayBuffer> {
     const file = await fileIo.open(path, fileIo.OpenMode.READ_ONLY)
     try {
       const size = (await fileIo.stat(file.fd)).size
       const buffer = new ArrayBuffer(size)
-      await fileIo.read(file.fd, buffer)
-      return buffer
+      const view = new Uint8Array(buffer)
+      let offset = 0
+      while (offset < size) {
+        const want = Math.min(256 * 1024, size - offset)
+        const chunk = new ArrayBuffer(want)
+        const count = await fileIo.read(file.fd, chunk, { offset: offset, length: want })
+        if (count <= 0) { break }
+        view.set(new Uint8Array(chunk, 0, count), offset)
+        offset += count
+      }
+      return offset === size ? buffer : buffer.slice(0, offset)
     } finally {
       await fileIo.close(file)
     }
@@ -179,6 +202,7 @@ export struct ImageCropPage {
       if (this.imgWidth <= 0 || this.imgHeight <= 0) {
         throw new Error('图片尺寸无效')
       }
+      this.displayPath = DecorationMedia.displayUri(this.currentPath)
       this.loaded = true
       if (!this.finished) {
         this.tip = this.currentPath.toLowerCase().endsWith('.gif')
@@ -709,13 +733,20 @@ export struct ImageCropPage {
 
         // 编辑区
         Stack({ alignContent: Alignment.TopStart }) {
-          if (this.loaded && this.dispWidth() > 0) {
-            Image(this.currentPath)
+          if (this.loaded && this.displayPath.length > 0 && this.dispWidth() > 0) {
+            Image(this.displayPath)
               .width(this.dispWidth())
               .height(this.dispHeight())
               .objectFit(ImageFit.Fill)
               .interpolation(ImageInterpolation.High)
               .position({ x: this.imageLeft(), y: this.imageTop() })
+              .hitTestBehavior(HitTestMode.None)
+          } else if (this.loaded && this.displayPath.length > 0) {
+            // 编辑区尺寸还没回调时也要能看到图，否则会误以为「选图失败」
+            Image(this.displayPath)
+              .width('100%')
+              .height('100%')
+              .objectFit(ImageFit.Contain)
               .hitTestBehavior(HitTestMode.None)
           }
           if (this.editorW > 0 && this.cropW > 0 && this.cropH > 0) {
@@ -768,7 +799,7 @@ export struct ImageCropPage {
         // 裁剪结果预览
         if (this.resultPath) {
           Row({ space: 12 }) {
-            Image(this.resultPath)
+            Image(DecorationMedia.displayUri(this.resultPath))
               .height(54).width(54).borderRadius(8).objectFit(ImageFit.Contain)
               .backgroundColor(TC.surfaceInset())
             Column({ space: 3 }) {

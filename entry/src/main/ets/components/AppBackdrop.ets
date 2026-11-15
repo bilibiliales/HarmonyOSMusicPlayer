@@ -1,4 +1,5 @@
 import { DecoKeys } from '../services/DecorationRuntime'
+import { DecorationMedia } from '../services/DecorationMedia'
 
 /**
  * 全局页面背景层。
@@ -30,7 +31,7 @@ export struct AppBackdrop {
         .backgroundColor(this.bgColor ? this.bgColor : (this.isDark ? '#121215' : '#f4f4f7'))
 
       if (this.bgImage) {
-        Image(this.bgImage)
+        Image(DecorationMedia.displayUri(this.bgImage))
           .width('100%')
           .height('100%')
           .objectFit(ImageFit.Cover)

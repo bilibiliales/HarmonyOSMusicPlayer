@@ -1,5 +1,6 @@
 import { common } from '@kit.AbilityKit'
-import { fileUri } from '@kit.CoreFileKit'
+import { BusinessError } from '@kit.BasicServicesKit'
+import { fileIo } from '@kit.CoreFileKit'
 import { media } from '@kit.MediaKit'
 import { BubbleTip } from '../services/BubbleTip'
 import { RingtoneService, RINGTONE_TYPE_TITLES } from '../services/RingtoneService'
@@ -44,10 +45,25 @@ export struct RingtonePage {
   @State previewing: boolean = false
 
   private previewPlayer?: media.AVPlayer
+  private previewFd: number = -1
+  private previewPath: string = ''
+  private previewFallback: boolean = false
   private clipPath: string = ''
   private clipKey: string = ''
   private dragBaseStart: number = 0
   private dragBaseEnd: number = 0
+  private dragBaseLength: number = 0
+
+  /**
+   * 粗调系数与标签位置映射互为逆运算：标签 y = 秒数/总时长 * 可用高度，
+   * 所以每拖 1vp 正好对应「总时长 / 可用高度」秒，标签就能完全跟手。
+   */
+  private secondsPerVp(): number {
+    // 编辑区尺寸还没回调时用固定系数兜底，避免 usable≈1 时一拖就跳到结尾
+    if (this.durationSec <= 0 || this.lyricHeight < 60) { return 0.12 }
+    const usable = Math.max(1, this.lyricHeight - 26)
+    return this.durationSec / usable
+  }
 
   aboutToAppear(): void {
     const song = this.pageParam.song
@@ -157,29 +173,83 @@ export struct RingtonePage {
     return result
   }
 
+  /** 片段最大长度：不能超过当前铃声类型的上限，也不能超过歌曲本身长度。 */
+  private maxLength(): number {
+    const songLength = this.durationSec > 0 ? this.durationSec : this.maxSeconds
+    return Math.max(1, Math.min(this.maxSeconds, songLength))
+  }
+
+  /** 三处拖动共用的统一约束：0 <= start < end <= duration，且长度 <= 类型上限。 */
   private clampSelection(): void {
-    const maxEnd = Math.min(this.durationSec, this.startSec + this.maxSeconds)
-    if (this.endSec > maxEnd) { this.endSec = maxEnd }
+    const maxLen = this.maxLength()
+    if (this.startSec < 0) { this.startSec = 0 }
+    if (this.endSec > this.durationSec) { this.endSec = this.durationSec }
+    if (this.endSec - this.startSec > maxLen) {
+      this.endSec = this.startSec + maxLen
+    }
+    if (this.endSec > this.durationSec) {
+      this.endSec = this.durationSec
+      this.startSec = Math.max(0, this.endSec - maxLen)
+    }
     if (this.endSec - this.startSec < 1) {
       this.endSec = Math.min(this.durationSec, this.startSec + 1)
-      if (this.endSec - this.startSec < 1) {
-        this.startSec = Math.max(0, this.endSec - 1)
-      }
+      this.startSec = Math.max(0, this.endSec - 1)
     }
-    if (this.startSec < 0) { this.startSec = 0 }
+  }
+
+  /** 选区变化后让裁剪缓存失效（预览与保存都重新生成片段）。 */
+  private invalidateClip(): void {
+    this.clipKey = ''
   }
 
   private setStart(value: number): void {
-    const limit = Math.max(0, this.endSec - 1)
-    this.startSec = Math.min(limit, Math.max(0, value))
-    this.clipKey = ''
+    // 下界由「end - 最大长度」决定：往左拖也不会让片段超出类型上限
+    const floor = Math.max(0, this.endSec - this.maxLength())
+    const ceiling = Math.max(floor, this.endSec - 1)
+    this.startSec = Math.min(ceiling, Math.max(floor, value))
+    this.invalidateClip()
   }
 
   private setEnd(value: number): void {
-    const floor = this.startSec + 1
-    const ceiling = Math.min(this.durationSec, this.startSec + this.maxSeconds)
+    const ceiling = Math.min(this.durationSec, this.startSec + this.maxLength())
+    const floor = Math.min(ceiling, this.startSec + 1)
     this.endSec = Math.max(floor, Math.min(ceiling, value))
-    this.clipKey = ''
+    this.invalidateClip()
+  }
+
+  /** 三处拖动共用的起点记录：拖动开始即停掉正在播放的旧片段。 */
+  private beginDrag(): void {
+    this.dragBaseStart = this.startSec
+    this.dragBaseEnd = this.endSec
+    this.dragBaseLength = Math.max(1, this.endSec - this.startSec)
+    this.invalidateClip()
+    this.stopPreview()
+  }
+
+  /** 拖歌词区域：整体平移选区，保持已选长度不变。 */
+  private moveWindow(deltaSeconds: number): void {
+    const length = Math.max(1, this.dragBaseLength)
+    const maxStart = Math.max(0, this.durationSec - length)
+    const start = Math.min(maxStart, Math.max(0, this.dragBaseStart + deltaSeconds))
+    this.startSec = start
+    this.endSec = Math.min(this.durationSec, start + length)
+    this.invalidateClip()
+  }
+
+  /** 标签在歌词窗口里的纵向位置：与选区时间成比例，下方波形拖动时也会跟着走。 */
+  private markerY(seconds: number): number {
+    const usable = Math.max(0, this.lyricHeight - 26)
+    if (this.durationSec <= 0 || usable <= 0) { return 0 }
+    return Math.min(usable, Math.max(0, seconds / this.durationSec * usable))
+  }
+
+  private startMarkerY(): number {
+    return this.markerY(this.startSec)
+  }
+
+  private endMarkerY(): number {
+    const top = Math.max(0, this.lyricHeight - 26)
+    return Math.min(top, Math.max(this.startMarkerY() + 26, this.markerY(this.endSec)))
   }
 
   private selectType(index: number): void {
@@ -187,7 +257,8 @@ export struct RingtonePage {
     this.typeIndex = index
     this.maxSeconds = RingtoneService.maxSeconds(index)
     this.clampSelection()
-    this.clipKey = ''
+    this.invalidateClip()
+    this.stopPreview()
   }
 
   private async selectQuality(index: number): Promise<void> {
@@ -220,32 +291,106 @@ export struct RingtonePage {
     return clip.path
   }
 
+  /** 帧级裁剪直接在内存里生成，预览不经过文件 URI。 */
+  private clipData(): ArrayBuffer {
+    if (!this.audioPath) { return new ArrayBuffer(0) }
+    return RingtoneService.clipBytes(this.audioPath,
+      Math.round(this.startSec * 1000), Math.round(this.endSec * 1000))
+  }
+
+  private attachPreviewHandlers(player: media.AVPlayer): void {
+    player.on('stateChange', (state: media.AVPlayerState) => {
+      if (player !== this.previewPlayer) { return }
+      console.info(`[Ringtone] preview state: ${state}`)
+      if (state === 'initialized') {
+        player.prepare().catch((error: Error) => {
+          console.error(`[Ringtone] prepare failed: ${error.message}`)
+          this.stopPreview()
+        })
+      } else if (state === 'prepared') {
+        player.loop = true
+        player.play().catch((error: Error) => {
+          console.error(`[Ringtone] play failed: ${error.message}`)
+          this.stopPreview()
+        })
+      }
+    })
+    player.on('error', (error: BusinessError) => {
+      // 切换到 fdSrc 兜底后，旧实例可能还会补发 error，忽略避免误停新播放器
+      if (player !== this.previewPlayer) { return }
+      console.error(`[Ringtone] AVPlayer error ${error.code}: ${error.message}`)
+      this.onPreviewError(`${error.code} ${error.message}`)
+    })
+  }
+
+  private onPreviewError(reason: string): void {
+    if (!this.previewFallback && this.previewPath.length > 0) {
+      this.previewFallback = true
+      console.info('[Ringtone] fallback to fdSrc preview')
+      this.startFdPreview(this.previewPath)
+      return
+    }
+    this.stopPreview()
+    BubbleTip.show(this.getUIContext(), `试听失败：${reason}`)
+  }
+
+  /** 主路径：内存字节交给 AVPlayer.dataSrc，边播边按顺序喂数据。 */
+  private async startMemoryPreview(data: ArrayBuffer): Promise<void> {
+    const bytes = new Uint8Array(data)
+    let cursor = 0
+    const player = await media.createAVPlayer()
+    this.previewPlayer = player
+    this.attachPreviewHandlers(player)
+    const descriptor: media.AVDataSrcDescriptor = {
+      fileSize: -1,
+      callback: (buffer: ArrayBuffer, length: number): number => {
+        if (cursor >= bytes.length) { return -1 }
+        const count = Math.min(length, bytes.length - cursor)
+        new Uint8Array(buffer, 0, count).set(bytes.subarray(cursor, cursor + count))
+        cursor += count
+        return count
+      }
+    }
+    player.dataSrc = descriptor
+    this.previewing = true
+  }
+
+  /** 兜底：内存源解析不了时，改用已裁剪文件的 fdSrc 播放。 */
+  private async startFdPreview(path: string): Promise<void> {
+    await this.stopPreview()
+    try {
+      const player = await media.createAVPlayer()
+      this.previewPlayer = player
+      this.attachPreviewHandlers(player)
+      const file = fileIo.openSync(path, fileIo.OpenMode.READ_ONLY)
+      this.previewFd = file.fd
+      const size = fileIo.statSync(path).size
+      const fdSrc: media.AVFileDescriptor = { fd: this.previewFd, offset: 0, length: size }
+      player.fdSrc = fdSrc
+      this.previewing = true
+    } catch (error) {
+      this.stopPreview()
+      BubbleTip.show(this.getUIContext(), error instanceof Error ? error.message : '试听失败')
+    }
+  }
+
   private async togglePreview(): Promise<void> {
     if (this.previewing) {
       await this.stopPreview()
       return
     }
+    await this.stopPreview()
+    this.previewFallback = false
     try {
-      const path = await this.buildClip()
-      if (!path) { return }
-      const player = await media.createAVPlayer()
-      this.previewPlayer = player
-      player.on('stateChange', (state: media.AVPlayerState) => {
-        if (player !== this.previewPlayer) { return }
-        if (state === 'initialized') {
-          player.prepare().catch(() => this.stopPreview())
-        } else if (state === 'prepared') {
-          player.loop = true
-          player.play().catch(() => this.stopPreview())
-        }
-      })
-      player.on('error', () => {
-        this.stopPreview()
-      })
-      player.url = fileUri.getUriFromPath(path)
-      this.previewing = true
+      const data = this.clipData()
+      if (data.byteLength === 0) {
+        throw new Error('裁剪结果为空，请调整开始/结束位置')
+      }
+      // 同时落一份文件：保存/设铃声复用，也作为内存播放失败时的兜底
+      this.previewPath = await this.buildClip()
+      await this.startMemoryPreview(data)
     } catch (error) {
-      this.previewing = false
+      this.stopPreview()
       BubbleTip.show(this.getUIContext(), error instanceof Error ? error.message : '试听失败')
     }
   }
@@ -257,6 +402,14 @@ export struct RingtonePage {
     if (player) {
       try {
         await player.release()
+      } catch (_error) {
+      }
+    }
+    if (this.previewFd >= 0) {
+      const fd = this.previewFd
+      this.previewFd = -1
+      try {
+        fileIo.closeSync(fd)
       } catch (_error) {
       }
     }
@@ -373,25 +526,22 @@ export struct RingtonePage {
   @Builder
   private LyricWindow() {
     Stack({ alignContent: Alignment.TopStart }) {
+      // 歌词不再用 Scroll：内建滚动手势会抢走拖动，改成普通 Column 后整个歌词区
+      // 都能拖动，用来整体平移选区（保持已选长度）。
       if (this.windowLyrics().length > 0) {
-        Scroll() {
-          Column({ space: 14 }) {
-            ForEach(this.windowLyrics(), (line: RingtoneLyric) => {
-              Text(line.text)
-                .width('100%')
-                .fontSize(15)
-                .lineHeight(21)
-                .fontColor(TC.textBody())
-                .textAlign(TextAlign.Center)
-            })
-          }
-          .width('100%')
-          .padding({ top: 30, bottom: 30, left: 6, right: 6 })
+        Column({ space: 12 }) {
+          ForEach(this.windowLyrics(), (line: RingtoneLyric) => {
+            Text(line.text)
+              .width('100%')
+              .fontSize(15)
+              .lineHeight(21)
+              .fontColor(TC.textBody())
+              .textAlign(TextAlign.Center)
+          }, (line: RingtoneLyric) => `${line.time}-${line.text}`)
         }
         .width('100%')
-        .height('100%')
-        .scrollBar(BarState.Off)
-        .scrollable(ScrollDirection.Vertical)
+        .padding({ top: 36, bottom: 36, left: 6, right: 6 })
+        .hitTestBehavior(HitTestMode.None)
       } else {
         Column({ space: 8 }) {
           SymbolGlyph($r('sys.symbol.music_note_list')).fontSize(26).fontColor([TC.textQuaternary()])
@@ -401,9 +551,32 @@ export struct RingtonePage {
         .width('100%')
         .height('100%')
         .justifyContent(FlexAlign.Center)
+        .hitTestBehavior(HitTestMode.None)
       }
 
-      // 顶部「开始」标签：上下拖动 = 粗调开始位置
+      // 独立的透明拖动层：拖歌词区 = 整体平移选区。放在标签下层，避免父子
+      // 手势竞争导致标签拖不动（ArkUI 同类型手势在父子间会互相抢占）。
+      Column()
+        .width('100%')
+        .height('100%')
+        .backgroundColor('#00000000')
+        .gesture(
+          PanGesture()
+            .onActionStart(() => { this.beginDrag() })
+            .onActionUpdate((event: GestureEvent) => {
+              this.moveWindow(event.offsetY * this.secondsPerVp())
+            })
+        )
+
+      // 选区在歌词窗口里的可视化背景
+      Column()
+        .width('100%')
+        .height(Math.max(0, this.endMarkerY() - this.startMarkerY()))
+        .backgroundColor('rgba(255,255,255,0.045)')
+        .position({ x: 0, y: this.startMarkerY() })
+        .hitTestBehavior(HitTestMode.None)
+
+      // 「开始」标签：自身可拖动；位置随 startSec 变化，下方波形拖动时也会跟着动
       Row() {
         Row()
           .layoutWeight(1)
@@ -412,18 +585,22 @@ export struct RingtonePage {
         this.MarkerTag('开始', this.timeText(this.startSec))
       }
       .width('100%')
-      .height(26)
+      .height(28)
       .alignItems(VerticalAlign.Center)
-      .position({ x: 0, y: 0 })
+      .position({ x: 0, y: this.startMarkerY() })
+      .hitTestBehavior(HitTestMode.Block)
       .gesture(
         PanGesture()
-          .onActionStart(() => { this.dragBaseStart = this.startSec })
+          .onActionStart(() => {
+            this.beginDrag()
+            this.dragBaseStart = this.startSec
+          })
           .onActionUpdate((event: GestureEvent) => {
-            this.setStart(this.dragBaseStart + event.offsetY * 0.12)
+            this.setStart(this.dragBaseStart + event.offsetY * this.secondsPerVp())
           })
       )
 
-      // 底部「结束」标签：上下拖动 = 粗调结束位置
+      // 「结束」标签：自身可拖动，且与「开始」标签保持至少 28vp 间距
       Row() {
         Row()
           .layoutWeight(1)
@@ -432,14 +609,18 @@ export struct RingtonePage {
         this.MarkerTag('结束', this.timeText(this.endSec))
       }
       .width('100%')
-      .height(26)
+      .height(28)
       .alignItems(VerticalAlign.Center)
-      .position({ x: 0, y: Math.max(0, this.lyricHeight - 26) })
+      .position({ x: 0, y: this.endMarkerY() })
+      .hitTestBehavior(HitTestMode.Block)
       .gesture(
         PanGesture()
-          .onActionStart(() => { this.dragBaseEnd = this.endSec })
+          .onActionStart(() => {
+            this.beginDrag()
+            this.dragBaseEnd = this.endSec
+          })
           .onActionUpdate((event: GestureEvent) => {
-            this.setEnd(this.dragBaseEnd + event.offsetY * 0.12)
+            this.setEnd(this.dragBaseEnd + event.offsetY * this.secondsPerVp())
           })
       )
     }
@@ -482,9 +663,10 @@ export struct RingtonePage {
         .borderRadius(2)
         .backgroundColor(TC.accent())
         .position({ x: Math.max(0, this.startX() - 1), y: 0 })
+        .hitTestBehavior(HitTestMode.Block)
         .gesture(
           PanGesture()
-            .onActionStart(() => { this.dragBaseStart = this.startSec })
+            .onActionStart(() => { this.beginDrag() })
             .onActionUpdate((event: GestureEvent) => {
               if (this.waveWidth <= 0) { return }
               this.setStart(this.dragBaseStart + event.offsetX / this.waveWidth * this.durationSec)
@@ -497,9 +679,10 @@ export struct RingtonePage {
         .borderRadius(2)
         .backgroundColor(TC.accent())
         .position({ x: Math.max(0, this.endX() - 1), y: 0 })
+        .hitTestBehavior(HitTestMode.Block)
         .gesture(
           PanGesture()
-            .onActionStart(() => { this.dragBaseEnd = this.endSec })
+            .onActionStart(() => { this.beginDrag() })
             .onActionUpdate((event: GestureEvent) => {
               if (this.waveWidth <= 0) { return }
               this.setEnd(this.dragBaseEnd + event.offsetX / this.waveWidth * this.durationSec)

@@ -400,7 +400,7 @@ export struct DecoMediaPicker {
         .clip(true)
         .backgroundColor(TC.surfaceInset())
       } else if (this.value) {
-        Image(this.value)
+        Image(DecorationMedia.displayUri(this.value))
           .width(54)
           .height(54)
           .borderRadius(12)

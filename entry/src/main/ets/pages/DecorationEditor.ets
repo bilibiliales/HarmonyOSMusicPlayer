@@ -771,7 +771,7 @@ export struct DecorationEditorPage {
   private SkinPreview() {
     Stack({ alignContent: Alignment.TopStart }) {
       if (this.skinBgImage) {
-        Image(this.skinBgImage)
+        Image(DecorationMedia.displayUri(this.skinBgImage))
           .width('100%')
           .height('100%')
           .objectFit(ImageFit.Cover)
@@ -881,7 +881,7 @@ export struct DecorationEditorPage {
 
   @Builder
   private StageLayer(layer: PlayerLayer) {
-    Image(layer.src)
+    Image(DecorationMedia.displayUri(layer.src))
       .width(this.stageW * layer.w / 100)
       .height(this.stageW * layer.h / 100)
       .objectFit(ImageFit.Contain)
@@ -932,7 +932,7 @@ export struct DecorationEditorPage {
           .blur(this.playerBgBlur)
           .opacity(this.playerBgOpacity / 100)
       } else if (this.playerBgImage) {
-        Image(this.playerBgImage)
+        Image(DecorationMedia.displayUri(this.playerBgImage))
           .width('100%')
           .height('100%')
           .objectFit(ImageFit.Cover)
@@ -951,7 +951,7 @@ export struct DecorationEditorPage {
       // 黑胶
       Stack({ alignContent: Alignment.Center }) {
         if (this.vinylImage) {
-          Image(this.vinylImage)
+          Image(DecorationMedia.displayUri(this.vinylImage))
             .width(this.stageVinylSize())
             .height(this.stageVinylSize())
             .objectFit(ImageFit.Contain)
@@ -1112,7 +1112,7 @@ export struct DecorationEditorPage {
   @Builder
   private LayerRow(layer: PlayerLayer) {
     Row({ space: 10 }) {
-      Image(layer.src)
+      Image(DecorationMedia.displayUri(layer.src))
         .width(38)
         .height(38)
         .borderRadius(8)
@@ -1373,7 +1373,7 @@ export struct DecorationEditorPage {
       DecoCard({ title: '效果预览' }) {
         Stack({ alignContent: Alignment.Center }) {
           if (this.dockBgImage) {
-            Image(this.dockBgImage)
+            Image(DecorationMedia.displayUri(this.dockBgImage))
               .width('100%')
               .height('100%')
               .objectFit(ImageFit.Cover)
@@ -1578,7 +1578,7 @@ export struct DecorationEditorPage {
         onChange: (path: string) => this.singleImage = path
       })
       if (this.singleImage) {
-        Image(this.singleImage)
+        Image(DecorationMedia.displayUri(this.singleImage))
           .width('100%')
           .height(120)
           .objectFit(ImageFit.Contain)

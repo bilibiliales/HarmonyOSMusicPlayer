@@ -251,18 +251,20 @@ export class RingtoneService {
     return new Uint8Array(buffer, 0, offset)
   }
 
-  /** 帧级裁剪：按整帧边界截取 [startMs, endMs)，输出裸 MP3 帧序列。 */
-  static trim(srcPath: string, dstPath: string, startMs: number, endMs: number): boolean {
+  /**
+   * 帧级裁剪：按整帧边界取出 [startMs, endMs) 的 MP3 字节，直接在内存里返回，
+   * 不写文件。预览播放用这份数据（AVPlayer.dataSrc），保存/设铃声再落盘。
+   */
+  static clipBytes(srcPath: string, startMs: number, endMs: number): ArrayBuffer {
     let srcFd = -1
     try {
       const file = fileIo.openSync(srcPath, fileIo.OpenMode.READ_ONLY)
       srcFd = file.fd
-      const stat = fileIo.statSync(srcPath)
-      const size = stat.size
-      if (size <= 0) { return false }
+      const size = fileIo.statSync(srcPath).size
+      if (size <= 0) { return new ArrayBuffer(0) }
       const bytes = RingtoneService.readAll(srcFd, size)
       const read = bytes.length
-      if (read <= 0) { return false }
+      if (read <= 0) { return new ArrayBuffer(0) }
 
       // 跳过 ID3v2 标签（十年内所有主流编码器都会写）
       let pos = 0
@@ -287,9 +289,26 @@ export class RingtoneService {
         elapsedSamples += head.samples
         pos += head.length
       }
-      if (startOffset < 0) { return false }
+      if (startOffset < 0) { return new ArrayBuffer(0) }
       if (endOffset < 0 || endOffset <= startOffset) { endOffset = read }
-      const slice = bytes.buffer.slice(startOffset, endOffset)
+      return bytes.buffer.slice(startOffset, endOffset)
+    } catch (_error) {
+      return new ArrayBuffer(0)
+    } finally {
+      if (srcFd >= 0) {
+        try {
+          fileIo.closeSync(srcFd)
+        } catch (_error) {
+        }
+      }
+    }
+  }
+
+  /** 把内存裁剪结果写成文件，供「保存音频 / 设为铃声」使用。 */
+  static trim(srcPath: string, dstPath: string, startMs: number, endMs: number): boolean {
+    const slice = RingtoneService.clipBytes(srcPath, startMs, endMs)
+    if (slice.byteLength <= 0) { return false }
+    try {
       const dst = fileIo.openSync(dstPath,
         fileIo.OpenMode.READ_WRITE | fileIo.OpenMode.CREATE | fileIo.OpenMode.TRUNC)
       try {
@@ -300,13 +319,6 @@ export class RingtoneService {
       return true
     } catch (_error) {
       return false
-    } finally {
-      if (srcFd >= 0) {
-        try {
-          fileIo.closeSync(srcFd)
-        } catch (_error) {
-        }
-      }
     }
   }
 

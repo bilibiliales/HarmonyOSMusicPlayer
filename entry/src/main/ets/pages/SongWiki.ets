@@ -1,4 +1,5 @@
 import { common } from '@kit.AbilityKit'
+import { DecorationMedia } from '../services/DecorationMedia'
 import { fileIo, fileUri } from '@kit.CoreFileKit'
 import { photoAccessHelper } from '@kit.MediaLibraryKit'
 import { http } from '@kit.NetworkKit'
@@ -768,7 +769,7 @@ export struct SongWiki {
       // 顶部背景图 + 歌曲名
       Stack({ alignContent: Alignment.BottomStart }) {
         if (this.memoryBgImage) {
-          Image(this.memoryBgImage)
+          Image(DecorationMedia.displayUri(this.memoryBgImage))
             .width('100%')
             .height(180)
             .objectFit(ImageFit.Cover)

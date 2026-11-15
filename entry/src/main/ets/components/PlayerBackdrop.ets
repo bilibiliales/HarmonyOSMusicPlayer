@@ -1,4 +1,5 @@
 import { PlayerLayer, PlayerStyleConfig } from '../models/decoration'
+import { DecorationMedia } from '../services/DecorationMedia'
 import { TC } from '../services/ThemeColors'
 
 /**
@@ -23,7 +24,7 @@ export struct PlayerBackdrop {
 
   @Builder
   private LayerView(layer: PlayerLayer) {
-    Image(layer.src)
+    Image(DecorationMedia.displayUri(layer.src))
       .width(`${layer.w}%`)
       .height(`${layer.h}%`)
       .objectFit(ImageFit.Contain)
@@ -54,7 +55,7 @@ export struct PlayerBackdrop {
           .blur(this.style.bgBlur)
           .opacity(Math.max(0, Math.min(100, this.style.bgOpacity)) / 100)
       } else if (this.style.bgImage) {
-        Image(this.style.bgImage)
+        Image(DecorationMedia.displayUri(this.style.bgImage))
           .width('100%')
           .height('100%')
           .objectFit(ImageFit.Cover)

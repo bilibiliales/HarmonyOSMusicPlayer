@@ -2,12 +2,6 @@ import { deviceInfo } from '@kit.BasicServicesKit'
 import { ApiClient } from './ApiClient'
 import { AppSettings } from './AppSettings'
 
-/** 设备详情页额外展示的原始字段（接口里没有落到强类型上的键值对）。 */
-export interface DeviceField {
-  label: string
-  value: string
-}
-
 export interface DeviceItem {
   deviceKey: string
   deviceName: string
@@ -20,7 +14,6 @@ export interface DeviceItem {
   isCurrent: boolean
   lastActiveTime: number
   platform: string
-  extra: DeviceField[]
 }
 
 /** 设备数上限档位：非会员 5 台 / 黑胶VIP 8 台 / 黑胶SVIP 10 台。 */
@@ -33,24 +26,6 @@ interface DeviceListResponse {
   code: number
   message?: string
   data: object
-}
-
-const KNOWN_KEYS: string[] = ['deviceKey', 'deviceName', 'deviceType', 'deviceModel', 'deviceBrand', 'os', 'ip',
-  'online', 'isCurrent', 'lastActiveTime', 'platform', 'extra']
-
-const FIELD_LABELS: Record<string, string> = {
-  'clientId': '客户端标识',
-  'deviceId': '设备 ID',
-  'deviceNo': '设备编号',
-  'version': '客户端版本',
-  'appVersion': '客户端版本',
-  'loginTime': '本次登录',
-  'lastLoginTime': '最近登录',
-  'createTime': '首次接入',
-  'city': '城市',
-  'province': '省份',
-  'network': '网络',
-  'clientType': '客户端类型'
 }
 
 export class DeviceService {
@@ -68,7 +43,7 @@ export class DeviceService {
   static emptyDevice(): DeviceItem {
     return {
       deviceKey: '', deviceName: '', deviceType: '', deviceModel: '', deviceBrand: '', os: '', ip: '',
-      online: false, isCurrent: false, lastActiveTime: 0, platform: '', extra: []
+      online: false, isCurrent: false, lastActiveTime: 0, platform: ''
     }
   }
 
@@ -172,18 +147,7 @@ export class DeviceService {
     const model = DeviceService.textOf(item, 'deviceModel')
     const brand = DeviceService.textOf(item, 'deviceBrand')
     const type = DeviceService.textOf(item, 'deviceType')
-    const extra: DeviceField[] = []
-    for (const key of Object.keys(item)) {
-      if (KNOWN_KEYS.includes(key)) {
-        continue
-      }
-      const value = DeviceService.textOf(item, key)
-      if (!value.length || value === 'null' || value === 'undefined') {
-        continue
-      }
-      const label = FIELD_LABELS[key]
-      extra.push({ label: label === undefined ? key : label, value: value })
-    }
+    // 只映射已知字段；接口里多余/未识别的键不进模型，详情页也不会展示。
     return {
       deviceKey: DeviceService.textOf(item, 'deviceKey') || DeviceService.textOf(item, 'deviceId') ||
         DeviceService.textOf(item, 'clientId'),
@@ -196,8 +160,7 @@ export class DeviceService {
       online: DeviceService.truthy(DeviceService.textOf(item, 'online')),
       isCurrent: DeviceService.truthy(DeviceService.textOf(item, 'isCurrent')),
       lastActiveTime: DeviceService.number(DeviceService.textOf(item, 'lastActiveTime')),
-      platform: DeviceService.textOf(item, 'platform'),
-      extra: extra
+      platform: DeviceService.textOf(item, 'platform')
     }
   }
 

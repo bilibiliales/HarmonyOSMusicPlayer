@@ -48,12 +48,22 @@
             ]
           },
           {
+            "entities": [
+              "entity.system.default"
+            ],
             "actions": [
               "ohos.want.action.viewData"
             ],
             "uris": [
               {
-                "type": "general.audio"
+                "scheme": "file",
+                "type": "general.audio",
+                "linkFeature": "FileOpen"
+              },
+              {
+                "scheme": "file",
+                "type": "general.mp3",
+                "linkFeature": "FileOpen"
               }
             ]
           }

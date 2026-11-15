@@ -47,9 +47,7 @@ export struct DeviceDetailPage {
     push('IP 地址', device.ip)
     push('最近活跃', DeviceService.formatTime(device.lastActiveTime))
     push('设备标识', device.deviceKey)
-    for (const field of device.extra) {
-      push(field.label, field.value)
-    }
+    // 只展示已知的强类型字段；接口里未识别到的原始键一律不展示。
     return list
   }
 
