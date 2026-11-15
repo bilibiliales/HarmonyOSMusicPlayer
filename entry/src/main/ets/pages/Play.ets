@@ -143,7 +143,10 @@ export struct Play {
 
   // ---- 播放器样式取色：装扮优先，未指定跟随主题（压图文字常白） ----
   private psIcon(): ResourceColor {
-    return this.playerStyle.iconColor ? this.playerStyle.iconColor : TC.textOnMedia()
+    // 只设了「文字色」装扮时，图标也跟着走，避免歌词区图标仍停留在默认白
+    if (this.playerStyle.iconColor) { return this.playerStyle.iconColor }
+    if (this.playerStyle.textColor) { return this.playerStyle.textColor }
+    return TC.textOnMedia()
   }
 
   private psText(): ResourceColor {
@@ -636,14 +639,17 @@ export struct Play {
     this.scrollToCurrentLyric(true)
   }
 
+  /**
+   * 歌词三色：
+   *  - 当前行的高亮歌词 = highlight（逐字已唱过部分 / 普通歌词整行）；
+   *  - 当前行还没被高亮的歌词 = pendingColor（逐字未唱到的底字）；
+   *  - 不在当前行的歌词 = otherLineColor（层次由 lyricLineOpacity 提供）。
+   */
   private lyricColor(index: number): string {
     if (index === this.currentLyricIndex) {
       return this.lyricAppearance.highlight
     }
-    if (index < this.currentLyricIndex) {
-      return 'rgba(255,255,255,0.25)'
-    }
-    return 'rgba(255,255,255,0.46)'
+    return this.lyricAppearance.otherLineColor
   }
 
   private lyricLineDistance(index: number): number {
@@ -726,7 +732,7 @@ export struct Play {
               Text(character)
                 .fontSize(this.lyricFontSize(index))
                 .fontWeight(FontWeight.Bold)
-                .fontColor(TC.textPrimary())
+                .fontColor(this.lyricAppearance.pendingColor)
                 .lineHeight(this.lyricLineHeight(index))
               Text(character)
                 .fontSize(this.lyricFontSize(index))
@@ -1336,8 +1342,8 @@ export struct Play {
           Blank()
           Row({ space: 5 }) {
             SymbolGlyph($r('sys.symbol.arrow_up_left_and_arrow_down_right'))
-              .fontSize(14).fontColor([TC.textBody()])
-            Text('退出沉浸').fontSize(10).fontColor(TC.textBody())
+              .fontSize(14).fontColor([this.psIcon()])
+            Text('退出沉浸').fontSize(10).fontColor(this.psText())
           }
           .padding({ left: 10, right: 10, top: 7, bottom: 7 })
           .backgroundColor('rgba(255,255,255,0.08)')
@@ -1354,30 +1360,30 @@ export struct Play {
           Text('歌词')
             .fontSize(15)
             .fontWeight(FontWeight.Bold)
-            .fontColor(TC.textPrimary())
+            .fontColor(this.psText())
           Text(this.lyricUserScrolling ? '已暂停跟随 · 点击歌词可跳转' :
             (this.hasPreciseLyrics() ? '逐字歌词 · 点击歌词返回唱片' : '点击歌词返回唱片'))
             .fontSize(9)
-            .fontColor(this.lyricUserScrolling ? TC.accentSoft() : '#85858e')
+            .fontColor(this.lyricUserScrolling ? TC.accentSoft() : this.psDim())
         }
         .layoutWeight(1)
         .alignItems(HorizontalAlign.Start)
         Row({ space: 8 }) {
-          SymbolGlyph($r('sys.symbol.gearshape')).fontSize(18).fontColor([TC.textBody()])
+          SymbolGlyph($r('sys.symbol.gearshape')).fontSize(18).fontColor([this.psIcon()])
             .onClick(() => this.activeSheet = 'lyricSettings')
           Row({ space: 5 }) {
             SymbolGlyph($r('sys.symbol.arrow_up_left_and_arrow_down_right'))
-              .fontSize(14).fontColor([this.lyricsImmersive ? TC.accentSoft() : '#d9d9de'])
+              .fontSize(14).fontColor([this.psIcon()])
             Text(this.lyricsImmersive ? '退出沉浸' : '沉浸歌词')
-              .fontSize(10).fontColor(this.lyricsImmersive ? TC.accentSoft() : '#d9d9de')
+              .fontSize(10).fontColor(this.psText())
           }
           .padding({ left: 10, right: 10, top: 7, bottom: 7 })
           .backgroundColor(this.lyricsImmersive ? 'rgba(239,35,60,0.16)' : 'rgba(255,255,255,0.08)')
           .borderRadius(14)
           .onClick(() => this.toggleLyricsImmersive())
           Row({ space: 5 }) {
-            SymbolGlyph($r('sys.symbol.music')).fontSize(14).fontColor([TC.textBody()])
-            Text('返回唱片').fontSize(10).fontColor(TC.textBody())
+            SymbolGlyph($r('sys.symbol.music')).fontSize(14).fontColor([this.psIcon()])
+            Text('返回唱片').fontSize(10).fontColor(this.psText())
           }
           .padding({ left: 10, right: 10, top: 7, bottom: 7 })
           .backgroundColor('rgba(255,255,255,0.08)')
@@ -1391,19 +1397,19 @@ export struct Play {
 
       if (this.lyricsLoading) {
         Column({ space: 12 }) {
-          LoadingProgress().width(40).color(TC.textPrimary())
-          Text('正在加载歌词…').fontSize(11).fontColor(TC.textTertiary())
+          LoadingProgress().width(40).color(this.psText())
+          Text('正在加载歌词…').fontSize(11).fontColor(this.psDim())
         }
         .layoutWeight(1)
         .justifyContent(FlexAlign.Center)
       } else if (this.lyricMessage) {
         Column({ space: 12 }) {
-          SymbolGlyph($r('sys.symbol.text_alignleft')).fontSize(40).fontColor([TC.textQuaternary()])
-          Text(this.lyricMessage).fontSize(12).fontColor(TC.textTertiary())
+          SymbolGlyph($r('sys.symbol.text_alignleft')).fontSize(40).fontColor([this.psFaint()])
+          Text(this.lyricMessage).fontSize(12).fontColor(this.psDim())
           if (this.lyricCanRetry) {
             Row({ space: 7 }) {
-              SymbolGlyph($r('sys.symbol.arrow_clockwise')).fontSize(17).fontColor([TC.textPrimary()])
-              Text('重新加载歌词').fontSize(12).fontColor(TC.textPrimary())
+              SymbolGlyph($r('sys.symbol.arrow_clockwise')).fontSize(17).fontColor([this.psIcon()])
+              Text('重新加载歌词').fontSize(12).fontColor(this.psText())
             }
             .padding({ left: 14, right: 14, top: 9, bottom: 9 })
             .backgroundColor('rgba(255,255,255,0.10)').borderRadius(18)
@@ -1432,7 +1438,7 @@ export struct Play {
                       Text(line.translation)
                         .width('100%')
                         .fontSize(index === this.currentLyricIndex ? 14 : 12)
-                        .fontColor(index === this.currentLyricIndex ? '#c8c8ce' : 'rgba(255,255,255,0.25)')
+                        .fontColor(index === this.currentLyricIndex ? this.lyricAppearance.pendingColor : this.lyricAppearance.otherLineColor)
                         .lineHeight(20)
                     }
                   }
@@ -1474,7 +1480,7 @@ export struct Play {
           if (this.lyricUserScrolling) {
             Row({ space: 7 }) {
               SymbolGlyph($r('sys.symbol.hand_draw')).fontSize(13).fontColor([TC.accentSoft()])
-              Text('已暂停自动跟随').fontSize(10).fontColor(TC.textPrimary())
+              Text('已暂停自动跟随').fontSize(10).fontColor(this.psText())
             }
             .padding({ left: 11, right: 11, top: 7, bottom: 7 })
             .backgroundColor('rgba(22,18,22,0.86)')

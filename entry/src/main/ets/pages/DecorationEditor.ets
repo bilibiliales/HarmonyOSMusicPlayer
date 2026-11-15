@@ -626,11 +626,16 @@ export struct DecorationEditorPage {
 
   // ---- 舞台预览取色：装扮优先，未指定按白字画布 ----
   private stageIcon(): string {
-    return this.playerIconColor ? this.playerIconColor : '#FFFFFF'
+    // 与实际播放页 psIcon() 一致：只设文字色时图标也跟着走
+    if (this.playerIconColor) { return this.playerIconColor }
+    if (this.playerTextColor) { return this.playerTextColor }
+    return '#FFFFFF'
   }
 
   private stageSmallIcon(): string {
-    return this.playerIconColor ? this.playerIconColor : '#999999'
+    if (this.playerIconColor) { return this.playerIconColor }
+    if (this.playerTextColor) { return DecoColor.alpha(this.playerTextColor, 0.6) }
+    return '#999999'
   }
 
   private stageText(): string {

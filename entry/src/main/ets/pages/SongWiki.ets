@@ -763,6 +763,18 @@ export struct SongWiki {
     .onClick(() => this.openSheetPreview(sheet))
   }
 
+  /**
+   * 回忆坐标顶部是压在背景图 + 底部黑色渐变上的文字，必须保持浅色；
+   * 只有接口没给背景图（纯浅色卡片底）时才回落到主题文字色，避免白字看不见。
+   */
+  private memoryTitleColor(): ResourceColor {
+    return this.memoryBgImage ? TC.textOnMediaSecondary() : TC.textBody()
+  }
+
+  private memoryNameColor(): ResourceColor {
+    return this.memoryBgImage ? TC.textOnMedia() : TC.textPrimary()
+  }
+
   @Builder
   private MemoryCoordinateCard() {
     Column() {
@@ -793,11 +805,11 @@ export struct SongWiki {
         Column({ space: 4 }) {
           Text(this.memoryTitle)
             .fontSize(12)
-            .fontColor(TC.textBody())
+            .fontColor(this.memoryTitleColor())
           Text(this.song.name)
             .fontSize(22)
             .fontWeight(FontWeight.Bold)
-            .fontColor(TC.textPrimary())
+            .fontColor(this.memoryNameColor())
             .maxLines(1)
             .textOverflow({ overflow: TextOverflow.Ellipsis })
         }

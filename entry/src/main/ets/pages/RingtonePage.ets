@@ -17,6 +17,14 @@ interface RingtoneLyric {
   text: string
 }
 
+/** 时间轴上的一行歌词：y 为相对歌词窗口顶部的 vp 位置。 */
+interface LyricRow {
+  time: number
+  text: string
+  y: number
+  inRange: boolean
+}
+
 const BAR_COUNT: number = 56
 
 @Component
@@ -54,15 +62,29 @@ export struct RingtonePage {
   private dragBaseEnd: number = 0
   private dragBaseLength: number = 0
 
-  /**
-   * 粗调系数与标签位置映射互为逆运算：标签 y = 秒数/总时长 * 可用高度，
-   * 所以每拖 1vp 正好对应「总时长 / 可用高度」秒，标签就能完全跟手。
-   */
-  private secondsPerVp(): number {
-    // 编辑区尺寸还没回调时用固定系数兜底，避免 usable≈1 时一拖就跳到结尾
-    if (this.durationSec <= 0 || this.lyricHeight < 60) { return 0.12 }
-    const usable = Math.max(1, this.lyricHeight - 26)
-    return this.durationSec / usable
+  // ---- 歌词时间轴 ----
+  // 歌词按「秒 → vp」线性铺开，组件逻辑高度 = 整首歌时长 * pxPerSec，
+  // 窗口只显示选区中点附近的一段；两条横线恰好圈出 startSec~endSec 的歌词。
+
+  /** 让「最大可选时长」占窗口 68%，因此选区再长也不会撑出歌词窗口。 */
+  private pxPerSec(): number {
+    if (this.lyricHeight < 60) { return 4 }
+    return Math.max(1.5, this.lyricHeight * 0.68 / Math.max(1, this.maxLength()))
+  }
+
+  /** 视窗中心时间 = 选区中点；拖标签 / 滑歌词都会改变它，歌词因此跟着滚动。 */
+  private centerSec(): number {
+    return (this.startSec + this.endSec) / 2
+  }
+
+  /** 拖标签时中心也移动一半，标签视觉位移 = Δ秒/2 * p，故系数取 2/p 才能跟手。 */
+  private markerSecondsPerVp(): number {
+    return 2 / this.pxPerSec()
+  }
+
+  /** 滑动歌词时内容位移 = Δ秒 * p，系数取 1/p；向下拖 = 看更早的歌词。 */
+  private scrollSecondsPerVp(): number {
+    return 1 / this.pxPerSec()
   }
 
   aboutToAppear(): void {
@@ -159,18 +181,29 @@ export struct RingtonePage {
     return { time: Math.round((minutes * 60 + seconds) * 1000), text: text }
   }
 
-  private windowLyrics(): RingtoneLyric[] {
-    const from = this.startSec * 1000 - 400
-    const to = this.endSec * 1000
-    const result: RingtoneLyric[] = []
-    for (let i = 0; i < this.lyrics.length; i++) {
-      const line = this.lyrics[i]
-      if (line.time >= from && line.time < to) {
-        result.push(line)
-        if (result.length >= 40) { break }
+  /**
+   * 只构建落在视窗（含上下缓冲）里的歌词行，避免整首歌几百行全量渲染。
+   * y 按真实时间轴计算，密集歌词用最小行距推开以免重叠。
+   */
+  private lyricRows(): LyricRow[] {
+    const p = this.pxPerSec()
+    const center = this.centerSec()
+    const half = this.lyricHeight / 2
+    const rows: LyricRow[] = []
+    let lastY = -10000
+    for (const line of this.lyrics) {
+      const timeSec = line.time / 1000
+      let y = half + (timeSec - center) * p
+      if (y < -50 || y > this.lyricHeight + 50) { continue }
+      if (y < lastY + 26) { y = lastY + 26 }
+      lastY = y
+      const row: LyricRow = {
+        time: line.time, text: line.text, y: y,
+        inRange: timeSec >= this.startSec && timeSec < this.endSec
       }
+      rows.push(row)
     }
-    return result
+    return rows
   }
 
   /** 片段最大长度：不能超过当前铃声类型的上限，也不能超过歌曲本身长度。 */
@@ -236,20 +269,17 @@ export struct RingtonePage {
     this.invalidateClip()
   }
 
-  /** 标签在歌词窗口里的纵向位置：与选区时间成比例，下方波形拖动时也会跟着走。 */
-  private markerY(seconds: number): number {
-    const usable = Math.max(0, this.lyricHeight - 26)
-    if (this.durationSec <= 0 || usable <= 0) { return 0 }
-    return Math.min(usable, Math.max(0, seconds / this.durationSec * usable))
-  }
-
+  /** 两条横线以选区中点为中心上下展开，间距 = 已选秒数 * pxPerSec。 */
   private startMarkerY(): number {
-    return this.markerY(this.startSec)
+    const half = this.lyricHeight / 2
+    const span = (this.endSec - this.startSec) * this.pxPerSec() / 2
+    return Math.max(0, Math.min(this.lyricHeight - 28, half - span))
   }
 
   private endMarkerY(): number {
-    const top = Math.max(0, this.lyricHeight - 26)
-    return Math.min(top, Math.max(this.startMarkerY() + 26, this.markerY(this.endSec)))
+    const half = this.lyricHeight / 2
+    const span = (this.endSec - this.startSec) * this.pxPerSec() / 2
+    return Math.min(this.lyricHeight - 28, Math.max(this.startMarkerY() + 28, half + span))
   }
 
   private selectType(index: number): void {
@@ -454,14 +484,15 @@ export struct RingtonePage {
     }
   }
 
-  private startX(): number {
+  /** 波形光标位置由传入的秒数决定，与上方标签共用同一份 startSec/endSec。 */
+  private startX(sec: number): number {
     if (this.durationSec <= 0 || this.waveWidth <= 0) { return 0 }
-    return Math.min(this.waveWidth, Math.max(0, this.startSec / this.durationSec * this.waveWidth))
+    return Math.min(this.waveWidth, Math.max(0, sec / this.durationSec * this.waveWidth))
   }
 
-  private endX(): number {
+  private endX(sec: number): number {
     if (this.durationSec <= 0 || this.waveWidth <= 0) { return 0 }
-    return Math.min(this.waveWidth, Math.max(0, this.endSec / this.durationSec * this.waveWidth))
+    return Math.min(this.waveWidth, Math.max(0, sec / this.durationSec * this.waveWidth))
   }
 
   @Builder
@@ -512,41 +543,26 @@ export struct RingtonePage {
   }
 
   @Builder
-  private MarkerTag(label: string, time: string) {
-    Row({ space: 4 }) {
-      Text(time).fontSize(10).fontColor(TC.textOnAccent())
-      Text(label).fontSize(10).fontColor(TC.textOnAccent()).fontWeight(FontWeight.Medium)
-    }
-    .height(18)
-    .padding({ left: 8, right: 8 })
-    .backgroundColor(TC.accent())
-    .borderRadius(9)
-  }
-
-  @Builder
-  private LyricWindow() {
+  private LyricWindow(startSec: number, endSec: number) {
     Stack({ alignContent: Alignment.TopStart }) {
-      // 歌词不再用 Scroll：内建滚动手势会抢走拖动，改成普通 Column 后整个歌词区
-      // 都能拖动，用来整体平移选区（保持已选长度）。
-      if (this.windowLyrics().length > 0) {
-        Column({ space: 12 }) {
-          ForEach(this.windowLyrics(), (line: RingtoneLyric) => {
-            Text(line.text)
-              .width('100%')
-              .fontSize(15)
-              .lineHeight(21)
-              .fontColor(TC.textBody())
-              .textAlign(TextAlign.Center)
-          }, (line: RingtoneLyric) => `${line.time}-${line.text}`)
-        }
-        .width('100%')
-        .padding({ top: 36, bottom: 36, left: 6, right: 6 })
-        .hitTestBehavior(HitTestMode.None)
+      // 歌词按时间轴铺开：组件逻辑高度 = 整首歌时长 * pxPerSec，
+      // 窗口只显示选区中点附近的一段，横线之间就是实际截取的歌词。
+      if (this.lyrics.length > 0) {
+        ForEach(this.lyricRows(), (row: LyricRow) => {
+          Text(row.text)
+            .width('100%')
+            .fontSize(14)
+            .lineHeight(20)
+            .fontColor(row.inRange ? TC.textBody() : TC.textTertiary())
+            .opacity(row.inRange ? 1 : 0.6)
+            .textAlign(TextAlign.Center)
+            .position({ x: 0, y: row.y - 10 })
+            .hitTestBehavior(HitTestMode.None)
+        }, (row: LyricRow) => `${row.time}-${row.text}`)
       } else {
         Column({ space: 8 }) {
           SymbolGlyph($r('sys.symbol.music_note_list')).fontSize(26).fontColor([TC.textQuaternary()])
-          Text(this.lyrics.length > 0 ? '该片段内没有歌词' : '这首歌暂无歌词')
-            .fontSize(12).fontColor(TC.textTertiary())
+          Text('这首歌暂无歌词').fontSize(12).fontColor(TC.textTertiary())
         }
         .width('100%')
         .height('100%')
@@ -554,8 +570,7 @@ export struct RingtonePage {
         .hitTestBehavior(HitTestMode.None)
       }
 
-      // 独立的透明拖动层：拖歌词区 = 整体平移选区。放在标签下层，避免父子
-      // 手势竞争导致标签拖不动（ArkUI 同类型手势在父子间会互相抢占）。
+      // 透明拖动层：滑动歌词 = 平移选区，歌词跟着滚动（类似歌词预览）
       Column()
         .width('100%')
         .height('100%')
@@ -564,11 +579,11 @@ export struct RingtonePage {
           PanGesture()
             .onActionStart(() => { this.beginDrag() })
             .onActionUpdate((event: GestureEvent) => {
-              this.moveWindow(event.offsetY * this.secondsPerVp())
+              this.moveWindow(-event.offsetY * this.scrollSecondsPerVp())
             })
         )
 
-      // 选区在歌词窗口里的可视化背景
+      // 两条横线之间 = 截取片段的实际长度
       Column()
         .width('100%')
         .height(Math.max(0, this.endMarkerY() - this.startMarkerY()))
@@ -576,13 +591,20 @@ export struct RingtonePage {
         .position({ x: 0, y: this.startMarkerY() })
         .hitTestBehavior(HitTestMode.None)
 
-      // 「开始」标签：自身可拖动；位置随 startSec 变化，下方波形拖动时也会跟着动
+      // 「开始」横线：数字与下方第一个光标共用 startSec（内联避免 @Builder 按值传参不刷新）
       Row() {
         Row()
           .layoutWeight(1)
           .height(1)
           .border({ width: { top: 1 }, color: 'rgba(128,128,128,0.5)', style: BorderStyle.Dashed })
-        this.MarkerTag('开始', this.timeText(this.startSec))
+        Row({ space: 4 }) {
+          Text(this.timeText(startSec)).fontSize(10).fontColor(TC.textOnAccent())
+          Text('开始').fontSize(10).fontColor(TC.textOnAccent()).fontWeight(FontWeight.Medium)
+        }
+        .height(18)
+        .padding({ left: 8, right: 8 })
+        .backgroundColor(TC.accent())
+        .borderRadius(9)
       }
       .width('100%')
       .height(28)
@@ -591,22 +613,26 @@ export struct RingtonePage {
       .hitTestBehavior(HitTestMode.Block)
       .gesture(
         PanGesture()
-          .onActionStart(() => {
-            this.beginDrag()
-            this.dragBaseStart = this.startSec
-          })
+          .onActionStart(() => { this.beginDrag() })
           .onActionUpdate((event: GestureEvent) => {
-            this.setStart(this.dragBaseStart + event.offsetY * this.secondsPerVp())
+            this.setStart(this.dragBaseStart + event.offsetY * this.markerSecondsPerVp())
           })
       )
 
-      // 「结束」标签：自身可拖动，且与「开始」标签保持至少 28vp 间距
+      // 「结束」横线：数字与下方第二个光标共用 endSec
       Row() {
         Row()
           .layoutWeight(1)
           .height(1)
           .border({ width: { top: 1 }, color: 'rgba(128,128,128,0.5)', style: BorderStyle.Dashed })
-        this.MarkerTag('结束', this.timeText(this.endSec))
+        Row({ space: 4 }) {
+          Text(this.timeText(endSec)).fontSize(10).fontColor(TC.textOnAccent())
+          Text('结束').fontSize(10).fontColor(TC.textOnAccent()).fontWeight(FontWeight.Medium)
+        }
+        .height(18)
+        .padding({ left: 8, right: 8 })
+        .backgroundColor(TC.accent())
+        .borderRadius(9)
       }
       .width('100%')
       .height(28)
@@ -615,12 +641,9 @@ export struct RingtonePage {
       .hitTestBehavior(HitTestMode.Block)
       .gesture(
         PanGesture()
-          .onActionStart(() => {
-            this.beginDrag()
-            this.dragBaseEnd = this.endSec
-          })
+          .onActionStart(() => { this.beginDrag() })
           .onActionUpdate((event: GestureEvent) => {
-            this.setEnd(this.dragBaseEnd + event.offsetY * this.secondsPerVp())
+            this.setEnd(this.dragBaseEnd + event.offsetY * this.markerSecondsPerVp())
           })
       )
     }
@@ -633,7 +656,7 @@ export struct RingtonePage {
   }
 
   @Builder
-  private WaveformStrip() {
+  private WaveformStrip(startSec: number, endSec: number) {
     Stack({ alignContent: Alignment.TopStart }) {
       Row({ space: 1 }) {
         ForEach(this.bars, (value: number, index: number) => {
@@ -651,18 +674,18 @@ export struct RingtonePage {
       .alignItems(VerticalAlign.Center)
 
       Column()
-        .width(Math.max(0, this.endX() - this.startX()))
+        .width(Math.max(0, this.endX(endSec) - this.startX(startSec)))
         .height(48)
         .backgroundColor('rgba(255,255,255,0.10)')
         .border({ width: { left: 1, right: 1 }, color: TC.accent() })
-        .position({ x: this.startX(), y: 0 })
+        .position({ x: this.startX(startSec), y: 0 })
 
       Column()
         .width(3)
         .height(52)
         .borderRadius(2)
         .backgroundColor(TC.accent())
-        .position({ x: Math.max(0, this.startX() - 1), y: 0 })
+        .position({ x: Math.max(0, this.startX(startSec) - 1), y: 0 })
         .hitTestBehavior(HitTestMode.Block)
         .gesture(
           PanGesture()
@@ -678,7 +701,7 @@ export struct RingtonePage {
         .height(52)
         .borderRadius(2)
         .backgroundColor(TC.accent())
-        .position({ x: Math.max(0, this.endX() - 1), y: 0 })
+        .position({ x: Math.max(0, this.endX(endSec) - 1), y: 0 })
         .hitTestBehavior(HitTestMode.Block)
         .gesture(
           PanGesture()
@@ -754,11 +777,11 @@ export struct RingtonePage {
           Column({ space: 10 }) {
             this.TypeChips()
             this.QualityRow()
-            this.LyricWindow()
+            this.LyricWindow(this.startSec, this.endSec)
             Text(`已选 ${this.timeText(this.selectedSeconds())}（最高可选 ${this.maxSeconds} 秒）`)
               .width('100%').fontSize(11).fontColor(TC.textTertiary()).textAlign(TextAlign.Center)
             Column() {
-              this.WaveformStrip()
+              this.WaveformStrip(this.startSec, this.endSec)
             }
             .width('100%')
             .padding({ left: 18, right: 18 })
