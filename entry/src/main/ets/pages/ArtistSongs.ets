@@ -1,3 +1,4 @@
+import { SkinBackdrop } from '../components/SkinBackdrop'
 import {
   ApiSong,
   ArtistSongsPageParam,
@@ -100,6 +101,7 @@ export struct ArtistSongsPage {
 
   build() {
     NavDestination() {
+      SkinBackdrop()
       Stack({ alignContent: Alignment.TopStart }) {
         Column() {
           Column().width('100%').height(this.topAvoidHeight + 54)

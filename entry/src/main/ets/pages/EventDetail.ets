@@ -1,3 +1,4 @@
+import { SkinBackdrop } from '../components/SkinBackdrop'
 import { ShareSheet } from '../components/ShareSheet'
 import { DetailTopBar } from '../components/DetailTopBar'
 import { NoMoreFooter } from '../components/NoMoreFooter'
@@ -408,6 +409,7 @@ export struct EventDetailPage {
 
   build() {
     NavDestination() {
+      SkinBackdrop()
       Stack({ alignContent: Alignment.TopStart }) {
         Column() {
           Scroll(this.scroller) {

@@ -1,3 +1,4 @@
+import { SkinBackdrop } from '../components/SkinBackdrop'
 import { UserLevelResponse } from '../models/api'
 import { ApiClient } from '../services/ApiClient'
 import { AuthStore } from '../stores/AuthStore'
@@ -134,6 +135,7 @@ export struct UserLevelPage {
 
   build() {
     NavDestination() {
+      SkinBackdrop()
       Column() {
         Row({ space: 16 }) {
           SymbolGlyph($r('sys.symbol.chevron_left')).fontSize(24).fontColor([TC.textPrimary()]).onClick(() => this.pageStack.pop())

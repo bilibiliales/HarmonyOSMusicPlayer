@@ -182,71 +182,86 @@ export struct DecoColorPicker {
 
   @Builder
   private SheetContent() {
-    Column({ space: 16 }) {
-      Text(this.label ? this.label : '选择颜色')
-        .fontSize(17)
-        .fontWeight(FontWeight.Bold)
-        .fontColor(TC.textPrimary())
-        .width('100%')
+    Column() {
+      Scroll() {
+        Column({ space: 16 }) {
+          Text(this.label ? this.label : '选择颜色')
+            .fontSize(17)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(TC.textPrimary())
+            .width('100%')
 
-      // 预览条
-      Row({ space: 12 }) {
-        Column()
-          .width(52)
-          .height(52)
-          .borderRadius(14)
-          .backgroundColor(this.currentColor())
-          .border({ width: 1, color: TC.borderSubtle() })
-        Column({ space: 4 }) {
-          Text(this.currentColor()).fontSize(13).fontColor(TC.textPrimary())
-            .maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
-          Text('拖动滑块实时生效').fontSize(11).fontColor(TC.textTertiary())
+          // 预览条
+          Row({ space: 12 }) {
+            Column()
+              .width(52)
+              .height(52)
+              .borderRadius(14)
+              .backgroundColor(this.currentColor())
+              .border({ width: 1, color: TC.borderSubtle() })
+            Column({ space: 4 }) {
+              Text(this.currentColor()).fontSize(13).fontColor(TC.textPrimary())
+                .maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
+              Text('拖动滑块实时生效').fontSize(11).fontColor(TC.textTertiary())
+            }
+            .layoutWeight(1)
+            .alignItems(HorizontalAlign.Start)
+          }
+          .width('100%')
+
+          this.ChannelSlider('红 R', this.red, 0, 255, '', (v: number) => this.red = v)
+          this.ChannelSlider('绿 G', this.green, 0, 255, '', (v: number) => this.green = v)
+          this.ChannelSlider('蓝 B', this.blue, 0, 255, '', (v: number) => this.blue = v)
+          if (this.withAlpha) {
+            this.ChannelSlider('透明度', this.alpha, 0, 100, '%', (v: number) => this.alpha = v)
+          }
+
+          // 预设色板
+          Text('常用色').fontSize(12).fontColor(TC.textTertiary()).width('100%')
+          Flex({ wrap: FlexWrap.Wrap }) {
+            ForEach(PRESET_COLORS, (color: string) => {
+              Column()
+                .width(30)
+                .height(30)
+                .borderRadius(15)
+                .backgroundColor(color)
+                .border({ width: 1, color: TC.borderSubtle() })
+                .margin({ right: 12, bottom: 12 })
+                .onClick(() => {
+                  const parsed = parseColorRGBA(color)
+                  this.red = parsed[0]
+                  this.green = parsed[1]
+                  this.blue = parsed[2]
+                  this.alpha = 100
+                  this.emit()
+                })
+            }, (color: string) => color)
+          }
+          .width('100%')
+
         }
-        .layoutWeight(1)
-        .alignItems(HorizontalAlign.Start)
-      }
-      .width('100%')
-
-      this.ChannelSlider('红 R', this.red, 0, 255, '', (v: number) => this.red = v)
-      this.ChannelSlider('绿 G', this.green, 0, 255, '', (v: number) => this.green = v)
-      this.ChannelSlider('蓝 B', this.blue, 0, 255, '', (v: number) => this.blue = v)
-      if (this.withAlpha) {
-        this.ChannelSlider('透明度', this.alpha, 0, 100, '%', (v: number) => this.alpha = v)
-      }
-
-      // 预设色板
-      Text('常用色').fontSize(12).fontColor(TC.textTertiary()).width('100%')
-      Flex({ wrap: FlexWrap.Wrap }) {
-        ForEach(PRESET_COLORS, (color: string) => {
-          Column()
-            .width(30)
-            .height(30)
-            .borderRadius(15)
-            .backgroundColor(color)
-            .border({ width: 1, color: TC.borderSubtle() })
-            .margin({ right: 12, bottom: 12 })
-            .onClick(() => {
-              const parsed = parseColorRGBA(color)
-              this.red = parsed[0]
-              this.green = parsed[1]
-              this.blue = parsed[2]
-              this.alpha = 100
-              this.emit()
-            })
-        }, (color: string) => color)
-      }
-      .width('100%')
-
-      Button('完成')
         .width('100%')
-        .height(44)
-        .fontColor(TC.textOnAccent())
-        .backgroundColor(TC.accent())
-        .borderRadius(22)
-        .onClick(() => this.sheetOpen = false)
+        .padding({ left: 20, right: 20, top: 8, bottom: 8 })
+      }
+      .width('100%')
+      .layoutWeight(1)
+      .scrollBar(BarState.Off)
+
+      // 固定在底部：半模态再矮也能点到「完成」
+      Column() {
+        Button('完成')
+          .width('100%')
+          .height(44)
+          .fontColor(TC.textOnAccent())
+          .backgroundColor(TC.accent())
+          .borderRadius(22)
+          .onClick(() => this.sheetOpen = false)
+      }
+      .width('100%')
+      .padding({ left: 20, right: 20, top: 8, bottom: 24 })
     }
     .width('100%')
-    .padding({ left: 20, right: 20, top: 8, bottom: 24 })
+    .height('100%')
   }
 
   build() {
@@ -298,7 +313,7 @@ export struct DecoColorPicker {
     }
     .width('100%')
     .bindSheet(this.sheetOpen, this.SheetContent(), {
-      height: SheetSize.MEDIUM,
+      height: '78%',
       backgroundColor: TC.sheetBackground(),
       // 展开时暗化背后内容，半模态与页面区分开
       maskColor: 'rgba(0,0,0,0.45)',

@@ -1,3 +1,4 @@
+import { SkinBackdrop } from '../components/SkinBackdrop'
 import { ApiSong, mapApiSong, OperationResponse, SearchResponse } from '../models/api'
 import { songItemType } from '../models/music'
 import { ApiClient } from '../services/ApiClient'
@@ -201,6 +202,7 @@ export struct PlaylistSongManagerPage {
 
   build() {
     NavDestination() {
+      SkinBackdrop()
       Column() {
         Column().width('100%').height(this.topAvoidHeight)
         Row({ space: 12 }) {

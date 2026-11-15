@@ -75,7 +75,10 @@ export struct Sidebar {
   }
 
   private sbIcon(): ResourceColor {
-    return this.sidebarIconColor ? this.sidebarIconColor : TC.textPrimary()
+    // 只设了「文字颜色」装扮时，图标也跟着走（编辑器会同步写两项，这里再兜底旧存档）
+    if (this.sidebarIconColor) { return this.sidebarIconColor }
+    if (this.sidebarTextColor) { return this.sidebarTextColor }
+    return TC.textPrimary()
   }
 
   /** 当前等级对应的自定义贴图；没有则返回空串。 */

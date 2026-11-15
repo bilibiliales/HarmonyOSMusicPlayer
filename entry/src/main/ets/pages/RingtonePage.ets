@@ -1,3 +1,4 @@
+import { SkinBackdrop } from '../components/SkinBackdrop'
 import { common } from '@kit.AbilityKit'
 import { BusinessError } from '@kit.BasicServicesKit'
 import { fileIo } from '@kit.CoreFileKit'
@@ -727,6 +728,7 @@ export struct RingtonePage {
 
   build() {
     NavDestination() {
+      SkinBackdrop()
       Column() {
         Column().width('100%').height(this.topAvoidHeight)
         Row() {

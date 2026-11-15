@@ -1,3 +1,4 @@
+import { SkinBackdrop } from '../components/SkinBackdrop'
 import { ApiParam, ApiSong, mapApiSong, SearchResponse, ShareResourceResponse } from '../models/api'
 import { songItemType } from '../models/music'
 import { ApiClient } from '../services/ApiClient'
@@ -177,6 +178,7 @@ export struct PublishEventPage {
 
   build() {
     NavDestination() {
+      SkinBackdrop()
       Column() {
         Column().width('100%').height(this.topAvoidHeight)
         Row({ space: 12 }) {

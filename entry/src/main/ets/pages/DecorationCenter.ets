@@ -1,3 +1,4 @@
+import { SkinBackdrop } from '../components/SkinBackdrop'
 import { BubbleTip } from '../services/BubbleTip'
 import { DecorationMedia } from '../services/DecorationMedia'
 import { DecorationStore } from '../services/DecorationStore'
@@ -238,6 +239,7 @@ export struct DecorationCenterPage {
 
   build() {
     NavDestination() {
+      SkinBackdrop()
       Column() {
         Column().width('100%').height(this.topAvoidHeight)
 

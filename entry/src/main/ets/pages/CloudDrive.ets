@@ -1,3 +1,4 @@
+import { SkinBackdrop } from '../components/SkinBackdrop'
 import { AudioMetadata } from '../services/AudioMetadata'
 import { media } from '@kit.MediaKit'
 import { common } from '@kit.AbilityKit'
@@ -395,6 +396,7 @@ export struct CloudDrivePage {
 
   build() {
     NavDestination() {
+      SkinBackdrop()
       Stack({ alignContent: Alignment.Bottom }) {
         Column({ space: 10 }) {
           Row({ space: 16 }) {

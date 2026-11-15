@@ -1,3 +1,4 @@
+import { SkinBackdrop } from '../components/SkinBackdrop'
 import { common } from '@kit.AbilityKit'
 import { ApiClient } from '../services/ApiClient'
 import { AppSettings } from '../services/AppSettings'
@@ -159,6 +160,7 @@ export struct DeviceManagementPage {
 
   build() {
     NavDestination() {
+      SkinBackdrop()
       Column() {
         Column().width('100%').height(this.topAvoidHeight)
         Row() {

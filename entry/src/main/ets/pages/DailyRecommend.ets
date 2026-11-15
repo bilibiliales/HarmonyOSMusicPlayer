@@ -1,3 +1,4 @@
+import { SkinBackdrop } from '../components/SkinBackdrop'
 import { DailySongsResponse, mapApiSong, songItemType } from '../models'
 import { ApiClient } from '../services/ApiClient'
 import { playerController } from '../services/PlayerController'
@@ -98,6 +99,7 @@ export struct DailyRecommendPage {
 
   build() {
     NavDestination() {
+      SkinBackdrop()
       Stack({ alignContent: Alignment.TopStart }) {
         Scroll(this.scroller) {
           Column() {

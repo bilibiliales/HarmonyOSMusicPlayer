@@ -1,3 +1,4 @@
+import { SkinBackdrop } from '../components/SkinBackdrop'
 import { common } from '@kit.AbilityKit'
 import { LocalLibrary, LocalTrack } from '../services/LocalLibrary'
 import { playerController } from '../services/PlayerController'
@@ -242,6 +243,7 @@ export struct LocalMusicPage {
 
   build() {
     NavDestination() {
+      SkinBackdrop()
       Column({ space: 14 }) {
         Row({ space: 14 }) {
           SymbolGlyph($r('sys.symbol.chevron_left')).fontSize(22).fontColor([TC.textPrimary()]).onClick(() => this.pageStack.pop())

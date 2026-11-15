@@ -1,3 +1,4 @@
+import { SkinBackdrop } from '../components/SkinBackdrop'
 import {
   AlbumPageParam,
   ArtistPageParam,
@@ -250,6 +251,7 @@ export struct DigitalAlbumDetailPage {
 
   build() {
     NavDestination() {
+      SkinBackdrop()
       Column() {
         Column().width('100%').height(this.topAvoidHeight)
         this.Header()

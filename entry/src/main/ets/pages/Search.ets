@@ -1,3 +1,4 @@
+import { SkinBackdrop } from '../components/SkinBackdrop'
 import {
   AlbumPageParam,
   ApiAlbum,
@@ -904,6 +905,7 @@ export struct SearchPage {
 
   build() {
     NavDestination() {
+      SkinBackdrop()
       Column() {
         Column().width('100%').height(this.topAvoidHeight)
         Row({ space: 10 }) {

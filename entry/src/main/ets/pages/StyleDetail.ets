@@ -1,3 +1,4 @@
+import { SkinBackdrop } from '../components/SkinBackdrop'
 import {
   AlbumPageParam,
   ApiAlbum,
@@ -755,6 +756,7 @@ export struct StyleDetailPage {
 
   build() {
     NavDestination() {
+      SkinBackdrop()
       Stack({ alignContent: Alignment.TopStart }) {
         Scroll(this.scroller) {
           Column() {

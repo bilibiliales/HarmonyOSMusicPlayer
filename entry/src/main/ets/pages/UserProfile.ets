@@ -1,3 +1,4 @@
+import { SkinBackdrop } from '../components/SkinBackdrop'
 import { EventUpdates } from '../services/EventUpdates'
 import { EventPresentation } from '../services/EventPresentation'
 import { EventCard } from '../components/EventCard'
@@ -611,6 +612,7 @@ export struct UserProfilePage {
 
   build() {
     NavDestination() {
+      SkinBackdrop()
       Stack({ alignContent: Alignment.TopStart }) {
         Column() {
           if (this.loading) {

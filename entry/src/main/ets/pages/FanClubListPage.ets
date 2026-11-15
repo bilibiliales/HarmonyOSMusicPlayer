@@ -1,3 +1,4 @@
+import { SkinBackdrop } from '../components/SkinBackdrop'
 import { FanClubGroup, FanClubDetailParam, FanClubService } from '../services/FanClubService'
 import { ArtistPageParam } from '../models/api'
 import { BubbleTip } from '../services/BubbleTip'
@@ -42,6 +43,7 @@ export struct FanClubListPage {
 
   build() {
     NavDestination() {
+      SkinBackdrop()
       Column() {
         Column().width('100%').height(this.topAvoidHeight)
         Row() {

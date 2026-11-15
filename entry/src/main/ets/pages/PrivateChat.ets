@@ -1,3 +1,4 @@
+import { SkinBackdrop } from '../components/SkinBackdrop'
 import {
   ApiAlbum,
   ApiArtist,
@@ -534,9 +535,12 @@ export struct PrivateChatPage {
             .padding({ left: 14, right: 14, top: 10, bottom: 10 })
             .backgroundColor(item.isSelf ? TC.accent() : TC.surfaceCard())
             .borderRadius(18)
+            // 限制单行宽度：对面发长文本时气泡自动换行，不会把整行撑到屏幕外
+            .constraintSize({ maxWidth: 240 })
             .maxLines(10)
         }
       }
+      .constraintSize({ maxWidth: '76%' })
       .alignItems(item.isSelf ? HorizontalAlign.End : HorizontalAlign.Start)
       if (item.isSelf) {
         Image(item.fromAvatar || this.authStore.avatarUrl)
@@ -548,6 +552,7 @@ export struct PrivateChatPage {
 
   build() {
     NavDestination() {
+      SkinBackdrop()
       Stack() {
       Column() {
         Column().width('100%').height(this.topAvoidHeight)

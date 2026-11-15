@@ -1,3 +1,4 @@
+import { SkinBackdrop } from '../components/SkinBackdrop'
 import { mapApiSong, NewSongPageParam, songItemType, TopSongResponse } from '../models'
 import { ApiClient } from '../services/ApiClient'
 import { playerController } from '../services/PlayerController'
@@ -105,6 +106,7 @@ export struct NewSongListPage {
 
   build() {
     NavDestination() {
+      SkinBackdrop()
       Stack({ alignContent: Alignment.TopStart }) {
         Scroll(this.scroller) {
           Column() {

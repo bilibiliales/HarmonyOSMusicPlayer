@@ -1,3 +1,4 @@
+import { SkinBackdrop } from '../components/SkinBackdrop'
 import { FanClubDetail, FanClubDetailParam, FanClubService } from '../services/FanClubService'
 import { ArtistPageParam, UserEventItem } from '../models/api'
 import { EventCard } from '../components/EventCard'
@@ -79,6 +80,7 @@ export struct FanClubDetailPage {
 
   build() {
     NavDestination() {
+      SkinBackdrop()
       Column() {
         Column().width('100%').height(this.topAvoidHeight)
         Row() {

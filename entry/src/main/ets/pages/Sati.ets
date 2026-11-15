@@ -1,3 +1,4 @@
+import { SkinBackdrop } from '../components/SkinBackdrop'
 import {
   SatiMoreResponse,
   SatiOperationResponse,
@@ -427,6 +428,7 @@ export struct SatiPage {
       this.PageContent(false)
     } else {
       NavDestination() {
+        SkinBackdrop()
         this.PageContent(true)
       }.hideTitleBar(true).backgroundColor(TC.pageBackground())
     }

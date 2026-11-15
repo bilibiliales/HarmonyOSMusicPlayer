@@ -1,3 +1,4 @@
+import { SkinBackdrop } from '../components/SkinBackdrop'
 import {
   DigitalAlbumDetailPageParam,
   DigitalAlbumNewResponse,
@@ -346,6 +347,7 @@ export struct DigitalAlbumPage {
       this.PageContent(false)
     } else {
       NavDestination() {
+        SkinBackdrop()
         this.PageContent(true)
       }.hideTitleBar(true).backgroundColor(TC.pageBackground())
     }

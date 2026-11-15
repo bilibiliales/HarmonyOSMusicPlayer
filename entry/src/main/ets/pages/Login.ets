@@ -1,3 +1,4 @@
+import { SkinBackdrop } from '../components/SkinBackdrop'
 import { ApiClient } from '../services/ApiClient'
 import { AppSettings } from '../services/AppSettings'
 import { AuthStore } from '../stores/AuthStore'
@@ -345,6 +346,7 @@ export struct Login {
 
   build() {
     NavDestination() {
+      SkinBackdrop()
       Column() {
         Column().width('100%').height(this.topAvoidHeight)
         Row() {

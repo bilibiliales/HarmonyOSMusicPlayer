@@ -1,3 +1,4 @@
+import { SkinBackdrop } from '../components/SkinBackdrop'
 import { ResourceComments } from '../components/ResourceComments'
 import { CommentResource } from '../models/CommentResource'
 import { CommentService } from '../services/CommentService'
@@ -142,6 +143,7 @@ export struct RadioDetailPage {
 
   build() {
     NavDestination() {
+      SkinBackdrop()
       Column() {
         Row({ space: 14 }) {
           SymbolGlyph($r('sys.symbol.chevron_left')).fontSize(24).fontColor([TC.textPrimary()]).onClick(() => this.pageStack.pop())
@@ -248,6 +250,7 @@ export struct RadioProgramPage {
 
   build() {
     NavDestination() {
+      SkinBackdrop()
       Column() {
         Row({ space: 14 }) {
           SymbolGlyph($r('sys.symbol.chevron_left')).fontSize(24).fontColor([TC.textPrimary()]).onClick(() => this.pageStack.pop())

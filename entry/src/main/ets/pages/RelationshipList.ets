@@ -1,3 +1,4 @@
+import { SkinBackdrop } from '../components/SkinBackdrop'
 import {
   ArtistFanItem,
   ArtistFanProfile,
@@ -286,6 +287,7 @@ export struct RelationshipListPage {
 
   build() {
     NavDestination() {
+      SkinBackdrop()
       Stack() {
         Column() {
           Column().width('100%').height(this.topAvoidHeight)

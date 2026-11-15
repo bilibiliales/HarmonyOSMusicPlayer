@@ -1,3 +1,4 @@
+import { SkinBackdrop } from '../components/SkinBackdrop'
 import { AuthStore } from '../stores/AuthStore'
 import { ListeningPlaylistService } from '../services/ListeningPlaylistService'
 import { RecentPlaybackService, RecentEntry } from '../services/RecentPlaybackService'
@@ -79,6 +80,7 @@ export struct RecentPlaybackPage {
 
   build() {
     NavDestination() {
+      SkinBackdrop()
       Column() {
         Row({ space: 14 }) {
           SymbolGlyph($r('sys.symbol.chevron_left')).fontSize(24).fontColor([TC.textPrimary()]).onClick(() => this.pageStack.pop())

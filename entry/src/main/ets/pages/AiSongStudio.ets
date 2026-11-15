@@ -1,3 +1,4 @@
+import { SkinBackdrop } from '../components/SkinBackdrop'
 import { http } from '@kit.NetworkKit'
 import {
   ApiSong,
@@ -438,6 +439,7 @@ export struct AiSongStudioPage {
 
   build() {
     NavDestination() {
+      SkinBackdrop()
       Column() {
         Column().width('100%').height(this.topAvoidHeight)
         Row() {

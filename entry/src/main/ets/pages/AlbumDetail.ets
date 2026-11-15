@@ -1,3 +1,4 @@
+import { SkinBackdrop } from '../components/SkinBackdrop'
 import { ResourceComments } from '../components/ResourceComments'
 import { CommentResource } from '../models/CommentResource'
 import {
@@ -332,6 +333,7 @@ export struct AlbumDetail {
 
   build() {
     NavDestination() {
+      SkinBackdrop()
       if (this.loading) {
         Column() {
           LoadingProgress().width(42).height(42).color(TC.accent())

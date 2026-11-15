@@ -1,3 +1,4 @@
+import { SkinBackdrop } from '../components/SkinBackdrop'
 import { fileIo } from '@kit.CoreFileKit'
 import { photoAccessHelper } from '@kit.MediaLibraryKit'
 import { OperationResponse, PlaylistCreateResponse } from '../models/api'
@@ -133,6 +134,7 @@ export struct PlaylistEditorPage {
 
   build() {
     NavDestination() {
+      SkinBackdrop()
       Column() {
         Column().width('100%').height(this.topAvoidHeight)
         Row({ space: 12 }) {

@@ -1,3 +1,4 @@
+import { SkinBackdrop } from '../components/SkinBackdrop'
 import { common } from '@kit.AbilityKit'
 import { DecorationMedia } from '../services/DecorationMedia'
 import { fileIo, fileUri } from '@kit.CoreFileKit'
@@ -1102,6 +1103,7 @@ export struct SongWiki {
 
   build() {
     NavDestination() {
+      SkinBackdrop()
       Column() {
         Column().width('100%').height(this.topAvoidHeight)
         Row() {

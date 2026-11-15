@@ -1,3 +1,4 @@
+import { SkinBackdrop } from '../components/SkinBackdrop'
 import {
   StyleDetailPageParam,
   StyleListResponse,
@@ -303,6 +304,7 @@ export struct StylePage {
       this.PageContent(false)
     } else {
       NavDestination() {
+        SkinBackdrop()
         this.PageContent(true)
       }.hideTitleBar(true).backgroundColor(TC.pageBackground())
     }

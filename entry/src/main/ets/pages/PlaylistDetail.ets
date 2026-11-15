@@ -1,3 +1,4 @@
+import { SkinBackdrop } from '../components/SkinBackdrop'
 import { CommentService } from '../services/CommentService'
 import { ResourceComments } from '../components/ResourceComments'
 import { CommentResource } from '../models/CommentResource'
@@ -618,6 +619,7 @@ export struct PlaylistDetail {
 
   build() {
     NavDestination() {
+      SkinBackdrop()
       Stack({ alignContent: Alignment.TopStart }) {
         Scroll(this.scroller) {
           Column() {

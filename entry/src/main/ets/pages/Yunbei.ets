@@ -1,3 +1,4 @@
+import { SkinBackdrop } from '../components/SkinBackdrop'
 import { common, OpenLinkOptions } from '@kit.AbilityKit'
 import { AuthStore } from '../stores/AuthStore'
 import { BubbleTip } from '../services/BubbleTip'
@@ -126,6 +127,7 @@ export struct YunbeiPage {
 
   build() {
     NavDestination() {
+      SkinBackdrop()
       Column({ space: 16 }) {
         Row({ space: 14 }) {
           SymbolGlyph($r('sys.symbol.chevron_left')).fontSize(22).fontColor([TC.textPrimary()])

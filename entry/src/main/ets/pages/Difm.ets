@@ -1,3 +1,4 @@
+import { SkinBackdrop } from '../components/SkinBackdrop'
 import { DifmService, DifmSource, DifmStyle, DifmChannel, DifmTrack } from '../services/DifmService'
 import { RadioService } from '../services/RadioService'
 import { playerController } from '../services/PlayerController'
@@ -122,6 +123,7 @@ export struct DifmPage {
 
   build() {
     NavDestination() {
+      SkinBackdrop()
       Column() {
         Row({ space: 14 }) {
           SymbolGlyph($r('sys.symbol.chevron_left')).fontSize(24).fontColor([TC.textPrimary()]).onClick(() => this.pageStack.pop())

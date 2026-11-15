@@ -1,3 +1,4 @@
+import { SkinBackdrop } from '../components/SkinBackdrop'
 import { DeviceItem, DeviceService } from '../services/DeviceService'
 import { BubbleTip } from '../services/BubbleTip'
 import { TC } from '../services/ThemeColors'
@@ -83,6 +84,7 @@ export struct DeviceDetailPage {
 
   build() {
     NavDestination() {
+      SkinBackdrop()
       Column() {
         Column().width('100%').height(this.topAvoidHeight)
         Row() {

@@ -1,3 +1,4 @@
+import { SkinBackdrop } from '../components/SkinBackdrop'
 import { common } from '@kit.AbilityKit'
 import { PlayMode, QUALITY_OPTIONS, QualityOption } from '../models/music'
 import { ApiClient } from '../services/ApiClient'
@@ -301,6 +302,7 @@ export struct SettingsPage {
 
   build() {
     NavDestination() {
+      SkinBackdrop()
       Column() {
         Column().width('100%').height(this.topAvoidHeight)
         Row() {

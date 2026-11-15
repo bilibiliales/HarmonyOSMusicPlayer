@@ -1,3 +1,4 @@
+import { SkinBackdrop } from '../components/SkinBackdrop'
 import {
   ArtistPageParam,
   ArtistToplistArtist,
@@ -384,6 +385,7 @@ export struct RankingPage {
       this.PageContent(false)
     } else {
       NavDestination() {
+        SkinBackdrop()
         this.PageContent(true)
       }.hideTitleBar(true).backgroundColor(TC.pageBackground())
     }

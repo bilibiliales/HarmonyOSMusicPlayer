@@ -1,3 +1,4 @@
+import { SkinBackdrop } from '../components/SkinBackdrop'
 import { DjRadioItem } from '../models/api'
 import { ProgramItem } from '../models/home'
 import { RadioCategory, RadioPageParam } from '../models/radio'
@@ -237,6 +238,11 @@ export struct RadioPage {
 
   build() {
     if (this.embedded) { this.Content() }
-    else { NavDestination() { this.Content() }.hideTitleBar(true).backgroundColor(TC.pageBackground()) }
+    else {
+      NavDestination() {
+        SkinBackdrop()
+        this.Content()
+      }.hideTitleBar(true).backgroundColor(TC.pageBackground())
+    }
   }
 }

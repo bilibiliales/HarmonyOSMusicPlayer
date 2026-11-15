@@ -1,3 +1,4 @@
+import { SkinBackdrop } from '../components/SkinBackdrop'
 import { common } from '@kit.AbilityKit'
 import { BubbleTip } from '../services/BubbleTip'
 import { DecorationMedia } from '../services/DecorationMedia'
@@ -1462,11 +1463,15 @@ export struct DecorationEditorPage {
           onChange: (v: number) => this.sideTextSize = v
         })
         DecoColorPicker({
-          label: '文字颜色', value: this.sideTextColor,
-          onChange: (v: string) => this.sideTextColor = v
+          label: '文字颜色（同时作用于图标）', value: this.sideTextColor,
+          onChange: (v: string) => {
+            this.sideTextColor = v
+            // 文字色调整同时带动图标色；需要单独配色可在下面的「图标颜色」里覆盖
+            this.sideIconColor = v
+          }
         })
         DecoColorPicker({
-          label: '图标颜色', value: this.sideIconColor,
+          label: '图标颜色（单独覆盖）', value: this.sideIconColor,
           onChange: (v: string) => this.sideIconColor = v
         })
       }
@@ -1684,6 +1689,7 @@ export struct DecorationEditorPage {
 
   build() {
     NavDestination() {
+      SkinBackdrop()
       Column() {
         Column().width('100%').height(this.topAvoidHeight)
 
