@@ -1,4 +1,5 @@
 import {
+  ApiParam,
   ListenDataResponse,
   ListenDataValue,
   ListenReportData,
@@ -12,7 +13,10 @@ import {
 } from '../models/api'
 import { ApiClient } from '../services/ApiClient'
 import { AuthStore } from '../stores/AuthStore'
-import { buildListeningPeriod, ListeningDay, ListeningPeriod, listeningDayBackground, listeningDayColor } from '../services/ListeningFootprint'
+import {
+  buildListeningPeriod, ListeningDay, ListeningPeriod, listeningDayBackground, listeningDayColor,
+  listeningPeriodEnd, listeningPeriodOffsetLabel, listeningPeriodStart, listeningPeriodTitle
+} from '../services/ListeningFootprint'
 import { TC } from '../services/ThemeColors'
 
 @Component
@@ -32,31 +36,131 @@ export struct ListeningStatsPage {
   @State selectedDay: string = ''
   @State weekMessage: string = ''
   @State monthMessage: string = ''
+  /** 0 = 本周/本月（不传 endTime）；负数 = 往前翻了几个周期。周、月各自独立。 */
+  @State weekOffset: number = 0
+  @State monthOffset: number = 0
+  @State switching: boolean = false
+
+  /** 已翻过的周期缓存，来回切换不再重复请求。 */
+  private reportCache: Map<string, ListenReportData> = new Map<string, ListenReportData>()
+  private emptyCache: Map<string, string> = new Map<string, string>()
+
+  private cacheKey(period: string, offset: number): string { return `${period}:${offset}` }
+  private offsetFor(period: string): number { return period === 'week' ? this.weekOffset : this.monthOffset }
+  private activeOffset(): number { return this.offsetFor(this.currentPeriod) }
 
   private activeReport(): ListenReportData | null { return this.currentPeriod === 'week' ? this.weekReport : this.monthReport }
   private activeChart(): ListeningPeriod | null { return this.currentPeriod === 'week' ? this.weekChart : this.monthChart }
   private activeMessage(): string { return this.currentPeriod === 'week' ? this.weekMessage : this.monthMessage }
+
+  private activeChartTitle(): string {
+    const chart = this.activeChart()
+    return chart ? chart.title : listeningPeriodTitle(this.currentPeriod, this.activeOffset())
+  }
+
+  /** 下一周期：最多回到最新的本周/本月，不能翻到未来。 */
+  private canGoNewer(): boolean { return this.activeOffset() < 0 }
+
+  /** 上一周期：限制最大回溯范围，并保证时间戳仍有效。 */
+  private canGoOlder(): boolean {
+    const next = this.activeOffset() - 1
+    if (this.currentPeriod === 'week' ? next < -104 : next < -60) { return false }
+    return listeningPeriodEnd(this.currentPeriod, next) > 0
+  }
 
   private switchPeriod(period: string): void {
     this.currentPeriod = period
     this.selectedDay = ''
   }
 
-  private async loadReport(period: string): Promise<void> {
-    try {
-      const response = await ApiClient.get<ListenReportResponse>('/listen/data/report', [{ key: 'type', value: period }])
-      if (response.code !== 200 || !response.data) { throw new Error(response.message || '暂无该周期的听歌报告') }
-      if (period === 'week') {
-        this.weekReport = response.data
-        this.weekChart = buildListeningPeriod(response.data, false)
-      } else {
-        this.monthReport = response.data
-        this.monthChart = buildListeningPeriod(response.data, true)
+  /** delta = -1 上一周期，+1 下一周期。 */
+  private async stepPeriod(delta: number): Promise<void> {
+    if (this.switching || this.loading) { return }
+    if (delta < 0 && !this.canGoOlder()) { return }
+    if (delta > 0 && !this.canGoNewer()) { return }
+    const period = this.currentPeriod
+    const next = this.offsetFor(period) + delta
+    if (period === 'week') { this.weekOffset = next } else { this.monthOffset = next }
+    this.selectedDay = ''
+    this.switching = true
+    await this.loadReport(period, next)
+    this.switching = false
+  }
+
+  private async fetchReport(period: string, endTime: number, seconds: boolean): Promise<ListenReportResponse> {
+    const params: ApiParam[] = [{ key: 'type', value: period }]
+    if (endTime > 0) {
+      const endParam: ApiParam = {
+        key: 'endTime',
+        value: (seconds ? Math.floor(endTime / 1000) : endTime).toString()
       }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : '听歌报告加载失败'
-      if (period === 'week') { this.weekMessage = message } else { this.monthMessage = message }
+      params.push(endParam)
     }
+    return await ApiClient.get<ListenReportResponse>('/listen/data/report', params)
+  }
+
+  private applyReport(period: string, offset: number, data: ListenReportData | null, errorMessage: string): void {
+    // 异步返回时用户可能已翻到别的周期，此时结果只留在缓存里，不覆盖当前展示
+    if (this.offsetFor(period) !== offset) { return }
+    const monthly = period === 'month'
+    // 当前周期仍按接口 startTime 对齐；历史周期用本地锚点，避免短日期被解析到当前月
+    let chart: ListeningPeriod | null = null
+    if (data) {
+      chart = offset === 0 ? buildListeningPeriod(data, monthly) :
+        buildListeningPeriod(data, monthly, new Date(), listeningPeriodStart(period, offset))
+    }
+    if (period === 'week') {
+      this.weekReport = data
+      this.weekChart = chart
+      this.weekMessage = errorMessage
+    } else {
+      this.monthReport = data
+      this.monthChart = chart
+      this.monthMessage = errorMessage
+    }
+  }
+
+  private async loadReport(period: string, offset: number): Promise<void> {
+    const key = this.cacheKey(period, offset)
+    if (this.reportCache.has(key)) {
+      this.applyReport(period, offset, this.reportCache.get(key) ?? null, '')
+      return
+    }
+    if (this.emptyCache.has(key)) {
+      this.applyReport(period, offset, null, this.emptyCache.get(key) || '暂无该周期的听歌足迹')
+      return
+    }
+    const endTime = listeningPeriodEnd(period, offset)
+    try {
+      let response = await this.fetchReport(period, endTime, false)
+      // 时间戳单位自适应：某些部署的 endTime 只认秒级，毫秒无数据时再试一次
+      if (endTime > 0 && (response.code !== 200 || !response.data)) {
+        response = await this.fetchReport(period, endTime, true)
+      }
+      const data = response.data
+      if (response.code !== 200 || !data) {
+        throw new Error(response.message || '暂无该周期的听歌足迹')
+      }
+      this.reportCache.set(key, data)
+      this.applyReport(period, offset, data, '')
+    } catch (error) {
+      const text = error instanceof Error ? error.message : '听歌报告加载失败'
+      this.emptyCache.set(key, text)
+      this.applyReport(period, offset, null, text)
+    }
+  }
+
+  private async retryCurrent(): Promise<void> {
+    if (this.switching) { return }
+    const period = this.currentPeriod
+    const offset = this.activeOffset()
+    const key = this.cacheKey(period, offset)
+    this.reportCache.delete(key)
+    this.emptyCache.delete(key)
+    this.switching = true
+    await this.loadReport(period, offset)
+    this.switching = false
+    if (!this.total) { await this.loadTotal() }
   }
 
   private async loadTotal(): Promise<void> {
@@ -80,7 +184,11 @@ export struct ListeningStatsPage {
     this.message = ''
     this.weekMessage = ''
     this.monthMessage = ''
-    await Promise.all([this.loadTotal(), this.loadReport('week'), this.loadReport('month')])
+    await Promise.all([
+      this.loadTotal(),
+      this.loadReport('week', this.weekOffset),
+      this.loadReport('month', this.monthOffset)
+    ])
     if (!this.total && !this.weekReport && !this.monthReport) {
       this.message = this.activeMessage() || '暂无听歌足迹'
     }
@@ -143,7 +251,7 @@ export struct ListeningStatsPage {
   }
 
   private periodLabel(): string {
-    return this.currentPeriod === 'week' ? '本周' : '本月'
+    return listeningPeriodOffsetLabel(this.currentPeriod, this.activeOffset())
   }
 
   private percent(value?: string): number { return Math.max(0, Math.min(100, parseFloat(value || '0') || 0)) }
@@ -332,7 +440,7 @@ export struct ListeningStatsPage {
     Row() {
       ForEach(['week', 'month'], (period: string) => {
         Column({ space: 7 }) {
-          Text(period === 'week' ? '本周' : '本月').fontSize(15)
+          Text(period === 'week' ? '周报' : '月报').fontSize(15)
             .fontWeight(this.currentPeriod === period ? FontWeight.Bold : FontWeight.Regular)
             .fontColor(this.currentPeriod === period ? TC.textPrimary() : TC.textTertiary())
           Column().width(24).height(3).borderRadius(2)
@@ -341,6 +449,43 @@ export struct ListeningStatsPage {
           .onClick(() => this.switchPeriod(period))
       })
     }.width('100%')
+  }
+
+  private navigatorHint(): string {
+    if (this.switching) { return '正在加载该周期…' }
+    return `${listeningPeriodOffsetLabel(this.currentPeriod, this.activeOffset())} · 左右箭头切换周期`
+  }
+
+  /** 左箭头 = 上一周期，右箭头 = 下一周期；周 / 月各自独立，年度暂不开放。 */
+  @Builder
+  private PeriodNavigator() {
+    Row({ space: 12 }) {
+      Row() {
+        SymbolGlyph($r('sys.symbol.chevron_left')).fontSize(20).fontColor([TC.textPrimary()])
+      }
+      .width(38).height(38).borderRadius(19)
+      .backgroundColor(TC.surfaceRaised())
+      .justifyContent(FlexAlign.Center)
+      .opacity(this.canGoOlder() && !this.switching ? 1 : 0.35)
+      .onClick(() => this.stepPeriod(-1))
+
+      Column({ space: 3 }) {
+        Text(this.activeChartTitle()).fontSize(14).fontWeight(FontWeight.Medium)
+          .fontColor(TC.textPrimary()).maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
+        Text(this.navigatorHint())
+          .fontSize(10).fontColor(TC.textTertiary()).maxLines(1)
+      }.layoutWeight(1).alignItems(HorizontalAlign.Center)
+
+      Row() {
+        SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(20).fontColor([TC.textPrimary()])
+      }
+      .width(38).height(38).borderRadius(19)
+      .backgroundColor(TC.surfaceRaised())
+      .justifyContent(FlexAlign.Center)
+      .opacity(this.canGoNewer() && !this.switching ? 1 : 0.35)
+      .onClick(() => this.stepPeriod(1))
+    }
+    .width('100%').height(58).padding({ left: 16, right: 16 })
   }
 
   @Builder
@@ -474,6 +619,7 @@ export struct ListeningStatsPage {
         .height(56).width('100%').padding({ left: 16, right: 16 })
 
         this.PeriodTabs()
+        this.PeriodNavigator()
 
         if (this.loading) {
           LoadingProgress().layoutWeight(1).width(46).color(TC.accent())
@@ -505,7 +651,8 @@ export struct ListeningStatsPage {
               } else {
                 Text(this.activeMessage() || '暂无该周期的听歌数据').width('100%').fontSize(13)
                   .fontColor(TC.textSecondary()).textAlign(TextAlign.Center).padding(24)
-                Button('重新加载').fontColor(TC.textOnAccent()).backgroundColor(TC.accent()).onClick(() => this.loadData())
+                Button('重新加载').fontColor(TC.textOnAccent()).backgroundColor(TC.accent())
+                  .onClick(() => this.retryCurrent())
               }
 
               Text('听歌足迹数据由网易云接口提供，部分账号或数据维度可能需要会员权益。')
