@@ -6,6 +6,7 @@ import { parseVipInfo, VipDisplayInfo } from '../services/VipService'
 import { AuthStore } from '../stores/AuthStore'
 import { TC } from '../services/ThemeColors'
 import { DecoKeys } from '../services/DecorationRuntime'
+import { DecorationMedia } from '../services/DecorationMedia'
 
 interface SidebarMenuItem {
   icon: Resource
@@ -155,7 +156,7 @@ export struct Sidebar {
       const dateStr = `${date.getFullYear()}.${(date.getMonth() + 1).toString().padStart(2, '0')}.${date.getDate().toString().padStart(2, '0')}`
       return `有效期至 ${dateStr}`
     }
-    return '音质选项根据歌曲资源和账号权限自动回落'
+    return '会员有效期内可享受对应音质权益'
   }
 
   aboutToAppear(): void {
@@ -228,7 +229,7 @@ export struct Sidebar {
   @Builder
   private VipMark() {
     if (this.vipBadgeSrc()) {
-      Image(this.vipBadgeSrc()).width(40).height(18).objectFit(ImageFit.Contain)
+      Image(DecorationMedia.displayUri(this.vipBadgeSrc())).width(40).height(18).objectFit(ImageFit.Contain)
     } else if (this.vipSvip) {
       Image($r('app.media.ic_svip')).width(40).height(18).objectFit(ImageFit.Contain)
     } else {
@@ -241,7 +242,7 @@ export struct Sidebar {
     Column({ space: 0 }) {
       if (this.vipCardImage.length > 0 || (this.vipCardBg.length > 0 && this.vipActive)) {
         Stack({ alignContent: Alignment.TopStart }) {
-          Image(this.vipCardImage ? this.vipCardImage : this.vipCardBg)
+          Image(DecorationMedia.displayUri(this.vipCardImage ? this.vipCardImage : this.vipCardBg))
             .width('100%')
             .height(140)
             .objectFit(ImageFit.Cover)
@@ -288,7 +289,7 @@ export struct Sidebar {
             }
             .width('100%')
             Divider().color('rgba(255,255,255,0.08)')
-            Text('音质选项会根据歌曲实际资源和账号权限自动回落')
+            Text('会员有效期内可享受对应音质权益')
               .fontSize(11)
               .fontColor('#92877d')
           }
@@ -348,7 +349,7 @@ export struct Sidebar {
           }
           .width('100%')
           Divider().color('rgba(255,255,255,0.08)')
-          Text('音质选项会根据歌曲实际资源和账号权限自动回落')
+          Text('会员有效期内可享受对应音质权益')
             .fontSize(11)
             .fontColor('#92877d')
         }
@@ -598,7 +599,7 @@ export struct Sidebar {
           .backgroundColor(this.sidebarBgColor ? this.sidebarBgColor : TC.sheetBackground())
 
         if (this.sidebarBg) {
-          Image(this.sidebarBg)
+          Image(DecorationMedia.displayUri(this.sidebarBg))
             .width('100%')
             .height('100%')
             .objectFit(ImageFit.Cover)

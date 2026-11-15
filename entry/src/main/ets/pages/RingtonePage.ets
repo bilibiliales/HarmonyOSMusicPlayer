@@ -17,13 +17,8 @@ interface RingtoneLyric {
   text: string
 }
 
-/** 时间轴上的一行歌词：y 为相对歌词窗口顶部的 vp 位置。 */
-interface LyricRow {
-  time: number
-  text: string
-  y: number
-  inRange: boolean
-}
+/** 拖标签时每移动这么多 vp 算一行歌词。 */
+const LYRIC_STEP_VP: number = 40
 
 const BAR_COUNT: number = 56
 
@@ -60,31 +55,34 @@ export struct RingtonePage {
   private clipKey: string = ''
   private dragBaseStart: number = 0
   private dragBaseEnd: number = 0
-  private dragBaseLength: number = 0
+  private lyricScroller: Scroller = new Scroller()
+  private lyricUserScrolling: boolean = false
+  private limitNotified: boolean = false
 
-  // ---- 歌词时间轴 ----
-  // 歌词按「秒 → vp」线性铺开，组件逻辑高度 = 整首歌时长 * pxPerSec，
-  // 窗口只显示选区中点附近的一段；两条横线恰好圈出 startSec~endSec 的歌词。
+  // ---- 歌词行刻度 ----
+  // 标签拖动 / 歌词滑动都以「一行歌词」为颗粒度；
+  // 下方波形片段的手柄才是精确到秒的真正主控。
 
-  /** 让「最大可选时长」占窗口 68%，因此选区再长也不会撑出歌词窗口。 */
-  private pxPerSec(): number {
-    if (this.lyricHeight < 60) { return 4 }
-    return Math.max(1.5, this.lyricHeight * 0.68 / Math.max(1, this.maxLength()))
+  /** 歌词行的时间刻度（秒，升序去重）。 */
+  private lyricTimes(): number[] {
+    const result: number[] = []
+    for (const line of this.lyrics) {
+      const sec = Math.max(0, Math.round(line.time / 1000))
+      if (!result.includes(sec)) { result.push(sec) }
+    }
+    return result
   }
 
-  /** 视窗中心时间 = 选区中点；拖标签 / 滑歌词都会改变它，歌词因此跟着滚动。 */
-  private centerSec(): number {
-    return (this.startSec + this.endSec) / 2
-  }
-
-  /** 拖标签时中心也移动一半，标签视觉位移 = Δ秒/2 * p，故系数取 2/p 才能跟手。 */
-  private markerSecondsPerVp(): number {
-    return 2 / this.pxPerSec()
-  }
-
-  /** 滑动歌词时内容位移 = Δ秒 * p，系数取 1/p；向下拖 = 看更早的歌词。 */
-  private scrollSecondsPerVp(): number {
-    return 1 / this.pxPerSec()
+  /** 以「一行歌词」为单位移动；没有歌词时退化为按整秒步进。 */
+  private stepByLine(baseSec: number, steps: number): number {
+    const times = this.lyricTimes()
+    if (times.length === 0) { return Math.max(0, baseSec + steps) }
+    let index = 0
+    for (let i = 0; i < times.length; i++) {
+      if (times[i] <= baseSec) { index = i }
+    }
+    const target = Math.max(0, Math.min(times.length - 1, index + steps))
+    return times[target]
   }
 
   aboutToAppear(): void {
@@ -181,29 +179,12 @@ export struct RingtonePage {
     return { time: Math.round((minutes * 60 + seconds) * 1000), text: text }
   }
 
-  /**
-   * 只构建落在视窗（含上下缓冲）里的歌词行，避免整首歌几百行全量渲染。
-   * y 按真实时间轴计算，密集歌词用最小行距推开以免重叠。
-   */
-  private lyricRows(): LyricRow[] {
-    const p = this.pxPerSec()
-    const center = this.centerSec()
-    const half = this.lyricHeight / 2
-    const rows: LyricRow[] = []
-    let lastY = -10000
-    for (const line of this.lyrics) {
-      const timeSec = line.time / 1000
-      let y = half + (timeSec - center) * p
-      if (y < -50 || y > this.lyricHeight + 50) { continue }
-      if (y < lastY + 26) { y = lastY + 26 }
-      lastY = y
-      const row: LyricRow = {
-        time: line.time, text: line.text, y: y,
-        inRange: timeSec >= this.startSec && timeSec < this.endSec
-      }
-      rows.push(row)
-    }
-    return rows
+  /** 当前这句歌词是否落在选区内（纯文本歌词只用颜色区分）。 */
+  private lineSelected(index: number): boolean {
+    const line = this.lyrics[index]
+    if (!line) { return false }
+    const sec = line.time / 1000
+    return sec >= this.startSec && sec < this.endSec
   }
 
   /** 片段最大长度：不能超过当前铃声类型的上限，也不能超过歌曲本身长度。 */
@@ -212,18 +193,22 @@ export struct RingtonePage {
     return Math.max(1, Math.min(this.maxSeconds, songLength))
   }
 
-  /** 三处拖动共用的统一约束：0 <= start < end <= duration，且长度 <= 类型上限。 */
-  private clampSelection(): void {
+  /**
+   * 统一兜底：超出「类型最大时长」时优先保开始，结束自动落到 开始 + 限时。
+   * 每次拖动只提醒一次，避免手势每帧弹气泡。
+   */
+  private enforceLimit(tip: boolean): void {
     const maxLen = this.maxLength()
     if (this.startSec < 0) { this.startSec = 0 }
-    if (this.endSec > this.durationSec) { this.endSec = this.durationSec }
+    if (this.startSec > this.durationSec - 1) { this.startSec = Math.max(0, this.durationSec - 1) }
     if (this.endSec - this.startSec > maxLen) {
-      this.endSec = this.startSec + maxLen
+      this.endSec = Math.min(this.durationSec, this.startSec + maxLen)
+      if (tip && !this.limitNotified) {
+        this.limitNotified = true
+        BubbleTip.show(this.getUIContext(), `最长 ${maxLen} 秒，结束时间已自动调整`)
+      }
     }
-    if (this.endSec > this.durationSec) {
-      this.endSec = this.durationSec
-      this.startSec = Math.max(0, this.endSec - maxLen)
-    }
+    if (this.endSec > this.durationSec) { this.endSec = this.durationSec }
     if (this.endSec - this.startSec < 1) {
       this.endSec = Math.min(this.durationSec, this.startSec + 1)
       this.startSec = Math.max(0, this.endSec - 1)
@@ -235,58 +220,49 @@ export struct RingtonePage {
     this.clipKey = ''
   }
 
-  private setStart(value: number): void {
-    // 下界由「end - 最大长度」决定：往左拖也不会让片段超出类型上限
-    const floor = Math.max(0, this.endSec - this.maxLength())
-    const ceiling = Math.max(floor, this.endSec - 1)
-    this.startSec = Math.min(ceiling, Math.max(floor, value))
+  /** 波形手柄主控：精确到秒（整数），超限保开始并提醒。 */
+  private setStart(value: number, tip: boolean = true): void {
+    this.startSec = Math.max(0, Math.min(this.durationSec - 1, Math.round(value)))
+    if (this.endSec <= this.startSec) { this.endSec = this.startSec + 1 }
+    this.enforceLimit(tip)
     this.invalidateClip()
   }
 
-  private setEnd(value: number): void {
-    const ceiling = Math.min(this.durationSec, this.startSec + this.maxLength())
-    const floor = Math.min(ceiling, this.startSec + 1)
-    this.endSec = Math.max(floor, Math.min(ceiling, value))
+  private setEnd(value: number, tip: boolean = true): void {
+    this.endSec = Math.max(1, Math.min(this.durationSec, Math.round(value)))
+    this.enforceLimit(tip)
     this.invalidateClip()
   }
 
-  /** 三处拖动共用的起点记录：拖动开始即停掉正在播放的旧片段。 */
+  /** 拖动开始：记录基准、重置「超限提醒」、停掉正在播放的旧片段。 */
   private beginDrag(): void {
     this.dragBaseStart = this.startSec
     this.dragBaseEnd = this.endSec
-    this.dragBaseLength = Math.max(1, this.endSec - this.startSec)
+    this.limitNotified = false
     this.invalidateClip()
     this.stopPreview()
   }
 
-  /** 拖歌词区域：整体平移选区，保持已选长度不变。 */
-  private moveWindow(deltaSeconds: number): void {
-    const length = Math.max(1, this.dragBaseLength)
-    const maxStart = Math.max(0, this.durationSec - length)
-    const start = Math.min(maxStart, Math.max(0, this.dragBaseStart + deltaSeconds))
+  /** 滑动歌词：把选区起点平移到可见的那一句，保持已选长度。 */
+  private applyWindowStart(firstLyricIndex: number): void {
+    const line = this.lyrics[firstLyricIndex]
+    if (!line) { return }
+    const length = Math.max(1, Math.min(this.selectedSeconds(), this.maxLength()))
+    const start = Math.max(0, Math.min(this.durationSec - 1, Math.round(line.time / 1000)))
+    if (start === this.startSec) { return }
+    if (this.previewing) { this.stopPreview() }
     this.startSec = start
-    this.endSec = Math.min(this.durationSec, start + length)
+    this.endSec = start + length
+    this.enforceLimit(true)
     this.invalidateClip()
-  }
-
-  /** 两条横线以选区中点为中心上下展开，间距 = 已选秒数 * pxPerSec。 */
-  private startMarkerY(): number {
-    const half = this.lyricHeight / 2
-    const span = (this.endSec - this.startSec) * this.pxPerSec() / 2
-    return Math.max(0, Math.min(this.lyricHeight - 28, half - span))
-  }
-
-  private endMarkerY(): number {
-    const half = this.lyricHeight / 2
-    const span = (this.endSec - this.startSec) * this.pxPerSec() / 2
-    return Math.min(this.lyricHeight - 28, Math.max(this.startMarkerY() + 28, half + span))
   }
 
   private selectType(index: number): void {
     if (this.typeIndex === index) { return }
     this.typeIndex = index
     this.maxSeconds = RingtoneService.maxSeconds(index)
-    this.clampSelection()
+    this.limitNotified = false
+    this.enforceLimit(true)
     this.invalidateClip()
     this.stopPreview()
   }
@@ -545,20 +521,40 @@ export struct RingtonePage {
   @Builder
   private LyricWindow(startSec: number, endSec: number) {
     Stack({ alignContent: Alignment.TopStart }) {
-      // 歌词按时间轴铺开：组件逻辑高度 = 整首歌时长 * pxPerSec，
-      // 窗口只显示选区中点附近的一段，横线之间就是实际截取的歌词。
+      // 最简沉浸式歌词：纯文本 List，可上下滑动；滑动时选区起点按「一行歌词」
+      // 平移，顶部/底部标签上的时间随之刷新。
       if (this.lyrics.length > 0) {
-        ForEach(this.lyricRows(), (row: LyricRow) => {
-          Text(row.text)
-            .width('100%')
-            .fontSize(14)
-            .lineHeight(20)
-            .fontColor(row.inRange ? TC.textBody() : TC.textTertiary())
-            .opacity(row.inRange ? 1 : 0.6)
-            .textAlign(TextAlign.Center)
-            .position({ x: 0, y: row.y - 10 })
-            .hitTestBehavior(HitTestMode.None)
-        }, (row: LyricRow) => `${row.time}-${row.text}`)
+        List({ space: 8, scroller: this.lyricScroller }) {
+          ListItem() {
+            Column().width('100%').height(Math.max(0, this.lyricHeight / 2 - 20))
+          }
+          ForEach(this.lyrics, (line: RingtoneLyric, index: number) => {
+            ListItem() {
+              Text(line.text)
+                .width('100%')
+                .fontSize(15)
+                .lineHeight(22)
+                .fontColor(this.lineSelected(index) ? TC.textBody() : TC.textTertiary())
+                .textAlign(TextAlign.Center)
+                .padding({ left: 18, right: 18 })
+            }
+          }, (line: RingtoneLyric, index: number) => `${line.time}-${index}`)
+          ListItem() {
+            Column().width('100%').height(Math.max(0, this.lyricHeight / 2))
+          }
+        }
+        .width('100%')
+        .height('100%')
+        .scrollBar(BarState.Off)
+        .edgeEffect(EdgeEffect.Spring)
+        .onScrollStart(() => {
+          this.lyricUserScrolling = true
+          this.limitNotified = false
+        })
+        .onScrollStop(() => { this.lyricUserScrolling = false })
+        .onScrollIndex((first: number) => {
+          if (this.lyricUserScrolling) { this.applyWindowStart(Math.max(0, first - 1)) }
+        })
       } else {
         Column({ space: 8 }) {
           SymbolGlyph($r('sys.symbol.music_note_list')).fontSize(26).fontColor([TC.textQuaternary()])
@@ -567,31 +563,9 @@ export struct RingtonePage {
         .width('100%')
         .height('100%')
         .justifyContent(FlexAlign.Center)
-        .hitTestBehavior(HitTestMode.None)
       }
 
-      // 透明拖动层：滑动歌词 = 平移选区，歌词跟着滚动（类似歌词预览）
-      Column()
-        .width('100%')
-        .height('100%')
-        .backgroundColor('#00000000')
-        .gesture(
-          PanGesture()
-            .onActionStart(() => { this.beginDrag() })
-            .onActionUpdate((event: GestureEvent) => {
-              this.moveWindow(-event.offsetY * this.scrollSecondsPerVp())
-            })
-        )
-
-      // 两条横线之间 = 截取片段的实际长度
-      Column()
-        .width('100%')
-        .height(Math.max(0, this.endMarkerY() - this.startMarkerY()))
-        .backgroundColor('rgba(255,255,255,0.045)')
-        .position({ x: 0, y: this.startMarkerY() })
-        .hitTestBehavior(HitTestMode.None)
-
-      // 「开始」横线：数字与下方第一个光标共用 startSec（内联避免 @Builder 按值传参不刷新）
+      // 顶部「开始」标签：装饰 + 显示起点；按住上下拖可按一行歌词微调开始时间
       Row() {
         Row()
           .layoutWeight(1)
@@ -609,17 +583,18 @@ export struct RingtonePage {
       .width('100%')
       .height(28)
       .alignItems(VerticalAlign.Center)
-      .position({ x: 0, y: this.startMarkerY() })
+      .position({ x: 0, y: 0 })
       .hitTestBehavior(HitTestMode.Block)
       .gesture(
         PanGesture()
           .onActionStart(() => { this.beginDrag() })
           .onActionUpdate((event: GestureEvent) => {
-            this.setStart(this.dragBaseStart + event.offsetY * this.markerSecondsPerVp())
+            const steps = Math.round(event.offsetY / LYRIC_STEP_VP)
+            this.setStart(this.stepByLine(this.dragBaseStart, steps), true)
           })
       )
 
-      // 「结束」横线：数字与下方第二个光标共用 endSec
+      // 底部「结束」标签：装饰 + 显示终点；按住上下拖可按一行歌词微调结束时间
       Row() {
         Row()
           .layoutWeight(1)
@@ -637,13 +612,14 @@ export struct RingtonePage {
       .width('100%')
       .height(28)
       .alignItems(VerticalAlign.Center)
-      .position({ x: 0, y: this.endMarkerY() })
+      .position({ x: 0, y: Math.max(0, this.lyricHeight - 28) })
       .hitTestBehavior(HitTestMode.Block)
       .gesture(
         PanGesture()
           .onActionStart(() => { this.beginDrag() })
           .onActionUpdate((event: GestureEvent) => {
-            this.setEnd(this.dragBaseEnd + event.offsetY * this.markerSecondsPerVp())
+            const steps = Math.round(event.offsetY / LYRIC_STEP_VP)
+            this.setEnd(this.stepByLine(this.dragBaseEnd, steps), true)
           })
       )
     }

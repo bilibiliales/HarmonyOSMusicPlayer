@@ -573,11 +573,59 @@ export class DecorationCodec {
       item.kind === DecoKind.APP_ICON) {
       return ImageOnlyConfig.from(item.payload).image
     }
-    if (item.kind === DecoKind.DOCK) { return DockConfig.from(item.payload).icons[0] ?? '' }
+    if (item.kind === DecoKind.DOCK) {
+      const cfg = DockConfig.from(item.payload)
+      for (const icon of cfg.icons) {
+        if (icon) { return icon }
+      }
+      return cfg.bgImage
+    }
     if (item.kind === DecoKind.VIP_BADGE) {
       const images = VipBadgeConfig.from(item.payload).images
       for (const image of images) {
         if (image) { return image }
+      }
+    }
+    // 套装 / 未来新增类型：从 payload 里找第一个正在启用的图片资源，
+    // 找不到（纯颜色类）就返回空，由列表保留默认图标。
+    return DecorationCodec.firstImageInPayload(item.payload)
+  }
+
+  /** 扫描配置里的第一个图片路径；优先常见图片键，颜色值不会被误命中。 */
+  static firstImageInPayload(payload: string): string {
+    if (!payload) { return '' }
+    try {
+      const root = JSON.parse(payload) as Record<string, Object>
+      return DecorationCodec.findImage(root, 0)
+    } catch (_error) {
+      return ''
+    }
+  }
+
+  private static findImage(value: Object, depth: number): string {
+    if (!value || depth > 3) { return '' }
+    if (typeof value === 'string') {
+      const text: string = value.toString()
+      return /\.(png|jpe?g|webp|gif|bmp|heic|mp4|mov|m4v)(\?|$)/i.test(text) ? text : ''
+    }
+    if (Array.isArray(value)) {
+      for (const item of value as Object[]) {
+        const hit = DecorationCodec.findImage(item, depth + 1)
+        if (hit) { return hit }
+      }
+      return ''
+    }
+    if (typeof value === 'object') {
+      const obj = value as Record<string, Object>
+      const preferred: string[] = ['cover', 'image', 'bgImage', 'media', 'src', 'vinylImage',
+        'bgVideo', 'icons', 'layers']
+      for (const key of preferred) {
+        const hit = DecorationCodec.findImage(obj[key], depth + 1)
+        if (hit) { return hit }
+      }
+      for (const key of Object.keys(obj)) {
+        const hit = DecorationCodec.findImage(obj[key], depth + 1)
+        if (hit) { return hit }
       }
     }
     return ''

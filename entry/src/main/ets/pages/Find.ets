@@ -76,7 +76,7 @@ struct Find {
     if (this.currentSection === 5) {
       return '让自然与轻柔声音安抚此刻'
     }
-    return '来自网易云音乐首页的实时推荐'
+    return '来自网易云音乐首页推荐'
   }
 
   private titleOf(ui?: HomepageUiElement): string {

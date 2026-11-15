@@ -1,4 +1,5 @@
 import { BubbleTip } from '../services/BubbleTip'
+import { DecorationMedia } from '../services/DecorationMedia'
 import { DecorationStore } from '../services/DecorationStore'
 import { DecoKind, DecorationCodec, DecorationItem } from '../models/decoration'
 import { TC } from '../services/ThemeColors'
@@ -75,7 +76,7 @@ export struct DecorationCenterPage {
   private KindCard(kind: string) {
     Stack({ alignContent: Alignment.BottomStart }) {
       if (this.previewOf(kind)) {
-        Image(this.previewOf(kind))
+        Image(DecorationMedia.displayUri(this.previewOf(kind)))
           .width('100%')
           .height('100%')
           .objectFit(ImageFit.Cover)
@@ -171,7 +172,7 @@ export struct DecorationCenterPage {
             ForEach(this.activeKinds(), (kind: string) => {
               Row({ space: 12 }) {
                 if (this.previewOf(kind)) {
-                  Image(this.previewOf(kind))
+                  Image(DecorationMedia.displayUri(this.previewOf(kind)))
                     .width(46)
                     .height(46)
                     .borderRadius(12)
@@ -272,7 +273,7 @@ export struct DecorationCenterPage {
 
               Column({ space: 8 }) {
                 Text('打造只属于你的播放器').fontSize(19).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary())
-                Text('皮肤、播放器样式、图标与特效全部本地保存，重启依然生效。')
+                Text('自定义应用皮肤、播放器样式、图标与特效。')
                   .fontSize(11)
                   .fontColor(TC.textSecondary())
                 Row({ space: 10 }) {
