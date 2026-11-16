@@ -11,7 +11,7 @@ import { DecorationEditorParam } from './DecorationEditor'
  * 装扮中心。
  *
  * 入口：侧边栏「AI 写歌」上方。
- * 结构：顶部概览（当前生效项数 + 我的装扮/全部取消）→ 14 类装扮入口 →
+ * 结构：顶部概览（当前生效项数 + 我的装扮/全部取消）→ 13 类装扮入口 →
  *       每类点进去是「列表 + 编辑」的装扮编辑器；套装在编辑器里一次性打包多类。
  * 全部数据本地存储（DecorationStore），颜色类装扮会覆盖到 SkinService（装扮优先于深浅色）。
  */
@@ -26,7 +26,7 @@ export struct DecorationCenterPage {
   private kinds: string[] = [
     DecoKind.SKIN, DecoKind.PLAYER, DecoKind.DOCK, DecoKind.SIDEBAR, DecoKind.HOME_BG,
     DecoKind.HEART, DecoKind.STARTUP, DecoKind.AVATAR_FRAME, DecoKind.VIP_CARD,
-    DecoKind.APP_ICON, DecoKind.VIP_BADGE, DecoKind.MINI_PLAYER, DecoKind.SHEET,
+    DecoKind.VIP_BADGE, DecoKind.MINI_PLAYER, DecoKind.SHEET,
     DecoKind.SUIT
   ]
 

@@ -1372,12 +1372,51 @@ export struct Play {
     this.loadLikedState()
   }
 
+  /**
+   * 「译 / 音」切换气泡：圈内文字、无底色，颜色跟随播放器装扮。
+   * 位置固定在歌词设置图标左侧（沉浸模式下在「退出沉浸」左侧），不遮歌词。
+   */
+  @Builder
+  private AuxBubble() {
+    if (this.translationAvailable || this.romaAvailable) {
+      Row({ space: 8 }) {
+        if (this.translationAvailable) {
+          Stack({ alignContent: Alignment.Center }) {
+            Text('译')
+              .fontSize(10)
+              .fontWeight(this.showTranslation ? FontWeight.Medium : FontWeight.Regular)
+              .fontColor(this.showTranslation ? this.psText() : this.psFaint())
+          }
+          .width(24)
+          .height(24)
+          .borderRadius(12)
+          .border({ width: 1, color: this.showTranslation ? this.psText() : this.psFaint() })
+          .onClick(() => { this.showTranslation = !this.showTranslation })
+        }
+        if (this.romaAvailable) {
+          Stack({ alignContent: Alignment.Center }) {
+            Text('音')
+              .fontSize(10)
+              .fontWeight(this.showRoma ? FontWeight.Medium : FontWeight.Regular)
+              .fontColor(this.showRoma ? this.psText() : this.psFaint())
+          }
+          .width(24)
+          .height(24)
+          .borderRadius(12)
+          .border({ width: 1, color: this.showRoma ? this.psText() : this.psFaint() })
+          .onClick(() => { this.showRoma = !this.showRoma })
+        }
+      }
+    }
+  }
+
   @Builder
   private LyricsPanel() {
     Column({ space: 8 }) {
       if (this.lyricsImmersive) {
-        Row() {
+        Row({ space: 10 }) {
           Blank()
+          this.AuxBubble()
           Row({ space: 5 }) {
             SymbolGlyph($r('sys.symbol.arrow_up_left_and_arrow_down_right'))
               .fontSize(14).fontColor([this.psIcon()])
@@ -1407,6 +1446,7 @@ export struct Play {
         .layoutWeight(1)
         .alignItems(HorizontalAlign.Start)
         Row({ space: 8 }) {
+          this.AuxBubble()
           SymbolGlyph($r('sys.symbol.gearshape')).fontSize(18).fontColor([this.psIcon()])
             .onClick(() => this.activeSheet = 'lyricSettings')
           Row({ space: 5 }) {
@@ -1514,7 +1554,8 @@ export struct Play {
                 })
                 .onClick(() => this.onLyricTap(line, index))
               }
-            })
+            }, (line: LyricLine, index: number) =>
+              `${index}-${line.time}-${this.lyricCentered() ? 'c' : 'l'}-${this.showTranslation ? 1 : 0}-${this.showRoma ? 1 : 0}`)
             ListItem() {
               Column().height(this.lyricsImmersive ? 280 : 195)
             }
@@ -1531,40 +1572,6 @@ export struct Play {
           })
           .onScrollStart(() => this.handleLyricScrollStart())
           .onScrollStop(() => this.handleLyricScrollStop())
-
-          // 左下角「译 / 音」气泡：只在有译文 / 罗马音时出现，圈内文字、无底色
-          if (this.translationAvailable || this.romaAvailable) {
-            Row({ space: 8 }) {
-              if (this.translationAvailable) {
-                Stack({ alignContent: Alignment.Center }) {
-                  Text('译')
-                    .fontSize(10)
-                    .fontWeight(this.showTranslation ? FontWeight.Medium : FontWeight.Regular)
-                    .fontColor(this.showTranslation ? this.psText() : this.psFaint())
-                }
-                .width(24)
-                .height(24)
-                .borderRadius(12)
-                .border({ width: 1, color: this.showTranslation ? this.psText() : this.psFaint() })
-                .onClick(() => { this.showTranslation = !this.showTranslation })
-              }
-              if (this.romaAvailable) {
-                Stack({ alignContent: Alignment.Center }) {
-                  Text('音')
-                    .fontSize(10)
-                    .fontWeight(this.showRoma ? FontWeight.Medium : FontWeight.Regular)
-                    .fontColor(this.showRoma ? this.psText() : this.psFaint())
-                }
-                .width(24)
-                .height(24)
-                .borderRadius(12)
-                .border({ width: 1, color: this.showRoma ? this.psText() : this.psFaint() })
-                .onClick(() => { this.showRoma = !this.showRoma })
-              }
-            }
-            .align(Alignment.BottomStart)
-            .margin({ left: 22, bottom: 12 })
-          }
 
           if (this.lyricUserScrolling) {
             Row({ space: 7 }) {

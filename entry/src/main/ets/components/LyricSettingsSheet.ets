@@ -80,6 +80,26 @@ export struct LyricSettingsSheet {
     }.width('100%')
   }
 
+  /**
+   * 对齐方式胶囊。这里必须写成两个固定的 Builder 调用，不能用 ForEach：
+   * ForEach 命中同一个 key 时不会重新执行 item builder，@State 改了界面不刷新，
+   * 看上去就是「点了没反应」。
+   */
+  @Builder
+  private AlignPill(mode: number) {
+    Text(mode === 0 ? '居左' : '居中')
+      .fontSize(12)
+      .fontColor(this.alignMode === mode ? TC.textOnAccent() : TC.textBody())
+      .padding({ left: 16, right: 16, top: 6, bottom: 6 })
+      .backgroundColor(this.alignMode === mode ? this.color : TC.chipBackground())
+      .borderRadius(14)
+      .onClick(() => {
+        if (this.alignMode === mode) { return }
+        this.alignMode = mode
+        this.onPreview(this.current())
+      })
+  }
+
   build() {
     Column({ space: 12 }) {
       Row() {
@@ -96,18 +116,8 @@ export struct LyricSettingsSheet {
           this.Control('字号 · ' + this.lyricSize, this.lyricSize, 14, 32, 1, (v: number) => this.lyricSize = v)
           Row({ space: 8 }) {
             Text('对齐方式').fontSize(13).fontColor(TC.textBody()).layoutWeight(1)
-            ForEach([0, 1], (mode: number) => {
-              Text(mode === 0 ? '居左' : '居中')
-                .fontSize(12)
-                .fontColor(this.alignMode === mode ? TC.textOnAccent() : TC.textBody())
-                .padding({ left: 16, right: 16, top: 6, bottom: 6 })
-                .backgroundColor(this.alignMode === mode ? this.color : TC.chipBackground())
-                .borderRadius(14)
-                .onClick(() => {
-                  this.alignMode = mode
-                  this.onPreview(this.current())
-                })
-            }, (mode: number) => `lyric_align_${mode}`)
+            this.AlignPill(0)
+            this.AlignPill(1)
           }
           .width('100%')
           .padding({ top: 2, bottom: 2 })

@@ -519,110 +519,111 @@ export struct RingtonePage {
     .scrollBar(BarState.Off)
   }
 
+  /**
+   * 开始 / 结束时间标签。它只在歌词卡片内部贴着上下边缘，不跨页；
+   * 拖动只挂在标签本体上，虚线对触摸透明，所以不会把歌词列表的滑动吃掉。
+   */
+  @Builder
+  private TimeBand(sec: number, label: string, isStart: boolean) {
+    Row() {
+      Row({ space: 4 }) {
+        Text(this.timeText(sec)).fontSize(10).fontColor(TC.textOnAccent())
+        Text(label).fontSize(10).fontColor(TC.textOnAccent()).fontWeight(FontWeight.Medium)
+      }
+      .height(20)
+      .padding({ left: 9, right: 9 })
+      .backgroundColor(TC.accent())
+      .borderRadius(10)
+      .hitTestBehavior(HitTestMode.Block)
+      .gesture(
+        PanGesture()
+          .onActionStart(() => { this.beginDrag() })
+          .onActionUpdate((event: GestureEvent) => {
+            const steps = Math.round(event.offsetY / LYRIC_STEP_VP)
+            if (isStart) {
+              this.setStart(this.stepByLine(this.dragBaseStart, steps), true)
+            } else {
+              this.setEnd(this.stepByLine(this.dragBaseEnd, steps), true)
+            }
+          })
+      )
+      Row()
+        .layoutWeight(1)
+        .height(1)
+        .margin({ left: 8, right: 12 })
+        .border({ width: { top: 1 }, color: 'rgba(128,128,128,0.45)', style: BorderStyle.Dashed })
+    }
+    .width('100%')
+    .height(28)
+    .padding({ left: 10 })
+    .alignItems(VerticalAlign.Center)
+  }
+
+  /**
+   * 歌词窗口：一块圆角卡片，顶部是「开始」边界条、底部是「结束」边界条，
+   * 中间是可上下滑动的纯文本歌词。滑动时选区起点按「一行歌词」平移，
+   * 两条边界条上的时间随之刷新；标签本身也可以上下拖动做逐行微调。
+   */
   @Builder
   private LyricWindow(startSec: number, endSec: number) {
     Stack({ alignContent: Alignment.TopStart }) {
-      // 最简沉浸式歌词：纯文本 List，可上下滑动；滑动时选区起点按「一行歌词」
-      // 平移，顶部/底部标签上的时间随之刷新。
-      if (this.lyrics.length > 0) {
-        List({ space: 8, scroller: this.lyricScroller }) {
-          ListItem() {
-            Column().width('100%').height(Math.max(0, this.lyricHeight / 2 - 20))
-          }
-          ForEach(this.lyrics, (line: RingtoneLyric, index: number) => {
+      // 卡片底：让「歌词组件」的边界看得见
+      Column()
+        .width('100%')
+        .height('100%')
+        .borderRadius(20)
+        .backgroundColor('rgba(128,128,128,0.06)')
+        .border({ width: 1, color: 'rgba(128,128,128,0.14)' })
+
+      Column() {
+        this.TimeBand(startSec, '开始', true)
+
+        if (this.lyrics.length > 0) {
+          List({ space: 8, scroller: this.lyricScroller }) {
             ListItem() {
-              Text(line.text)
-                .width('100%')
-                .fontSize(15)
-                .lineHeight(22)
-                .fontColor(this.lineSelected(index) ? TC.textBody() : TC.textTertiary())
-                .textAlign(TextAlign.Center)
-                .padding({ left: 18, right: 18 })
+              Column().width('100%').height(Math.max(0, (this.lyricHeight - 56) / 2 - 11))
             }
-          }, (line: RingtoneLyric, index: number) => `${line.time}-${index}`)
-          ListItem() {
-            Column().width('100%').height(Math.max(0, this.lyricHeight / 2))
+            ForEach(this.lyrics, (line: RingtoneLyric, index: number) => {
+              ListItem() {
+                Text(line.text)
+                  .width('100%')
+                  .fontSize(15)
+                  .lineHeight(22)
+                  .fontColor(this.lineSelected(index) ? TC.textBody() : TC.textTertiary())
+                  .textAlign(TextAlign.Center)
+                  .padding({ left: 18, right: 18 })
+              }
+            }, (line: RingtoneLyric, index: number) => `${line.time}-${index}`)
+            ListItem() {
+              Column().width('100%').height(Math.max(0, (this.lyricHeight - 56) / 2 - 11))
+            }
           }
-        }
-        .width('100%')
-        .height('100%')
-        .scrollBar(BarState.Off)
-        .edgeEffect(EdgeEffect.Spring)
-        .onScrollStart(() => {
-          this.lyricUserScrolling = true
-          this.limitNotified = false
-        })
-        .onScrollStop(() => { this.lyricUserScrolling = false })
-        .onScrollIndex((first: number) => {
-          if (this.lyricUserScrolling) { this.applyWindowStart(Math.max(0, first - 1)) }
-        })
-      } else {
-        Column({ space: 8 }) {
-          SymbolGlyph($r('sys.symbol.music_note_list')).fontSize(26).fontColor([TC.textQuaternary()])
-          Text('这首歌暂无歌词').fontSize(12).fontColor(TC.textTertiary())
-        }
-        .width('100%')
-        .height('100%')
-        .justifyContent(FlexAlign.Center)
-      }
-
-      // 顶部「开始」标签：装饰 + 显示起点；按住上下拖可按一行歌词微调开始时间
-      Row() {
-        Row()
+          .width('100%')
           .layoutWeight(1)
-          .height(1)
-          .border({ width: { top: 1 }, color: 'rgba(128,128,128,0.5)', style: BorderStyle.Dashed })
-        Row({ space: 4 }) {
-          Text(this.timeText(startSec)).fontSize(10).fontColor(TC.textOnAccent())
-          Text('开始').fontSize(10).fontColor(TC.textOnAccent()).fontWeight(FontWeight.Medium)
+          .scrollBar(BarState.Off)
+          .edgeEffect(EdgeEffect.Spring)
+          .onScrollStart(() => {
+            this.lyricUserScrolling = true
+            this.limitNotified = false
+          })
+          .onScrollStop(() => { this.lyricUserScrolling = false })
+          .onScrollIndex((first: number) => {
+            if (this.lyricUserScrolling) { this.applyWindowStart(Math.max(0, first - 1)) }
+          })
+        } else {
+          Column({ space: 8 }) {
+            SymbolGlyph($r('sys.symbol.music_note_list')).fontSize(26).fontColor([TC.textQuaternary()])
+            Text('这首歌暂无歌词').fontSize(12).fontColor(TC.textTertiary())
+          }
+          .width('100%')
+          .layoutWeight(1)
+          .justifyContent(FlexAlign.Center)
         }
-        .height(18)
-        .padding({ left: 8, right: 8 })
-        .backgroundColor(TC.accent())
-        .borderRadius(9)
+
+        this.TimeBand(endSec, '结束', false)
       }
       .width('100%')
-      .height(28)
-      .alignItems(VerticalAlign.Center)
-      .position({ x: 0, y: 0 })
-      .hitTestBehavior(HitTestMode.Block)
-      .gesture(
-        PanGesture()
-          .onActionStart(() => { this.beginDrag() })
-          .onActionUpdate((event: GestureEvent) => {
-            const steps = Math.round(event.offsetY / LYRIC_STEP_VP)
-            this.setStart(this.stepByLine(this.dragBaseStart, steps), true)
-          })
-      )
-
-      // 底部「结束」标签：装饰 + 显示终点；按住上下拖可按一行歌词微调结束时间
-      Row() {
-        Row()
-          .layoutWeight(1)
-          .height(1)
-          .border({ width: { top: 1 }, color: 'rgba(128,128,128,0.5)', style: BorderStyle.Dashed })
-        Row({ space: 4 }) {
-          Text(this.timeText(endSec)).fontSize(10).fontColor(TC.textOnAccent())
-          Text('结束').fontSize(10).fontColor(TC.textOnAccent()).fontWeight(FontWeight.Medium)
-        }
-        .height(18)
-        .padding({ left: 8, right: 8 })
-        .backgroundColor(TC.accent())
-        .borderRadius(9)
-      }
-      .width('100%')
-      .height(28)
-      .alignItems(VerticalAlign.Center)
-      .position({ x: 0, y: Math.max(0, this.lyricHeight - 28) })
-      .hitTestBehavior(HitTestMode.Block)
-      .gesture(
-        PanGesture()
-          .onActionStart(() => { this.beginDrag() })
-          .onActionUpdate((event: GestureEvent) => {
-            const steps = Math.round(event.offsetY / LYRIC_STEP_VP)
-            this.setEnd(this.stepByLine(this.dragBaseEnd, steps), true)
-          })
-      )
+      .height('100%')
     }
     .width('100%')
     .layoutWeight(1)
@@ -650,44 +651,47 @@ export struct RingtonePage {
       .justifyContent(FlexAlign.SpaceBetween)
       .alignItems(VerticalAlign.Center)
 
+      // 选区底色：不拦触摸，避免把手柄盖住
       Column()
         .width(Math.max(0, this.endX(endSec) - this.startX(startSec)))
         .height(48)
         .backgroundColor('rgba(255,255,255,0.10)')
         .border({ width: { left: 1, right: 1 }, color: TC.accent() })
         .position({ x: this.startX(startSec), y: 0 })
+        .hitTestBehavior(HitTestMode.None)
 
-      Column()
-        .width(3)
-        .height(52)
-        .borderRadius(2)
-        .backgroundColor(TC.accent())
-        .position({ x: Math.max(0, this.startX(startSec) - 1), y: 0 })
-        .hitTestBehavior(HitTestMode.Block)
-        .gesture(
-          PanGesture()
-            .onActionStart(() => { this.beginDrag() })
-            .onActionUpdate((event: GestureEvent) => {
-              if (this.waveWidth <= 0) { return }
-              this.setStart(this.dragBaseStart + event.offsetX / this.waveWidth * this.durationSec)
-            })
-        )
+      // 手柄：视觉只有 3vp 宽，但触摸区放宽到 22vp，否则手指根本捏不住
+      Stack({ alignContent: Alignment.Center }) {
+        Column().width(3).height(52).borderRadius(2).backgroundColor(TC.accent())
+      }
+      .width(22)
+      .height(52)
+      .position({ x: Math.max(0, this.startX(startSec) - 11), y: 0 })
+      .hitTestBehavior(HitTestMode.Block)
+      .gesture(
+        PanGesture()
+          .onActionStart(() => { this.beginDrag() })
+          .onActionUpdate((event: GestureEvent) => {
+            if (this.waveWidth <= 0) { return }
+            this.setStart(this.dragBaseStart + event.offsetX / this.waveWidth * this.durationSec)
+          })
+      )
 
-      Column()
-        .width(3)
-        .height(52)
-        .borderRadius(2)
-        .backgroundColor(TC.accent())
-        .position({ x: Math.max(0, this.endX(endSec) - 1), y: 0 })
-        .hitTestBehavior(HitTestMode.Block)
-        .gesture(
-          PanGesture()
-            .onActionStart(() => { this.beginDrag() })
-            .onActionUpdate((event: GestureEvent) => {
-              if (this.waveWidth <= 0) { return }
-              this.setEnd(this.dragBaseEnd + event.offsetX / this.waveWidth * this.durationSec)
-            })
-        )
+      Stack({ alignContent: Alignment.Center }) {
+        Column().width(3).height(52).borderRadius(2).backgroundColor(TC.accent())
+      }
+      .width(22)
+      .height(52)
+      .position({ x: Math.max(0, this.endX(endSec) - 11), y: 0 })
+      .hitTestBehavior(HitTestMode.Block)
+      .gesture(
+        PanGesture()
+          .onActionStart(() => { this.beginDrag() })
+          .onActionUpdate((event: GestureEvent) => {
+            if (this.waveWidth <= 0) { return }
+            this.setEnd(this.dragBaseEnd + event.offsetX / this.waveWidth * this.durationSec)
+          })
+      )
     }
     .width('100%')
     .height(52)
@@ -815,7 +819,7 @@ export struct RingtonePage {
             .onClick(() => this.applyRingtone())
           }
           .width('100%')
-          .padding({ left: 18, right: 18, bottom: 12 })
+          .padding({ left: 18, right: 18, bottom: 24 })
         }
       }
       .width('100%')

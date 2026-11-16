@@ -109,13 +109,6 @@ export struct FanClubDetailPage {
                 if (this.detail.brief) {
                   Text(this.detail.brief).width('100%').fontSize(13).lineHeight(20).fontColor(TC.textBody())
                 }
-                if (this.detail.headId) {
-                  Row() {
-                    Text('歌手主页').fontSize(13).fontColor(TC.textPrimary()).layoutWeight(1)
-                    SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(18).fontColor([TC.textQuaternary()])
-                  }.width('100%').padding(14).backgroundColor(TC.surfaceCard()).borderRadius(14)
-                  .onClick(() => this.openArtist())
-                }
               }.width('100%').padding(18).backgroundColor(TC.surfaceCardAlt()).borderRadius(20)
             } else if (this.loading) {
               LoadingProgress().width(32).height(32).color(TC.accent()).alignSelf(ItemAlign.Center).padding({ top: 20 })

@@ -117,10 +117,12 @@ export class DecoKind {
 
   /** 有「我的装扮」条目可选的类型（套装单独管理）。 */
   static pickable(): string[] {
+    // 应用图标已下线：系统不允许运行时替换桌面图标，只能换备用图标，
+    // 价值不足；等后续内置几套风格图标再作为只读选项回归，这里不再开放自定义。
     return [
       DecoKind.SKIN, DecoKind.PLAYER, DecoKind.DOCK, DecoKind.SIDEBAR, DecoKind.HOME_BG,
       DecoKind.HEART, DecoKind.STARTUP, DecoKind.AVATAR_FRAME, DecoKind.VIP_CARD,
-      DecoKind.APP_ICON, DecoKind.VIP_BADGE, DecoKind.MINI_PLAYER, DecoKind.SHEET
+      DecoKind.VIP_BADGE, DecoKind.MINI_PLAYER, DecoKind.SHEET
     ]
   }
 
@@ -304,8 +306,15 @@ export class PlayerStyleConfig {
 // ---------------------------------------------------------------------------
 
 export class DockConfig {
-  /** 四个页签的自定义图标（本地路径），空串=默认图标。顺序：推荐/发现/动态/我的。 */
+  /** 四个页签的「未选中」图标（本地路径），空串=默认图标。顺序：推荐/发现/动态/我的。 */
   icons: string[] = ['', '', '', '']
+  /**
+   * 四个页签的「选中」图标。哪一项为空就沿用 icons 里同一项，
+   * 所以只传一套时会选中未选中都显示那一套。
+   */
+  activeIcons: string[] = ['', '', '', '']
+  /** 图标显示边长（vp），文字开关不影响。 */
+  iconSize: number = 22
   iconColor: string = ''
   activeColor: string = ''
   textColor: string = ''
@@ -314,6 +323,12 @@ export class DockConfig {
   bgColor: string = ''
   /** 底板背景图片（本地路径，铺满底部导航区）；优先于 bgColor。 */
   bgImage: string = ''
+  /** 底板背景图不透明度 0-100。 */
+  bgOpacity: number = 100
+  /** 底板背景图亮度 0-200（100=原图）。 */
+  bgBrightness: number = 100
+  /** 底板可读性蒙版 0-100：压暗背景，保证图标与文字清楚。 */
+  bgScrim: number = 0
   /** 选中指示块颜色；空=主题色。 */
   indicatorColor: string = ''
   /** 是否显示文字。 */
@@ -325,22 +340,38 @@ export class DockConfig {
     try {
       const src = JSON.parse(raw) as DockConfig
       const icons: string[] = src.icons ?? []
+      const activeIcons: string[] = src.activeIcons ?? []
       out.icons = ['', '', '', '']
+      out.activeIcons = ['', '', '', '']
       for (let i = 0; i < 4; i++) {
         out.icons[i] = i < icons.length ? (icons[i] ?? '') : ''
+        out.activeIcons[i] = i < activeIcons.length ? (activeIcons[i] ?? '') : ''
       }
+      out.iconSize = src.iconSize ?? 22
       out.iconColor = src.iconColor ?? ''
       out.activeColor = src.activeColor ?? ''
       out.textColor = src.textColor ?? ''
       out.textSize = src.textSize ?? 10
       out.bgColor = src.bgColor ?? ''
       out.bgImage = src.bgImage ?? ''
+      out.bgOpacity = src.bgOpacity ?? 100
+      out.bgBrightness = src.bgBrightness ?? 100
+      out.bgScrim = src.bgScrim ?? 0
       out.indicatorColor = src.indicatorColor ?? ''
       out.showText = src.showText ?? true
     } catch (_error) {
       return new DockConfig()
     }
     return out
+  }
+
+  /** 某个页签实际要显示的图标：选中态优先，缺了就用未选中那套。 */
+  iconAt(index: number, active: boolean): string {
+    if (active) {
+      const picked = index < this.activeIcons.length ? this.activeIcons[index] : ''
+      if (picked) { return picked }
+    }
+    return index < this.icons.length ? (this.icons[index] ?? '') : ''
   }
 }
 
@@ -692,6 +723,9 @@ export class DecorationCodec {
     if (item.kind === DecoKind.DOCK) {
       const cfg = DockConfig.from(item.payload)
       for (const icon of cfg.icons) {
+        if (icon) { return icon }
+      }
+      for (const icon of cfg.activeIcons) {
         if (icon) { return icon }
       }
       return cfg.bgImage

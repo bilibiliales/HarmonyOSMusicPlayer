@@ -97,12 +97,18 @@ export struct DecorationEditorPage {
 
   // ---- 底部导航 ----
   @State private dockIcons: string[] = ['', '', '', '']
+  @State private dockActiveIcons: string[] = ['', '', '', '']
+  @State private dockIconSize: number = 22
   @State private dockIconColor: string = ''
   @State private dockActiveColor: string = ''
   @State private dockTextColor: string = ''
   @State private dockTextSize: number = 10
   @State private dockBgColor: string = ''
   @State private dockBgImage: string = ''
+  @State private dockBgOpacity: number = 100
+  @State private dockBgBrightness: number = 100
+  @State private dockBgScrim: number = 0
+  @State private dockIndicatorColor: string = ''
   @State private dockShowText: boolean = true
 
   // ---- 侧边栏 ----
@@ -227,12 +233,18 @@ export struct DecorationEditorPage {
     this.playerTextColor = ''
 
     this.dockIcons = ['', '', '', '']
+    this.dockActiveIcons = ['', '', '', '']
+    this.dockIconSize = 22
     this.dockIconColor = ''
     this.dockActiveColor = ''
     this.dockTextColor = ''
     this.dockTextSize = 10
     this.dockBgColor = ''
     this.dockBgImage = ''
+    this.dockBgOpacity = 100
+    this.dockBgBrightness = 100
+    this.dockBgScrim = 0
+    this.dockIndicatorColor = ''
     this.dockShowText = true
 
     this.sideBgImage = ''
@@ -326,12 +338,18 @@ export struct DecorationEditorPage {
     if (this.kind === DecoKind.DOCK) {
       const cfg = DockConfig.from(raw)
       this.dockIcons = cfg.icons
+      this.dockActiveIcons = cfg.activeIcons
+      this.dockIconSize = cfg.iconSize
       this.dockIconColor = cfg.iconColor
       this.dockActiveColor = cfg.activeColor
       this.dockTextColor = cfg.textColor
       this.dockTextSize = cfg.textSize
       this.dockBgColor = cfg.bgColor
       this.dockBgImage = cfg.bgImage
+      this.dockBgOpacity = cfg.bgOpacity
+      this.dockBgBrightness = cfg.bgBrightness
+      this.dockBgScrim = cfg.bgScrim
+      this.dockIndicatorColor = cfg.indicatorColor
       this.dockShowText = cfg.showText
       return
     }
@@ -457,12 +475,18 @@ export struct DecorationEditorPage {
     if (this.kind === DecoKind.DOCK) {
       const cfg = new DockConfig()
       cfg.icons = this.dockIcons
+      cfg.activeIcons = this.dockActiveIcons
+      cfg.iconSize = this.dockIconSize
       cfg.iconColor = this.dockIconColor
       cfg.activeColor = this.dockActiveColor
       cfg.textColor = this.dockTextColor
       cfg.textSize = this.dockTextSize
       cfg.bgColor = this.dockBgColor
       cfg.bgImage = this.dockBgImage
+      cfg.bgOpacity = this.dockBgOpacity
+      cfg.bgBrightness = this.dockBgBrightness
+      cfg.bgScrim = this.dockBgScrim
+      cfg.indicatorColor = this.dockIndicatorColor
       cfg.showText = this.dockShowText
       return JSON.stringify(cfg)
     }
@@ -1407,33 +1431,60 @@ export struct DecorationEditorPage {
   // 视图：其它类型
   // =========================================================================
 
+  /** 预览里第 index 个页签实际显示的图标（选中态缺省时沿用未选中）。 */
+  private dockPreviewIcon(index: number): string {
+    if (index === 0) {
+      const picked = index < this.dockActiveIcons.length ? this.dockActiveIcons[index] : ''
+      if (picked) { return picked }
+    }
+    return index < this.dockIcons.length ? (this.dockIcons[index] ?? '') : ''
+  }
+
+  private dockTabNames: string[] = ['推荐', '发现', '动态', '我的']
+
+  @Builder
+  private DockIconPickers(active: boolean) {
+    Column({ space: 12 }) {
+      DecoMediaPicker({
+        label: active ? '推荐页 · 选中' : '推荐页', value: active ? this.dockActiveIcons[0] : this.dockIcons[0],
+        mediaType: 'image', cropAspect: DecoRatio.SQUARE,
+        onChange: (path: string) => this.setDockIcon(0, path, active)
+      })
+      DecoMediaPicker({
+        label: active ? '发现页 · 选中' : '发现页', value: active ? this.dockActiveIcons[1] : this.dockIcons[1],
+        mediaType: 'image', cropAspect: DecoRatio.SQUARE,
+        onChange: (path: string) => this.setDockIcon(1, path, active)
+      })
+      DecoMediaPicker({
+        label: active ? '动态页 · 选中' : '动态页', value: active ? this.dockActiveIcons[2] : this.dockIcons[2],
+        mediaType: 'image', cropAspect: DecoRatio.SQUARE,
+        onChange: (path: string) => this.setDockIcon(2, path, active)
+      })
+      DecoMediaPicker({
+        label: active ? '我的页 · 选中' : '我的页', value: active ? this.dockActiveIcons[3] : this.dockIcons[3],
+        mediaType: 'image', cropAspect: DecoRatio.SQUARE,
+        onChange: (path: string) => this.setDockIcon(3, path, active)
+      })
+    }
+    .width('100%')
+  }
+
   @Builder
   private DockForm() {
     Column({ space: 12 }) {
-      DecoCard({ title: '导航图标', hint: '依次对应：推荐 / 发现 / 动态 / 我的；不选则用默认图标' }) {
-        DecoMediaPicker({
-          label: '推荐页图标', value: this.dockIcons[0], mediaType: 'image',
-          cropAspect: DecoRatio.SQUARE,
-          onChange: (path: string) => this.setDockIcon(0, path)
-        })
-        DecoMediaPicker({
-          label: '发现页图标', value: this.dockIcons[1], mediaType: 'image',
-          cropAspect: DecoRatio.SQUARE,
-          onChange: (path: string) => this.setDockIcon(1, path)
-        })
-        DecoMediaPicker({
-          label: '动态页图标', value: this.dockIcons[2], mediaType: 'image',
-          cropAspect: DecoRatio.SQUARE,
-          onChange: (path: string) => this.setDockIcon(2, path)
-        })
-        DecoMediaPicker({
-          label: '我的页图标', value: this.dockIcons[3], mediaType: 'image',
-          cropAspect: DecoRatio.SQUARE,
-          onChange: (path: string) => this.setDockIcon(3, path)
-        })
+      DecoCard({ title: '导航图标 · 未选中', hint: '依次对应：推荐 / 发现 / 动态 / 我的；不选则用默认图标' }) {
+        this.DockIconPickers(false)
+      }
+
+      DecoCard({ title: '导航图标 · 选中', hint: '留空就沿用上面「未选中」那一套，所以只传一套也能正常显示' }) {
+        this.DockIconPickers(true)
       }
 
       DecoCard({ title: '样式' }) {
+        DecoSlider({
+          label: '图标大小', value: this.dockIconSize, min: 14, max: 32, step: 1, unit: 'vp',
+          onChange: (v: number) => this.dockIconSize = v
+        })
         DecoToggleRow({
           label: '显示文字', isOn: this.dockShowText,
           onChange: (v: boolean) => this.dockShowText = v
@@ -1443,7 +1494,7 @@ export struct DecorationEditorPage {
           onChange: (v: number) => this.dockTextSize = v
         })
         DecoColorPicker({
-          label: '图标色', value: this.dockIconColor,
+          label: '图标色（默认图标用；自定义图标按原色显示）', value: this.dockIconColor,
           onChange: (v: string) => this.dockIconColor = v
         })
         DecoColorPicker({
@@ -1455,6 +1506,13 @@ export struct DecorationEditorPage {
           onChange: (v: string) => this.dockTextColor = v
         })
         DecoColorPicker({
+          label: '选中指示块色', value: this.dockIndicatorColor,
+          onChange: (v: string) => this.dockIndicatorColor = v
+        })
+      }
+
+      DecoCard({ title: '底板', hint: '底板图片优先于底板色；三个滑杆都只作用于图片' }) {
+        DecoColorPicker({
           label: '底板色', value: this.dockBgColor,
           onChange: (v: string) => this.dockBgColor = v
         })
@@ -1464,6 +1522,18 @@ export struct DecorationEditorPage {
           onChange: (path: string) => this.dockBgImage = path
         })
         if (this.dockBgImage) {
+          DecoSlider({
+            label: '背景亮度', value: this.dockBgBrightness, min: 0, max: 200, step: 1, unit: '%',
+            onChange: (v: number) => this.dockBgBrightness = v
+          })
+          DecoSlider({
+            label: '背景不透明度', value: this.dockBgOpacity, min: 0, max: 100, step: 1, unit: '%',
+            onChange: (v: number) => this.dockBgOpacity = v
+          })
+          DecoSlider({
+            label: '可读性蒙版', value: this.dockBgScrim, min: 0, max: 80, step: 1, unit: '%',
+            onChange: (v: number) => this.dockBgScrim = v
+          })
           Row({ space: 8 }) {
             Text('清除背景图').fontSize(11).fontColor(TC.accent())
               .onClick(() => this.dockBgImage = '')
@@ -1474,36 +1544,57 @@ export struct DecorationEditorPage {
       }
 
       // 效果预览
-      DecoCard({ title: '效果预览' }) {
+      DecoCard({ title: '效果预览', hint: '第一个页签按「选中」外观渲染' }) {
         Stack({ alignContent: Alignment.Center }) {
+          Column()
+            .width('100%')
+            .height('100%')
+            .backgroundColor(this.dockBgColor ? this.dockBgColor : TC.navBackground())
           if (this.dockBgImage) {
             Image(DecorationMedia.displayUri(this.dockBgImage))
               .width('100%')
               .height('100%')
               .objectFit(ImageFit.Cover)
+              .opacity(this.dockBgOpacity / 100)
+              .brightness(this.dockBgBrightness / 100)
           }
-          Column()
-            .width('100%')
-            .height('100%')
-            .backgroundColor(this.dockBgImage
-              ? 'rgba(0,0,0,0)'
-              : (this.dockBgColor ? this.dockBgColor : TC.navBackground()))
+          if (this.dockBgImage && this.dockBgScrim > 0) {
+            Column()
+              .width('100%')
+              .height('100%')
+              .backgroundColor(`rgba(0,0,0,${this.dockBgScrim / 100})`)
+          }
           Row() {
-            ForEach(this.dockIcons, (icon: string, index: number) => {
+            ForEach([0, 1, 2, 3], (index: number) => {
               Column({ space: 2 }) {
-                if (icon) {
-                  Image(icon).width(17).height(17).objectFit(ImageFit.Contain)
-                } else {
-                  SymbolGlyph(index === 0 ? $r('sys.symbol.play_circle') :
-                    (index === 1 ? $r('sys.symbol.line_3_horizontal') :
-                      (index === 2 ? $r('sys.symbol.camera_fill') : $r('sys.symbol.person_crop_circle_fill'))))
-                    .fontSize(16)
-                    .fontColor([index === 0
-                      ? (this.dockActiveColor ? this.dockActiveColor : TC.textOnAccent())
-                      : (this.dockIconColor ? this.dockIconColor : TC.textTertiary())])
+                Stack() {
+                  if (index === 0) {
+                    Column()
+                      .width(28)
+                      .height(28)
+                      .backgroundColor(this.dockIndicatorColor ? this.dockIndicatorColor : TC.accent())
+                      .borderRadius(14)
+                  }
+                  if (this.dockPreviewIcon(index)) {
+                    Image(DecorationMedia.displayUri(this.dockPreviewIcon(index)))
+                      .width(this.dockIconSize * 0.8)
+                      .height(this.dockIconSize * 0.8)
+                      .objectFit(ImageFit.Contain)
+                  } else {
+                    SymbolGlyph(index === 0 ? $r('sys.symbol.play_circle') :
+                      (index === 1 ? $r('sys.symbol.line_3_horizontal') :
+                        (index === 2 ? $r('sys.symbol.camera_fill') : $r('sys.symbol.person_crop_circle_fill'))))
+                      .fontSize(16)
+                      .fontColor([index === 0
+                        ? (this.dockActiveColor ? this.dockActiveColor : TC.textOnAccent())
+                        : (this.dockIconColor ? this.dockIconColor : TC.textTertiary())])
+                  }
                 }
+                .width(30)
+                .height(30)
+                .alignContent(Alignment.Center)
                 if (this.dockShowText) {
-                  Text(index === 0 ? '推荐' : (index === 1 ? '发现' : (index === 2 ? '动态' : '我的')))
+                  Text(this.dockTabNames[index])
                     .fontSize(this.dockTextSize)
                     .fontColor(index === 0
                       ? (this.dockTextColor ? this.dockTextColor : TC.textPrimary())
@@ -1512,7 +1603,7 @@ export struct DecorationEditorPage {
               }
               .layoutWeight(1)
               .alignItems(HorizontalAlign.Center)
-            }, (icon: string, index: number) => `${index}_${icon}`)
+            }, (index: number) => `dock_preview_${index}_${this.dockPreviewIcon(index)}_${this.dockIconSize}`)
           }
           .width('100%')
           .padding({ left: 8, right: 8 })
@@ -1526,7 +1617,13 @@ export struct DecorationEditorPage {
     .width('100%')
   }
 
-  private setDockIcon(index: number, path: string): void {
+  private setDockIcon(index: number, path: string, active: boolean = false): void {
+    if (active) {
+      const nextActive = this.dockActiveIcons.slice()
+      nextActive[index] = path
+      this.dockActiveIcons = nextActive
+      return
+    }
     const next = this.dockIcons.slice()
     next[index] = path
     this.dockIcons = next

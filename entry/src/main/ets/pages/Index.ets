@@ -98,12 +98,17 @@ struct HomeIndex {
   @State sidebarMounted: boolean = false
   // 底部导航装扮
   @StorageProp(DecoKeys.DOCK_ICONS) dockIcons: string = ''
+  @StorageProp(DecoKeys.DOCK_ACTIVE_ICONS) dockActiveIcons: string = ''
+  @StorageProp(DecoKeys.DOCK_ICON_SIZE) dockIconSize: number = 22
   @StorageProp(DecoKeys.DOCK_ICON_COLOR) dockIconColor: string = ''
   @StorageProp(DecoKeys.DOCK_ACTIVE_COLOR) dockActiveColor: string = ''
   @StorageProp(DecoKeys.DOCK_TEXT_COLOR) dockTextColor: string = ''
   @StorageProp(DecoKeys.DOCK_TEXT_SIZE) dockTextSize: number = 10
   @StorageProp(DecoKeys.DOCK_BG) dockBgColor: string = ''
   @StorageProp(DecoKeys.DOCK_BG_IMAGE) dockBgImage: string = ''
+  @StorageProp(DecoKeys.DOCK_BG_OPACITY) dockBgOpacity: number = 100
+  @StorageProp(DecoKeys.DOCK_BG_BRIGHTNESS) dockBgBrightness: number = 100
+  @StorageProp(DecoKeys.DOCK_BG_SCRIM) dockBgScrim: number = 0
   @StorageProp(DecoKeys.DOCK_INDICATOR) dockIndicator: string = ''
   @StorageProp(DecoKeys.DOCK_SHOW_TEXT) dockShowText: boolean = true
 
@@ -111,10 +116,21 @@ struct HomeIndex {
     return Math.max(0, this.pageHeight - 60)
   }
 
-  private dockIcon(index: number): string {
+  /** 某个页签的图标：选中有独立一套就用它，否则退回未选中那套。 */
+  private dockIcon(index: number, active: boolean): string {
+    if (active && this.dockActiveIcons) {
+      const actives = this.dockActiveIcons.split('\n')
+      if (index < actives.length && actives[index]) { return actives[index] }
+    }
     if (!this.dockIcons) { return '' }
     const parts = this.dockIcons.split('\n')
     return index < parts.length ? parts[index] : ''
+  }
+
+  /** 自定义图标的边长；没配装饰时保持原来的 22vp 观感。 */
+  private dockIconSide(): number {
+    const size = Number.isFinite(this.dockIconSize) ? this.dockIconSize : 22
+    return Math.max(14, Math.min(32, size))
   }
 
   private dockIconTint(active: boolean): ResourceColor {
@@ -368,16 +384,17 @@ struct HomeIndex {
       Stack() {
         if (item.name === this.currentName) {
           Column()
-            .width(30)
-            .height(30)
+            .width(Math.max(30, this.dockIconSide() + 4))
+            .height(Math.max(30, this.dockIconSide() + 4))
             .backgroundColor(this.dockIndicator ? this.dockIndicator : TC.accent())
-            .borderRadius(15)
+            .borderRadius(Math.max(30, this.dockIconSide() + 4) / 2)
             .shadow({ radius: 10, color: 'rgba(239,35,60,0.28)', offsetY: 4 })
         }
-        if (this.dockIcon(index)) {
-          Image(this.dockIcon(index))
-            .width(22)
-            .height(22)
+        if (this.dockIcon(index, item.name === this.currentName)) {
+          // 沙箱里的裸路径必须转成 file:// uri，否则 Image 什么都加载不出来
+          Image(DecorationMedia.displayUri(this.dockIcon(index, item.name === this.currentName)))
+            .width(this.dockIconSide())
+            .height(this.dockIconSide())
             .objectFit(ImageFit.Contain)
         } else {
           Image(item.icon)
@@ -386,8 +403,8 @@ struct HomeIndex {
             .fillColor(this.dockIconTint(item.name === this.currentName))
         }
       }
-      .width(36)
-      .height(30)
+      .width(Math.max(36, this.dockIconSide()))
+      .height(Math.max(30, this.dockIconSide()))
       .alignContent(Alignment.Center)
 
       if (this.dockShowText) {
@@ -409,13 +426,26 @@ struct HomeIndex {
       Stack() {
         AppBackdrop()
 
-        // 底部导航背景图：画在 Tabs 之下，Tab 栏背景改透明透出
+        // 底部导航背景图：画在 Tabs 之下，Tab 栏背景改透明透出。
+        // 不透明度 / 亮度 / 可读性蒙版与皮肤一致，蒙版压在最上层保证图标与文字可读。
         if (this.dockBgImage) {
-          Image(DecorationMedia.displayUri(this.dockBgImage))
-            .width('100%')
-            .height(60)
-            .objectFit(ImageFit.Cover)
-            .position({ x: 0, y: this.dockBarTop() })
+          Stack() {
+            Image(DecorationMedia.displayUri(this.dockBgImage))
+              .width('100%')
+              .height('100%')
+              .objectFit(ImageFit.Cover)
+              .opacity(Math.max(0, Math.min(100, this.dockBgOpacity)) / 100)
+              .brightness(Math.max(0, Math.min(200, this.dockBgBrightness)) / 100)
+            if (this.dockBgScrim > 0) {
+              Column()
+                .width('100%')
+                .height('100%')
+                .backgroundColor(`rgba(0,0,0,${Math.max(0, Math.min(100, this.dockBgScrim)) / 100})`)
+            }
+          }
+          .width('100%')
+          .height(60)
+          .position({ x: 0, y: this.dockBarTop() })
         }
 
         Tabs({ barPosition: BarPosition.End, index: this.currentIndex }) {

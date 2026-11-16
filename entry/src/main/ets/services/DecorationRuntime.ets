@@ -27,12 +27,17 @@ export class DecoKeys {
   static readonly SKIN_SCRIM: string = 'decoSkinScrim'
   // 底部导航
   static readonly DOCK_ICONS: string = 'decoDockIcons'
+  static readonly DOCK_ACTIVE_ICONS: string = 'decoDockActiveIcons'
+  static readonly DOCK_ICON_SIZE: string = 'decoDockIconSize'
   static readonly DOCK_ICON_COLOR: string = 'decoDockIconColor'
   static readonly DOCK_ACTIVE_COLOR: string = 'decoDockActiveColor'
   static readonly DOCK_TEXT_COLOR: string = 'decoDockTextColor'
   static readonly DOCK_TEXT_SIZE: string = 'decoDockTextSize'
   static readonly DOCK_BG: string = 'decoDockBg'
   static readonly DOCK_BG_IMAGE: string = 'decoDockBgImage'
+  static readonly DOCK_BG_OPACITY: string = 'decoDockBgOpacity'
+  static readonly DOCK_BG_BRIGHTNESS: string = 'decoDockBgBrightness'
+  static readonly DOCK_BG_SCRIM: string = 'decoDockBgScrim'
   static readonly DOCK_INDICATOR: string = 'decoDockIndicator'
   static readonly DOCK_SHOW_TEXT: string = 'decoDockShowText'
   // 侧边栏
@@ -220,12 +225,17 @@ export class DecorationRuntime {
     const raw = DecorationStore.payload(DecoKind.DOCK)
     const cfg = raw ? DockConfig.from(raw) : undefined
     AppStorage.setOrCreate<string>(DecoKeys.DOCK_ICONS, cfg ? cfg.icons.join('\n') : '')
+    AppStorage.setOrCreate<string>(DecoKeys.DOCK_ACTIVE_ICONS, cfg ? cfg.activeIcons.join('\n') : '')
+    AppStorage.setOrCreate<number>(DecoKeys.DOCK_ICON_SIZE, cfg ? cfg.iconSize : 22)
     AppStorage.setOrCreate<string>(DecoKeys.DOCK_ICON_COLOR, cfg ? cfg.iconColor : '')
     AppStorage.setOrCreate<string>(DecoKeys.DOCK_ACTIVE_COLOR, cfg ? cfg.activeColor : '')
     AppStorage.setOrCreate<string>(DecoKeys.DOCK_TEXT_COLOR, cfg ? cfg.textColor : '')
     AppStorage.setOrCreate<number>(DecoKeys.DOCK_TEXT_SIZE, cfg ? cfg.textSize : 10)
     AppStorage.setOrCreate<string>(DecoKeys.DOCK_BG, cfg ? cfg.bgColor : '')
     AppStorage.setOrCreate<string>(DecoKeys.DOCK_BG_IMAGE, cfg ? cfg.bgImage : '')
+    AppStorage.setOrCreate<number>(DecoKeys.DOCK_BG_OPACITY, cfg ? cfg.bgOpacity : 100)
+    AppStorage.setOrCreate<number>(DecoKeys.DOCK_BG_BRIGHTNESS, cfg ? cfg.bgBrightness : 100)
+    AppStorage.setOrCreate<number>(DecoKeys.DOCK_BG_SCRIM, cfg ? cfg.bgScrim : 0)
     AppStorage.setOrCreate<string>(DecoKeys.DOCK_INDICATOR, cfg ? cfg.indicatorColor : '')
     AppStorage.setOrCreate<boolean>(DecoKeys.DOCK_SHOW_TEXT, cfg ? cfg.showText : true)
   }
