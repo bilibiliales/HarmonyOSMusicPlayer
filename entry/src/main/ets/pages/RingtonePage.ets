@@ -22,10 +22,8 @@ const BAR_COUNT: number = 56
 /** 歌词一行的高度与行距（与 List.space 一致）。 */
 const LYRIC_LINE_VP: number = 22
 const LYRIC_ROW_VP: number = LYRIC_LINE_VP + 8
-/** 标签行高度：虚线 / 胶囊都在这个高度里垂直居中。 */
+/** 标签行高度：虚线 / 胶囊都在这个高度里垂直居中，不占歌词高度。 */
 const LYRIC_TAG_VP: number = 28
-/** List 的上内边距，第一行歌词从 4vp 开始。 */
-const LYRIC_LIST_TOP_VP: number = 4
 
 @Component
 export struct RingtonePage {
@@ -47,8 +45,6 @@ export struct RingtonePage {
   @State bars: number[] = []
   @State lyrics: RingtoneLyric[] = []
   @State lyricHeight: number = 0
-  @State lyricScrollY: number = 0
-  @State lyricViewportHeight: number = 0
   @State waveWidth: number = 0
   @State saving: boolean = false
   @State applying: boolean = false
@@ -498,20 +494,69 @@ export struct RingtonePage {
   }
 
   /**
-   * 标签中心正好压在亮 / 暗歌词的分界线上：
-   *   开始标签 → 第一句亮歌词的上边缘；结束标签 → 最后一句亮歌词的下边缘。
-   * 坐标只用歌词列表自身的行高 / 行距 / 滚动偏移算，和页面高度无关；
-   * 选区滚出可视区时允许跟着歌词飞出卡片。
+   * 开始 / 结束标签作为「歌词行的一部分」浮在行边界上，不占歌词高度。
+   * 它们随 ListItem 一起滚动，所以不需要监听 onScroll 或做任何坐标换算。
+   * 所有动态值都直接读 @State，ForEach 不重建也能跟着滑块刷新。
    */
-  private tagY(index: number, afterLine: boolean): number {
-    const lineTop = LYRIC_LIST_TOP_VP + index * LYRIC_ROW_VP - this.lyricScrollY
-    return lineTop + (afterLine ? LYRIC_LINE_VP : 0) - LYRIC_TAG_VP / 2
+  @Builder
+  private StartTag(index: number) {
+    Row() {
+      Row({ space: 4 }) {
+        Text(this.timeText(this.startSec)).fontSize(10).fontColor(TC.textOnAccent())
+        Text('开始').fontSize(10).fontColor(TC.textOnAccent()).fontWeight(FontWeight.Medium)
+      }
+      .height(20)
+      .padding({ left: 9, right: 9 })
+      .backgroundColor(TC.accent())
+      .borderRadius(10)
+      Row()
+        .layoutWeight(1)
+        .height(1)
+        .margin({ left: 8, right: 12 })
+        .border({ width: { top: 1 }, color: 'rgba(128,128,128,0.45)', style: BorderStyle.Dashed })
+    }
+    .width('100%')
+    .height(LYRIC_TAG_VP)
+    .padding({ left: 10 })
+    .alignItems(VerticalAlign.Center)
+    // 中心压在这一行的上边缘
+    .position({ x: 0, y: -LYRIC_TAG_VP / 2 })
+    .opacity(this.firstSelectedLyric() === index ? 1 : 0)
+    .zIndex(2)
+    .hitTestBehavior(HitTestMode.None)
+  }
+
+  @Builder
+  private EndTag(index: number) {
+    Row() {
+      Row({ space: 4 }) {
+        Text(this.timeText(this.endSec)).fontSize(10).fontColor(TC.textOnAccent())
+        Text('结束').fontSize(10).fontColor(TC.textOnAccent()).fontWeight(FontWeight.Medium)
+      }
+      .height(20)
+      .padding({ left: 9, right: 9 })
+      .backgroundColor(TC.accent())
+      .borderRadius(10)
+      Row()
+        .layoutWeight(1)
+        .height(1)
+        .margin({ left: 8, right: 12 })
+        .border({ width: { top: 1 }, color: 'rgba(128,128,128,0.45)', style: BorderStyle.Dashed })
+    }
+    .width('100%')
+    .height(LYRIC_TAG_VP)
+    .padding({ left: 10 })
+    .alignItems(VerticalAlign.Center)
+    // 中心压在这一行的下边缘
+    .position({ x: 0, y: LYRIC_LINE_VP - LYRIC_TAG_VP / 2 })
+    .opacity(this.lastSelectedLyric() === index ? 1 : 0)
+    .zIndex(2)
+    .hitTestBehavior(HitTestMode.None)
   }
 
   /**
-   * 歌词组件：普通文本列表，不做缩放/透明动画。歌词的亮暗只由是否落在选区内决定，
-   * 亮暗交界处正好贴着开始 / 结束标签。
-   * 动态值一律直接读 @State（不走 @Builder 的基础类型传参），否则滑块拖动时标签不刷新。
+   * 歌词组件：普通文本列表，不做缩放/透明动画。开始 / 结束标签是歌词行内部的浮动层，
+   * 自然跟随滚动，位置始终对应亮暗交界那两行。
    */
   @Builder
   private LyricWindow() {
@@ -527,15 +572,21 @@ export struct RingtonePage {
         List({ space: 8, scroller: this.lyricScroller }) {
           ForEach(this.lyrics, (line: RingtoneLyric, index: number) => {
             ListItem() {
-              Text(line.text)
-                .width('100%')
-                .fontSize(15)
-                .lineHeight(LYRIC_LINE_VP)
-                .maxLines(1)
-                .textOverflow({ overflow: TextOverflow.Ellipsis })
-                .fontColor(this.lineSelected(index) ? TC.textBody() : TC.textTertiary())
-                .textAlign(TextAlign.Center)
-                .padding({ left: 18, right: 18 })
+              Stack({ alignContent: Alignment.TopStart }) {
+                Text(line.text)
+                  .width('100%')
+                  .fontSize(15)
+                  .lineHeight(LYRIC_LINE_VP)
+                  .maxLines(1)
+                  .textOverflow({ overflow: TextOverflow.Ellipsis })
+                  .fontColor(this.lineSelected(index) ? TC.textBody() : TC.textTertiary())
+                  .textAlign(TextAlign.Center)
+                  .padding({ left: 18, right: 18 })
+                this.StartTag(index)
+                this.EndTag(index)
+              }
+              .width('100%')
+              .height(LYRIC_LINE_VP)
             }
           }, (line: RingtoneLyric, index: number) => `${line.time}-${index}`)
         }
@@ -544,58 +595,6 @@ export struct RingtonePage {
         .padding({ top: 4, bottom: 4 })
         .scrollBar(BarState.Off)
         .edgeEffect(EdgeEffect.Spring)
-        .onScroll((offset: number) => { this.lyricScrollY = offset })
-        .onAreaChange((_old: Area, area: Area) => {
-          this.lyricViewportHeight = Number(area.height)
-        })
-
-        // 开始标签：贴在「第一句亮歌词」上，纯展示、不拦歌词滑动
-        Row() {
-          Row({ space: 4 }) {
-            Text(this.timeText(this.startSec)).fontSize(10).fontColor(TC.textOnAccent())
-            Text('开始').fontSize(10).fontColor(TC.textOnAccent()).fontWeight(FontWeight.Medium)
-          }
-          .height(20)
-          .padding({ left: 9, right: 9 })
-          .backgroundColor(TC.accent())
-          .borderRadius(10)
-          Row()
-            .layoutWeight(1)
-            .height(1)
-            .margin({ left: 8, right: 12 })
-            .border({ width: { top: 1 }, color: 'rgba(128,128,128,0.45)', style: BorderStyle.Dashed })
-        }
-        .width('100%')
-        .height(28)
-        .padding({ left: 10 })
-        .alignItems(VerticalAlign.Center)
-        .position({ x: 0, y: this.tagY(this.firstSelectedLyric(), false) })
-        .zIndex(10)
-        .hitTestBehavior(HitTestMode.None)
-
-        // 结束标签：贴在「最后一句亮歌词」下
-        Row() {
-          Row({ space: 4 }) {
-            Text(this.timeText(this.endSec)).fontSize(10).fontColor(TC.textOnAccent())
-            Text('结束').fontSize(10).fontColor(TC.textOnAccent()).fontWeight(FontWeight.Medium)
-          }
-          .height(20)
-          .padding({ left: 9, right: 9 })
-          .backgroundColor(TC.accent())
-          .borderRadius(10)
-          Row()
-            .layoutWeight(1)
-            .height(1)
-            .margin({ left: 8, right: 12 })
-            .border({ width: { top: 1 }, color: 'rgba(128,128,128,0.45)', style: BorderStyle.Dashed })
-        }
-        .width('100%')
-        .height(28)
-        .padding({ left: 10 })
-        .alignItems(VerticalAlign.Center)
-        .position({ x: 0, y: this.tagY(this.lastSelectedLyric(), true) })
-        .zIndex(10)
-        .hitTestBehavior(HitTestMode.None)
       } else {
         Column({ space: 8 }) {
           SymbolGlyph($r('sys.symbol.music_note_list')).fontSize(26).fontColor([TC.textQuaternary()])
@@ -608,7 +607,6 @@ export struct RingtonePage {
     }
     .width('100%')
     .layoutWeight(1)
-    .zIndex(5)
     .onAreaChange((_old: Area, area: Area) => {
       this.lyricHeight = Number(area.height)
     })
