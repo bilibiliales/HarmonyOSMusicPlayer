@@ -18,10 +18,9 @@ interface RingtoneLyric {
   text: string
 }
 
-/** 拖标签时每移动这么多 vp 算一行歌词。 */
-const LYRIC_STEP_VP: number = 40
-
 const BAR_COUNT: number = 56
+/** 歌词一行的步长：lineHeight 22 + List.space 8。 */
+const LYRIC_ROW_VP: number = 30
 
 @Component
 export struct RingtonePage {
@@ -43,6 +42,8 @@ export struct RingtonePage {
   @State bars: number[] = []
   @State lyrics: RingtoneLyric[] = []
   @State lyricHeight: number = 0
+  @State lyricScrollY: number = 0
+  @State lyricViewportHeight: number = 0
   @State waveWidth: number = 0
   @State saving: boolean = false
   @State applying: boolean = false
@@ -54,37 +55,10 @@ export struct RingtonePage {
   private previewFallback: boolean = false
   private clipPath: string = ''
   private clipKey: string = ''
-  private dragBaseStart: number = 0
-  private dragBaseEnd: number = 0
   private lyricScroller: Scroller = new Scroller()
-  private lyricUserScrolling: boolean = false
+  /** 双向滑块当前在拖哪一头：0=无，1=开始，2=结束。 */
+  private dragThumb: number = 0
   private limitNotified: boolean = false
-
-  // ---- 歌词行刻度 ----
-  // 标签拖动 / 歌词滑动都以「一行歌词」为颗粒度；
-  // 下方波形片段的手柄才是精确到秒的真正主控。
-
-  /** 歌词行的时间刻度（秒，升序去重）。 */
-  private lyricTimes(): number[] {
-    const result: number[] = []
-    for (const line of this.lyrics) {
-      const sec = Math.max(0, Math.round(line.time / 1000))
-      if (!result.includes(sec)) { result.push(sec) }
-    }
-    return result
-  }
-
-  /** 以「一行歌词」为单位移动；没有歌词时退化为按整秒步进。 */
-  private stepByLine(baseSec: number, steps: number): number {
-    const times = this.lyricTimes()
-    if (times.length === 0) { return Math.max(0, baseSec + steps) }
-    let index = 0
-    for (let i = 0; i < times.length; i++) {
-      if (times[i] <= baseSec) { index = i }
-    }
-    const target = Math.max(0, Math.min(times.length - 1, index + steps))
-    return times[target]
-  }
 
   aboutToAppear(): void {
     const song = this.pageParam.song
@@ -235,27 +209,11 @@ export struct RingtonePage {
     this.invalidateClip()
   }
 
-  /** 拖动开始：记录基准、重置「超限提醒」、停掉正在播放的旧片段。 */
+  /** 拖动滑块前重置「超限提醒」并停掉旧试听。 */
   private beginDrag(): void {
-    this.dragBaseStart = this.startSec
-    this.dragBaseEnd = this.endSec
     this.limitNotified = false
     this.invalidateClip()
     this.stopPreview()
-  }
-
-  /** 滑动歌词：把选区起点平移到可见的那一句，保持已选长度。 */
-  private applyWindowStart(firstLyricIndex: number): void {
-    const line = this.lyrics[firstLyricIndex]
-    if (!line) { return }
-    const length = Math.max(1, Math.min(this.selectedSeconds(), this.maxLength()))
-    const start = Math.max(0, Math.min(this.durationSec - 1, Math.round(line.time / 1000)))
-    if (start === this.startSec) { return }
-    if (this.previewing) { this.stopPreview() }
-    this.startSec = start
-    this.endSec = start + length
-    this.enforceLimit(true)
-    this.invalidateClip()
   }
 
   private selectType(index: number): void {
@@ -519,55 +477,36 @@ export struct RingtonePage {
     .scrollBar(BarState.Off)
   }
 
-  /**
-   * 开始 / 结束时间标签。它只在歌词卡片内部贴着上下边缘，不跨页；
-   * 拖动只挂在标签本体上，虚线对触摸透明，所以不会把歌词列表的滑动吃掉。
-   */
-  @Builder
-  private TimeBand(sec: number, label: string, isStart: boolean) {
-    Row() {
-      Row({ space: 4 }) {
-        Text(this.timeText(sec)).fontSize(10).fontColor(TC.textOnAccent())
-        Text(label).fontSize(10).fontColor(TC.textOnAccent()).fontWeight(FontWeight.Medium)
-      }
-      .height(20)
-      .padding({ left: 9, right: 9 })
-      .backgroundColor(TC.accent())
-      .borderRadius(10)
-      .hitTestBehavior(HitTestMode.Block)
-      .gesture(
-        PanGesture()
-          .onActionStart(() => { this.beginDrag() })
-          .onActionUpdate((event: GestureEvent) => {
-            const steps = Math.round(event.offsetY / LYRIC_STEP_VP)
-            if (isStart) {
-              this.setStart(this.stepByLine(this.dragBaseStart, steps), true)
-            } else {
-              this.setEnd(this.stepByLine(this.dragBaseEnd, steps), true)
-            }
-          })
-      )
-      Row()
-        .layoutWeight(1)
-        .height(1)
-        .margin({ left: 8, right: 12 })
-        .border({ width: { top: 1 }, color: 'rgba(128,128,128,0.45)', style: BorderStyle.Dashed })
+  /** 选中区间的第一句 / 最后一句歌词，用来把标签贴到亮暗交界处。 */
+  private firstSelectedLyric(): number {
+    for (let i = 0; i < this.lyrics.length; i++) {
+      if (this.lyrics[i].time / 1000 >= this.startSec) { return i }
     }
-    .width('100%')
-    .height(28)
-    .padding({ left: 10 })
-    .alignItems(VerticalAlign.Center)
+    return Math.max(0, this.lyrics.length - 1)
+  }
+
+  private lastSelectedLyric(): number {
+    let index = 0
+    for (let i = 0; i < this.lyrics.length; i++) {
+      if (this.lyrics[i].time / 1000 < this.endSec) { index = i }
+    }
+    return index
+  }
+
+  /** 标签贴在对应歌词行的位置，超出可视区就贴边，避免跑出歌词组件。 */
+  private tagY(index: number, bottom: boolean): number {
+    const raw = 4 + index * LYRIC_ROW_VP - this.lyricScrollY + (bottom ? 18 : -4)
+    return Math.max(0, Math.min(Math.max(0, this.lyricViewportHeight - 28), raw))
   }
 
   /**
-   * 歌词窗口：一块圆角卡片，顶部是「开始」边界条、底部是「结束」边界条，
-   * 中间是可上下滑动的纯文本歌词。滑动时选区起点按「一行歌词」平移，
-   * 两条边界条上的时间随之刷新；标签本身也可以上下拖动做逐行微调。
+   * 歌词组件：普通文本列表，不做缩放/透明动画。歌词的亮暗只由是否落在选区内决定，
+   * 亮暗交界处正好贴着开始 / 结束标签。
+   * 动态值一律直接读 @State（不走 @Builder 的基础类型传参），否则滑块拖动时标签不刷新。
    */
   @Builder
-  private LyricWindow(startSec: number, endSec: number) {
+  private LyricWindow() {
     Stack({ alignContent: Alignment.TopStart }) {
-      // 卡片底：让「歌词组件」的边界看得见
       Column()
         .width('100%')
         .height('100%')
@@ -575,55 +514,84 @@ export struct RingtonePage {
         .backgroundColor('rgba(128,128,128,0.06)')
         .border({ width: 1, color: 'rgba(128,128,128,0.14)' })
 
-      Column() {
-        this.TimeBand(startSec, '开始', true)
-
-        if (this.lyrics.length > 0) {
-          List({ space: 8, scroller: this.lyricScroller }) {
+      if (this.lyrics.length > 0) {
+        List({ space: 8, scroller: this.lyricScroller }) {
+          ForEach(this.lyrics, (line: RingtoneLyric, index: number) => {
             ListItem() {
-              Column().width('100%').height(Math.max(0, (this.lyricHeight - 56) / 2 - 11))
+              Text(line.text)
+                .width('100%')
+                .fontSize(15)
+                .lineHeight(22)
+                .fontColor(this.lineSelected(index) ? TC.textBody() : TC.textTertiary())
+                .textAlign(TextAlign.Center)
+                .padding({ left: 18, right: 18 })
             }
-            ForEach(this.lyrics, (line: RingtoneLyric, index: number) => {
-              ListItem() {
-                Text(line.text)
-                  .width('100%')
-                  .fontSize(15)
-                  .lineHeight(22)
-                  .fontColor(this.lineSelected(index) ? TC.textBody() : TC.textTertiary())
-                  .textAlign(TextAlign.Center)
-                  .padding({ left: 18, right: 18 })
-              }
-            }, (line: RingtoneLyric, index: number) => `${line.time}-${index}`)
-            ListItem() {
-              Column().width('100%').height(Math.max(0, (this.lyricHeight - 56) / 2 - 11))
-            }
-          }
-          .width('100%')
-          .layoutWeight(1)
-          .scrollBar(BarState.Off)
-          .edgeEffect(EdgeEffect.Spring)
-          .onScrollStart(() => {
-            this.lyricUserScrolling = true
-            this.limitNotified = false
-          })
-          .onScrollStop(() => { this.lyricUserScrolling = false })
-          .onScrollIndex((first: number) => {
-            if (this.lyricUserScrolling) { this.applyWindowStart(Math.max(0, first - 1)) }
-          })
-        } else {
-          Column({ space: 8 }) {
-            SymbolGlyph($r('sys.symbol.music_note_list')).fontSize(26).fontColor([TC.textQuaternary()])
-            Text('这首歌暂无歌词').fontSize(12).fontColor(TC.textTertiary())
-          }
-          .width('100%')
-          .layoutWeight(1)
-          .justifyContent(FlexAlign.Center)
+          }, (line: RingtoneLyric, index: number) => `${line.time}-${index}`)
         }
+        .width('100%')
+        .height('100%')
+        .padding({ top: 4, bottom: 4 })
+        .scrollBar(BarState.Off)
+        .edgeEffect(EdgeEffect.Spring)
+        .onScroll((offset: number) => { this.lyricScrollY = offset })
+        .onAreaChange((_old: Area, area: Area) => {
+          this.lyricViewportHeight = Number(area.height)
+        })
 
-        this.TimeBand(endSec, '结束', false)
+        // 开始标签：贴在「第一句亮歌词」上，纯展示、不拦歌词滑动
+        Row() {
+          Row({ space: 4 }) {
+            Text(this.timeText(this.startSec)).fontSize(10).fontColor(TC.textOnAccent())
+            Text('开始').fontSize(10).fontColor(TC.textOnAccent()).fontWeight(FontWeight.Medium)
+          }
+          .height(20)
+          .padding({ left: 9, right: 9 })
+          .backgroundColor(TC.accent())
+          .borderRadius(10)
+          Row()
+            .layoutWeight(1)
+            .height(1)
+            .margin({ left: 8, right: 12 })
+            .border({ width: { top: 1 }, color: 'rgba(128,128,128,0.45)', style: BorderStyle.Dashed })
+        }
+        .width('100%')
+        .height(28)
+        .padding({ left: 10 })
+        .alignItems(VerticalAlign.Center)
+        .position({ x: 0, y: this.tagY(this.firstSelectedLyric(), false) })
+        .hitTestBehavior(HitTestMode.None)
+
+        // 结束标签：贴在「最后一句亮歌词」下
+        Row() {
+          Row({ space: 4 }) {
+            Text(this.timeText(this.endSec)).fontSize(10).fontColor(TC.textOnAccent())
+            Text('结束').fontSize(10).fontColor(TC.textOnAccent()).fontWeight(FontWeight.Medium)
+          }
+          .height(20)
+          .padding({ left: 9, right: 9 })
+          .backgroundColor(TC.accent())
+          .borderRadius(10)
+          Row()
+            .layoutWeight(1)
+            .height(1)
+            .margin({ left: 8, right: 12 })
+            .border({ width: { top: 1 }, color: 'rgba(128,128,128,0.45)', style: BorderStyle.Dashed })
+        }
+        .width('100%')
+        .height(28)
+        .padding({ left: 10 })
+        .alignItems(VerticalAlign.Center)
+        .position({ x: 0, y: this.tagY(this.lastSelectedLyric(), true) })
+        .hitTestBehavior(HitTestMode.None)
+      } else {
+        Column({ space: 8 }) {
+          SymbolGlyph($r('sys.symbol.music_note_list')).fontSize(26).fontColor([TC.textQuaternary()])
+          Text('这首歌暂无歌词').fontSize(12).fontColor(TC.textTertiary())
+        }
+        .width('100%')
+        .height('100%')
+        .justifyContent(FlexAlign.Center)
       }
-      .width('100%')
-      .height('100%')
     }
     .width('100%')
     .layoutWeight(1)
@@ -633,71 +601,96 @@ export struct RingtonePage {
     })
   }
 
-  @Builder
-  private WaveformStrip(startSec: number, endSec: number) {
-    Stack({ alignContent: Alignment.TopStart }) {
-      Row({ space: 1 }) {
-        ForEach(this.bars, (value: number, index: number) => {
-          Column()
-            .width(2)
-            .height(Math.max(4, Math.round(value * 44)))
-            .borderRadius(1)
-            .backgroundColor(TC.textTertiary())
-            .opacity(0.55)
-        })
-      }
-      .width('100%')
-      .height(48)
-      .justifyContent(FlexAlign.SpaceBetween)
-      .alignItems(VerticalAlign.Center)
+  /** 把滑块上的横坐标换成秒。 */
+  private secAt(x: number): number {
+    if (this.waveWidth <= 0 || this.durationSec <= 0) { return 0 }
+    return Math.max(0, Math.min(this.durationSec, Math.round(x / this.waveWidth * this.durationSec)))
+  }
 
-      // 选区底色：不拦触摸，避免把手柄盖住
-      Column()
-        .width(Math.max(0, this.endX(endSec) - this.startX(startSec)))
-        .height(48)
-        .backgroundColor('rgba(255,255,255,0.10)')
-        .border({ width: { left: 1, right: 1 }, color: TC.accent() })
-        .position({ x: this.startX(startSec), y: 0 })
+  private nearestThumb(x: number): number {
+    const sec = this.secAt(x)
+    return Math.abs(sec - this.startSec) <= Math.abs(sec - this.endSec) ? 1 : 2
+  }
+
+  /** 拖动当前选中的那一头，两个手柄都能滑。 */
+  private applyThumbX(x: number): void {
+    const sec = this.secAt(x)
+    if (this.dragThumb === 1) { this.setStart(sec, true) }
+    else if (this.dragThumb === 2) { this.setEnd(sec, true) }
+  }
+
+  /**
+   * 双向范围滑块：整条轨道都是触摸区，按下时自动抓离手指更近的那一头，
+   * 之后拖动只更新那一头；里面的波形、选区和手柄都只是画出来，不参与命中测试。
+   */
+  @Builder
+  private RangeSlider() {
+    Column({ space: 4 }) {
+      Stack({ alignContent: Alignment.TopStart }) {
+        Row({ space: 1 }) {
+          ForEach(this.bars, (value: number, index: number) => {
+            Column()
+              .width(2)
+              .height(Math.max(4, Math.round(value * 40)))
+              .borderRadius(1)
+              .backgroundColor(TC.textTertiary())
+              .opacity(0.55)
+          })
+        }
+        .width('100%')
+        .height(44)
+        .justifyContent(FlexAlign.SpaceBetween)
+        .alignItems(VerticalAlign.Center)
         .hitTestBehavior(HitTestMode.None)
 
-      // 手柄：视觉只有 3vp 宽，但触摸区放宽到 22vp，否则手指根本捏不住
-      Stack({ alignContent: Alignment.Center }) {
-        Column().width(3).height(52).borderRadius(2).backgroundColor(TC.accent())
+        Column()
+          .width(Math.max(0, this.endX(this.endSec) - this.startX(this.startSec)))
+          .height(44)
+          .backgroundColor('rgba(255,255,255,0.10)')
+          .position({ x: this.startX(this.startSec), y: 0 })
+          .hitTestBehavior(HitTestMode.None)
+
+        // 开始手柄
+        Column()
+          .width(6)
+          .height(44)
+          .borderRadius(3)
+          .backgroundColor(TC.accent())
+          .position({ x: Math.max(0, this.startX(this.startSec) - 3), y: 0 })
+          .hitTestBehavior(HitTestMode.None)
+        // 结束手柄
+        Column()
+          .width(6)
+          .height(44)
+          .borderRadius(3)
+          .backgroundColor(TC.accent())
+          .position({ x: Math.max(0, this.endX(this.endSec) - 3), y: 0 })
+          .hitTestBehavior(HitTestMode.None)
       }
-      .width(22)
-      .height(52)
-      .position({ x: Math.max(0, this.startX(startSec) - 11), y: 0 })
-      .hitTestBehavior(HitTestMode.Block)
+      .width('100%')
+      .height(44)
+      .onAreaChange((_old: Area, area: Area) => {
+        this.waveWidth = Math.max(0, Number(area.width))
+      })
       .gesture(
-        PanGesture()
-          .onActionStart(() => { this.beginDrag() })
-          .onActionUpdate((event: GestureEvent) => {
-            if (this.waveWidth <= 0) { return }
-            this.setStart(this.dragBaseStart + event.offsetX / this.waveWidth * this.durationSec)
+        PanGesture({ distance: 1 })
+          .onActionStart((event: GestureEvent) => {
+            this.beginDrag()
+            this.dragThumb = this.nearestThumb(event.localX)
+            this.applyThumbX(event.localX)
           })
+          .onActionUpdate((event: GestureEvent) => this.applyThumbX(event.localX))
+          .onActionEnd(() => { this.dragThumb = 0 })
       )
 
-      Stack({ alignContent: Alignment.Center }) {
-        Column().width(3).height(52).borderRadius(2).backgroundColor(TC.accent())
+      Row() {
+        Text(`开始 ${this.timeText(this.startSec)}`).fontSize(10).fontColor(TC.textSecondary())
+        Text(`结束 ${this.timeText(this.endSec)}`).fontSize(10).fontColor(TC.textSecondary())
       }
-      .width(22)
-      .height(52)
-      .position({ x: Math.max(0, this.endX(endSec) - 11), y: 0 })
-      .hitTestBehavior(HitTestMode.Block)
-      .gesture(
-        PanGesture()
-          .onActionStart(() => { this.beginDrag() })
-          .onActionUpdate((event: GestureEvent) => {
-            if (this.waveWidth <= 0) { return }
-            this.setEnd(this.dragBaseEnd + event.offsetX / this.waveWidth * this.durationSec)
-          })
-      )
+      .width('100%')
+      .justifyContent(FlexAlign.SpaceBetween)
     }
     .width('100%')
-    .height(52)
-    .onAreaChange((_old: Area, area: Area) => {
-      this.waveWidth = Math.max(0, Number(area.width))
-    })
   }
 
   @Builder
@@ -759,11 +752,11 @@ export struct RingtonePage {
           Column({ space: 10 }) {
             this.TypeChips()
             this.QualityRow()
-            this.LyricWindow(this.startSec, this.endSec)
+            this.LyricWindow()
             Text(`已选 ${this.timeText(this.selectedSeconds())}（最高可选 ${this.maxSeconds} 秒）`)
               .width('100%').fontSize(11).fontColor(TC.textTertiary()).textAlign(TextAlign.Center)
             Column() {
-              this.WaveformStrip(this.startSec, this.endSec)
+              this.RangeSlider()
             }
             .width('100%')
             .padding({ left: 18, right: 18 })
