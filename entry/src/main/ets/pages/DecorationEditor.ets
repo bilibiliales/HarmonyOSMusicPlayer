@@ -106,7 +106,7 @@ export struct DecorationEditorPage {
   @State private dockBgColor: string = ''
   @State private dockBgImage: string = ''
   @State private dockBgOpacity: number = 100
-  @State private dockBgBrightness: number = 100
+  @State private dockBgBlur: number = 0
   @State private dockBgScrim: number = 0
   @State private dockIndicatorColor: string = ''
   @State private dockShowText: boolean = true
@@ -242,7 +242,7 @@ export struct DecorationEditorPage {
     this.dockBgColor = ''
     this.dockBgImage = ''
     this.dockBgOpacity = 100
-    this.dockBgBrightness = 100
+    this.dockBgBlur = 0
     this.dockBgScrim = 0
     this.dockIndicatorColor = ''
     this.dockShowText = true
@@ -347,7 +347,7 @@ export struct DecorationEditorPage {
       this.dockBgColor = cfg.bgColor
       this.dockBgImage = cfg.bgImage
       this.dockBgOpacity = cfg.bgOpacity
-      this.dockBgBrightness = cfg.bgBrightness
+      this.dockBgBlur = cfg.bgBlur
       this.dockBgScrim = cfg.bgScrim
       this.dockIndicatorColor = cfg.indicatorColor
       this.dockShowText = cfg.showText
@@ -484,7 +484,7 @@ export struct DecorationEditorPage {
       cfg.bgColor = this.dockBgColor
       cfg.bgImage = this.dockBgImage
       cfg.bgOpacity = this.dockBgOpacity
-      cfg.bgBrightness = this.dockBgBrightness
+      cfg.bgBlur = this.dockBgBlur
       cfg.bgScrim = this.dockBgScrim
       cfg.indicatorColor = this.dockIndicatorColor
       cfg.showText = this.dockShowText
@@ -954,7 +954,7 @@ export struct DecorationEditorPage {
           onChange: (path: string) => this.skinBgImage = path
         })
         DecoSlider({
-          label: '背景亮度', value: this.skinBgBlur, min: 0, max: 40, step: 1, unit: 'vp',
+          label: '背景模糊', value: this.skinBgBlur, min: 0, max: 40, step: 1, unit: 'vp',
           onChange: (v: number) => this.skinBgBlur = v
         })
         DecoSlider({
@@ -1523,8 +1523,8 @@ export struct DecorationEditorPage {
         })
         if (this.dockBgImage) {
           DecoSlider({
-            label: '背景亮度', value: this.dockBgBrightness, min: 0, max: 200, step: 1, unit: '%',
-            onChange: (v: number) => this.dockBgBrightness = v
+            label: '背景模糊', value: this.dockBgBlur, min: 0, max: 40, step: 1, unit: 'vp',
+            onChange: (v: number) => this.dockBgBlur = v
           })
           DecoSlider({
             label: '背景不透明度', value: this.dockBgOpacity, min: 0, max: 100, step: 1, unit: '%',
@@ -1556,7 +1556,7 @@ export struct DecorationEditorPage {
               .height('100%')
               .objectFit(ImageFit.Cover)
               .opacity(this.dockBgOpacity / 100)
-              .brightness(this.dockBgBrightness / 100)
+              .blur(this.dockBgBlur)
           }
           if (this.dockBgImage && this.dockBgScrim > 0) {
             Column()

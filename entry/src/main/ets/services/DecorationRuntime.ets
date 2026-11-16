@@ -36,7 +36,7 @@ export class DecoKeys {
   static readonly DOCK_BG: string = 'decoDockBg'
   static readonly DOCK_BG_IMAGE: string = 'decoDockBgImage'
   static readonly DOCK_BG_OPACITY: string = 'decoDockBgOpacity'
-  static readonly DOCK_BG_BRIGHTNESS: string = 'decoDockBgBrightness'
+  static readonly DOCK_BG_BLUR: string = 'decoDockBgBlur'
   static readonly DOCK_BG_SCRIM: string = 'decoDockBgScrim'
   static readonly DOCK_INDICATOR: string = 'decoDockIndicator'
   static readonly DOCK_SHOW_TEXT: string = 'decoDockShowText'
@@ -234,7 +234,7 @@ export class DecorationRuntime {
     AppStorage.setOrCreate<string>(DecoKeys.DOCK_BG, cfg ? cfg.bgColor : '')
     AppStorage.setOrCreate<string>(DecoKeys.DOCK_BG_IMAGE, cfg ? cfg.bgImage : '')
     AppStorage.setOrCreate<number>(DecoKeys.DOCK_BG_OPACITY, cfg ? cfg.bgOpacity : 100)
-    AppStorage.setOrCreate<number>(DecoKeys.DOCK_BG_BRIGHTNESS, cfg ? cfg.bgBrightness : 100)
+    AppStorage.setOrCreate<number>(DecoKeys.DOCK_BG_BLUR, cfg ? cfg.bgBlur : 0)
     AppStorage.setOrCreate<number>(DecoKeys.DOCK_BG_SCRIM, cfg ? cfg.bgScrim : 0)
     AppStorage.setOrCreate<string>(DecoKeys.DOCK_INDICATOR, cfg ? cfg.indicatorColor : '')
     AppStorage.setOrCreate<boolean>(DecoKeys.DOCK_SHOW_TEXT, cfg ? cfg.showText : true)

@@ -107,7 +107,7 @@ struct HomeIndex {
   @StorageProp(DecoKeys.DOCK_BG) dockBgColor: string = ''
   @StorageProp(DecoKeys.DOCK_BG_IMAGE) dockBgImage: string = ''
   @StorageProp(DecoKeys.DOCK_BG_OPACITY) dockBgOpacity: number = 100
-  @StorageProp(DecoKeys.DOCK_BG_BRIGHTNESS) dockBgBrightness: number = 100
+  @StorageProp(DecoKeys.DOCK_BG_BLUR) dockBgBlur: number = 0
   @StorageProp(DecoKeys.DOCK_BG_SCRIM) dockBgScrim: number = 0
   @StorageProp(DecoKeys.DOCK_INDICATOR) dockIndicator: string = ''
   @StorageProp(DecoKeys.DOCK_SHOW_TEXT) dockShowText: boolean = true
@@ -427,7 +427,7 @@ struct HomeIndex {
         AppBackdrop()
 
         // 底部导航背景图：画在 Tabs 之下，Tab 栏背景改透明透出。
-        // 不透明度 / 亮度 / 可读性蒙版与皮肤一致，蒙版压在最上层保证图标与文字可读。
+        // 模糊 / 不透明度 / 可读性蒙版与皮肤一致，蒙版压在最上层保证图标与文字可读。
         if (this.dockBgImage) {
           Stack() {
             Image(DecorationMedia.displayUri(this.dockBgImage))
@@ -435,7 +435,7 @@ struct HomeIndex {
               .height('100%')
               .objectFit(ImageFit.Cover)
               .opacity(Math.max(0, Math.min(100, this.dockBgOpacity)) / 100)
-              .brightness(Math.max(0, Math.min(200, this.dockBgBrightness)) / 100)
+              .blur(Math.max(0, Math.min(60, this.dockBgBlur)))
             if (this.dockBgScrim > 0) {
               Column()
                 .width('100%')

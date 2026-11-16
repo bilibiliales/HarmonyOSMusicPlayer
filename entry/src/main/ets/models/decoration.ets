@@ -325,8 +325,8 @@ export class DockConfig {
   bgImage: string = ''
   /** 底板背景图不透明度 0-100。 */
   bgOpacity: number = 100
-  /** 底板背景图亮度 0-200（100=原图）。 */
-  bgBrightness: number = 100
+  /** 底板背景图模糊半径（vp）。 */
+  bgBlur: number = 0
   /** 底板可读性蒙版 0-100：压暗背景，保证图标与文字清楚。 */
   bgScrim: number = 0
   /** 选中指示块颜色；空=主题色。 */
@@ -355,7 +355,7 @@ export class DockConfig {
       out.bgColor = src.bgColor ?? ''
       out.bgImage = src.bgImage ?? ''
       out.bgOpacity = src.bgOpacity ?? 100
-      out.bgBrightness = src.bgBrightness ?? 100
+      out.bgBlur = src.bgBlur ?? 0
       out.bgScrim = src.bgScrim ?? 0
       out.indicatorColor = src.indicatorColor ?? ''
       out.showText = src.showText ?? true
