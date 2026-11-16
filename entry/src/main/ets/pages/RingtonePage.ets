@@ -8,6 +8,7 @@ import { RingtoneService, RINGTONE_TYPE_TITLES } from '../services/RingtoneServi
 import { SongMetadataCache } from '../services/SongMetadataCache'
 import { TC } from '../services/ThemeColors'
 import { QualityOption, songItemType } from '../models/music'
+import curves from '@ohos.curves'
 
 export interface RingtonePageParam {
   song: songItemType
@@ -46,6 +47,9 @@ export struct RingtonePage {
   @State lyrics: RingtoneLyric[] = []
   @State lyricHeight: number = 0
   @State waveWidth: number = 0
+  /** 标签拖拽时的临时偏移；松手后用弹簧动画归到吸附位置。 */
+  @State startTagDragY: number = 0
+  @State endTagDragY: number = 0
   @State saving: boolean = false
   @State applying: boolean = false
   @State previewing: boolean = false
@@ -58,6 +62,8 @@ export struct RingtonePage {
   private clipKey: string = ''
   private lyricScroller: Scroller = new Scroller()
   private dragBaseSec: number = 0
+  private dragTagBaseBoundary: number = 0
+  private snapTimer: number = -1
   private limitNotified: boolean = false
 
   aboutToAppear(): void {
@@ -72,6 +78,10 @@ export struct RingtonePage {
   }
 
   aboutToDisappear(): void {
+    if (this.snapTimer >= 0) {
+      clearTimeout(this.snapTimer)
+      this.snapTimer = -1
+    }
     this.stopPreview()
   }
 
@@ -494,6 +504,61 @@ export struct RingtonePage {
   }
 
   /**
+   * 第 k 条边界对应的时间：k=0 在第一行之前，k= lyrics.length 在最后一行之后，
+   * 其余取相邻两句歌词时间的中间值，让分隔线真的落在两行之间。
+   */
+  private boundaryTime(k: number): number {
+    if (this.lyrics.length === 0) { return 0 }
+    if (k <= 0) { return Math.max(0, Math.floor(this.lyrics[0].time / 1000) - 1) }
+    if (k >= this.lyrics.length) {
+      return Math.round(this.lyrics[this.lyrics.length - 1].time / 1000) + 1
+    }
+    const prev = this.lyrics[k - 1].time / 1000
+    const next = this.lyrics[k].time / 1000
+    return Math.round((prev + next) / 2)
+  }
+
+  private beginTagDrag(isStart: boolean): void {
+    if (this.snapTimer >= 0) {
+      clearTimeout(this.snapTimer)
+      this.snapTimer = -1
+      this.startTagDragY = 0
+      this.endTagDragY = 0
+    }
+    this.dragTagBaseBoundary = isStart ? this.firstSelectedLyric() : this.lastSelectedLyric() + 1
+    if (isStart) { this.startTagDragY = 0 }
+    else { this.endTagDragY = 0 }
+    this.beginDrag()
+  }
+
+  private updateTagDrag(isStart: boolean, offsetY: number): void {
+    if (isStart) { this.startTagDragY = offsetY }
+    else { this.endTagDragY = offsetY }
+  }
+
+  /** 松手：先弹簧滑到最近的两行中间，动画结束后再提交时间，视觉上无缝衔接。 */
+  private finishTagDrag(isStart: boolean): void {
+    const current = isStart ? this.startTagDragY : this.endTagDragY
+    const maxK = this.lyrics.length
+    const targetK = Math.max(0, Math.min(maxK,
+      this.dragTagBaseBoundary + Math.round(current / LYRIC_ROW_VP)))
+    const targetPx = (targetK - this.dragTagBaseBoundary) * LYRIC_ROW_VP
+    const time = this.boundaryTime(targetK)
+    animateTo({
+      duration: 330,
+      curve: curves.springMotion(0.55, 0.76, 0.24)
+    }, () => {
+      if (isStart) { this.startTagDragY = targetPx }
+      else { this.endTagDragY = targetPx }
+    })
+    this.snapTimer = setTimeout(() => {
+      if (isStart) { this.setStart(time, true); this.startTagDragY = 0 }
+      else { this.setEnd(time, true); this.endTagDragY = 0 }
+      this.snapTimer = -1
+    }, 340)
+  }
+
+  /**
    * 开始 / 结束标签作为「歌词行的一部分」浮在行边界上，不占歌词高度。
    * 它们随 ListItem 一起滚动，所以不需要监听 onScroll 或做任何坐标换算。
    * 所有动态值都直接读 @State，ForEach 不重建也能跟着滑块刷新。
@@ -509,6 +574,13 @@ export struct RingtonePage {
       .padding({ left: 9, right: 9 })
       .backgroundColor(TC.accent())
       .borderRadius(10)
+      .hitTestBehavior(HitTestMode.Block)
+      .gesture(
+        PanGesture({ distance: 1 })
+          .onActionStart(() => this.beginTagDrag(true))
+          .onActionUpdate((event: GestureEvent) => this.updateTagDrag(true, event.offsetY))
+          .onActionEnd(() => this.finishTagDrag(true))
+      )
       Row()
         .layoutWeight(1)
         .height(1)
@@ -521,9 +593,10 @@ export struct RingtonePage {
     .alignItems(VerticalAlign.Center)
     // 中心压在这一行的上边缘
     .position({ x: 0, y: -LYRIC_TAG_VP / 2 })
+    .translate({ y: this.startTagDragY })
     .opacity(this.firstSelectedLyric() === index ? 1 : 0)
     .zIndex(2)
-    .hitTestBehavior(HitTestMode.None)
+    .hitTestBehavior(this.firstSelectedLyric() === index ? HitTestMode.Transparent : HitTestMode.None)
   }
 
   @Builder
@@ -537,6 +610,13 @@ export struct RingtonePage {
       .padding({ left: 9, right: 9 })
       .backgroundColor(TC.accent())
       .borderRadius(10)
+      .hitTestBehavior(HitTestMode.Block)
+      .gesture(
+        PanGesture({ distance: 1 })
+          .onActionStart(() => this.beginTagDrag(false))
+          .onActionUpdate((event: GestureEvent) => this.updateTagDrag(false, event.offsetY))
+          .onActionEnd(() => this.finishTagDrag(false))
+      )
       Row()
         .layoutWeight(1)
         .height(1)
@@ -549,9 +629,10 @@ export struct RingtonePage {
     .alignItems(VerticalAlign.Center)
     // 中心压在这一行的下边缘
     .position({ x: 0, y: LYRIC_LINE_VP - LYRIC_TAG_VP / 2 })
+    .translate({ y: this.endTagDragY })
     .opacity(this.lastSelectedLyric() === index ? 1 : 0)
     .zIndex(2)
-    .hitTestBehavior(HitTestMode.None)
+    .hitTestBehavior(this.lastSelectedLyric() === index ? HitTestMode.Transparent : HitTestMode.None)
   }
 
   /**
