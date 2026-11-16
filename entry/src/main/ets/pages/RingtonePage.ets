@@ -492,10 +492,12 @@ export struct RingtonePage {
     return index
   }
 
-  /** 标签贴在对应歌词行的位置，超出可视区就贴边，避免跑出歌词组件。 */
+  /**
+   * 标签贴在对应歌词行的位置。它只是指示物：选区滚出可视区时允许跟着歌词飞出卡片，
+   * 不再夹在容器边缘，这样滑歌词时总能找到它对应的那一行。
+   */
   private tagY(index: number, bottom: boolean): number {
-    const raw = 4 + index * LYRIC_ROW_VP - this.lyricScrollY + (bottom ? 18 : -4)
-    return Math.max(0, Math.min(Math.max(0, this.lyricViewportHeight - 28), raw))
+    return 4 + index * LYRIC_ROW_VP - this.lyricScrollY + (bottom ? 18 : -4)
   }
 
   /**
@@ -558,6 +560,7 @@ export struct RingtonePage {
         .padding({ left: 10 })
         .alignItems(VerticalAlign.Center)
         .position({ x: 0, y: this.tagY(this.firstSelectedLyric(), false) })
+        .zIndex(10)
         .hitTestBehavior(HitTestMode.None)
 
         // 结束标签：贴在「最后一句亮歌词」下
@@ -581,6 +584,7 @@ export struct RingtonePage {
         .padding({ left: 10 })
         .alignItems(VerticalAlign.Center)
         .position({ x: 0, y: this.tagY(this.lastSelectedLyric(), true) })
+        .zIndex(10)
         .hitTestBehavior(HitTestMode.None)
       } else {
         Column({ space: 8 }) {
@@ -594,7 +598,7 @@ export struct RingtonePage {
     }
     .width('100%')
     .layoutWeight(1)
-    .clip(true)
+    .zIndex(5)
     .onAreaChange((_old: Area, area: Area) => {
       this.lyricHeight = Number(area.height)
     })
