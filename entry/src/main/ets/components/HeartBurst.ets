@@ -92,6 +92,9 @@ export struct HeartBurst {
     }
     .width(120)
     .height(160)
+    // 没有粒子时整个动画层从布局和命中测试中移除，
+    // 否则它会盖在播放页 68%/40% 一片区域上，让下面的按钮点不到
+    .visibility(this.particles.length > 0 ? Visibility.Visible : Visibility.None)
     .hitTestBehavior(HitTestMode.None)
   }
 }
