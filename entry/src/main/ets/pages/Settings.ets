@@ -401,7 +401,7 @@ export struct SettingsPage {
 
             Column({ space: 10 }) {
               Text('后端服务').width('100%').fontSize(16).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary())
-              TextInput({ text: this.serverUrl, placeholder: '后端服务 Base URL，例如 https://neteaseapi.gksm.store' })
+              TextInput({ text: this.serverUrl, placeholder: '后端服务 Base URL，例如 https://api.enzymeym.top' })
                 .height(50).fontColor(TC.textPrimary()).placeholderColor(TC.textQuaternary()).backgroundColor(TC.surfaceInset())
                 .borderRadius(14).onChange((value: string) => this.serverUrl = value)
               Button('保存服务地址').width('100%').height(46).borderRadius(23)
