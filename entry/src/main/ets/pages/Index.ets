@@ -1,4 +1,5 @@
 import { LocalMusicPage } from './LocalMusic'
+import { DecorationMedia } from '../services/DecorationMedia'
 import { YunbeiPage } from './Yunbei'
 import { songItemType, TabClass, playlistType } from '../models'
 import { tabsData } from '../constants'
@@ -15,6 +16,7 @@ import { SongWiki } from './SongWiki'
 import { SearchPage } from './Search'
 import { SettingsPage } from './Settings'
 import { DeviceManagementPage } from './DeviceManagementPage'
+import { DeviceDetailPage, DeviceDetailParam } from './DeviceDetailPage'
 import { FanClubListPage } from './FanClubListPage'
 import { FanClubDetailPage } from './FanClubDetailPage'
 import { FanClubDetailParam } from '../services/FanClubService'
@@ -46,9 +48,12 @@ import { DigitalAlbumPage } from './DigitalAlbum'
 import { DigitalAlbumDetailPage } from './DigitalAlbumDetail'
 import { SatiPage } from './Sati'
 import { PlaylistCoverPreview, PlaylistCoverPreviewPageParam } from './PlaylistCoverPreview'
+import { ImagePreviewPage, ImagePreviewPageParam } from './ImagePreviewPage'
+import { RingtonePage, RingtonePageParam } from './RingtonePage'
 import {
   AlbumPageParam,
   ArtistPageParam,
+  ArtistSongsPageParam,
   EventDetailPageParam,
   MvPlayerPageParam,
   PrivateChatPageParam,
@@ -59,24 +64,89 @@ import { StyleDetailPageParam } from '../models/style'
 import { DigitalAlbumDetailPageParam } from '../models/digitalAlbum'
 import { FloatingMusicCard } from '../components/FloatingMusicCard'
 import { Sidebar } from '../components/Sidebar'
+import { AppBackdrop } from '../components/AppBackdrop'
+import { StartupOverlay } from '../components/StartupOverlay'
+import { DecoKeys } from '../services/DecorationRuntime'
+import { DecorationCenterPage } from './DecorationCenter'
+import { DecorationEditorPage, DecorationEditorParam } from './DecorationEditor'
+import { ArtistSongsPage } from './ArtistSongs'
+import { ImageCropPage } from './ImageCropPage'
+import { ImageCropPageParam } from '../models/decoration'
 import { AuthStore } from '../stores/AuthStore'
 import { PlayerStore } from '../stores/PlayerStore'
 import { playerController } from '../services/PlayerController'
 import { AppSettings } from '../services/AppSettings'
 import { common } from '@kit.AbilityKit'
+import { fileIo, fileUri } from '@kit.CoreFileKit'
 import { window } from '@kit.ArkUI'
+import { TC } from '../services/ThemeColors'
 
 @Entry
 @Component
 struct HomeIndex {
+  @StorageProp('skinVersion') skinVersionObs: number = 0
+  @StorageLink('openAudioUri') openAudioUri: string = ''
+  @StorageLink('openAudioSeq') @Watch('onExternalAudio') openAudioSeq: number = 0
   @Provide('pageStack') pageStack: NavPathStack = new NavPathStack()
   @Provide('authStore') authStore: AuthStore = new AuthStore()
   @Provide('playerStore') playerStore: PlayerStore = new PlayerStore()
   @Provide('topAvoidHeight') topAvoidHeight: number = 0
   @State currentName: string = 'recommend'
+  @State pageHeight: number = 0
   @State currentIndex: number = 0
   @State sidebarVisible: boolean = false
   @State sidebarMounted: boolean = false
+  // 底部导航装扮
+  @StorageProp(DecoKeys.DOCK_ICONS) dockIcons: string = ''
+  @StorageProp(DecoKeys.DOCK_ACTIVE_ICONS) dockActiveIcons: string = ''
+  @StorageProp(DecoKeys.DOCK_ICON_SIZE) dockIconSize: number = 22
+  @StorageProp(DecoKeys.DOCK_ICON_COLOR) dockIconColor: string = ''
+  @StorageProp(DecoKeys.DOCK_ACTIVE_COLOR) dockActiveColor: string = ''
+  @StorageProp(DecoKeys.DOCK_TEXT_COLOR) dockTextColor: string = ''
+  @StorageProp(DecoKeys.DOCK_TEXT_SIZE) dockTextSize: number = 10
+  @StorageProp(DecoKeys.DOCK_BG) dockBgColor: string = ''
+  @StorageProp(DecoKeys.DOCK_BG_IMAGE) dockBgImage: string = ''
+  @StorageProp(DecoKeys.DOCK_BG_OPACITY) dockBgOpacity: number = 100
+  @StorageProp(DecoKeys.DOCK_BG_BLUR) dockBgBlur: number = 0
+  @StorageProp(DecoKeys.DOCK_BG_SCRIM) dockBgScrim: number = 0
+  @StorageProp(DecoKeys.DOCK_INDICATOR) dockIndicator: string = ''
+  @StorageProp(DecoKeys.DOCK_SHOW_TEXT) dockShowText: boolean = true
+
+  private dockBarTop(): number {
+    return Math.max(0, this.pageHeight - 60)
+  }
+
+  /** 某个页签的图标：选中有独立一套就用它，否则退回未选中那套。 */
+  private dockIcon(index: number, active: boolean): string {
+    if (active && this.dockActiveIcons) {
+      const actives = this.dockActiveIcons.split('\n')
+      if (index < actives.length && actives[index]) { return actives[index] }
+    }
+    if (!this.dockIcons) { return '' }
+    const parts = this.dockIcons.split('\n')
+    return index < parts.length ? parts[index] : ''
+  }
+
+  /** 自定义图标的边长；没配装饰时保持原来的 22vp 观感。 */
+  private dockIconSide(): number {
+    const size = Number.isFinite(this.dockIconSize) ? this.dockIconSize : 22
+    return Math.max(14, Math.min(32, size))
+  }
+
+  private dockIconTint(active: boolean): ResourceColor {
+    if (active) {
+      return this.dockActiveColor.length > 0 ? this.dockActiveColor : TC.textOnAccent()
+    }
+    return this.dockIconColor.length > 0 ? this.dockIconColor : TC.textTertiary()
+  }
+
+  private dockTextTint(active: boolean): ResourceColor {
+    if (active) {
+      return this.dockTextColor.length > 0 ? this.dockTextColor : TC.textPrimary()
+    }
+    return this.dockIconColor.length > 0 ? this.dockIconColor : TC.textTertiary()
+  }
+
 
   async aboutToAppear(): Promise<void> {
     await this.loadWindowAvoidArea()
@@ -85,6 +155,88 @@ struct HomeIndex {
     await AppSettings.loadAuth(this.authStore)
     if (this.authStore.loggedIn) {
       this.authStore.refreshAccount()
+    }
+    if (this.openAudioUri) {
+      const uri = this.openAudioUri
+      this.openAudioUri = ''
+      this.openExternalAudio(uri)
+    }
+  }
+
+  /** 热启动时系统再次以「打开方式」拉起应用。 */
+  onExternalAudio(): void {
+    if (!this.openAudioUri) { return }
+    const uri = this.openAudioUri
+    this.openAudioUri = ''
+    this.openExternalAudio(uri)
+  }
+
+  /** 外部 uri 可能是沙箱 uri、公共目录 uri 或裸路径，按「uri → 路径」依次尝试。 */
+  private openAudioSource(uri: string): fileIo.File {
+    try {
+      return fileIo.openSync(uri, fileIo.OpenMode.READ_ONLY)
+    } catch (error) {
+      if (uri.startsWith('file://')) {
+        return fileIo.openSync(new fileUri.FileUri(uri).path, fileIo.OpenMode.READ_ONLY)
+      }
+      throw error as Error
+    }
+  }
+
+  /** 把外部传入的音频复制到沙箱后直接播放（避免临时授权失效）。 */
+  private async openExternalAudio(uri: string): Promise<void> {
+    const context = this.getUIContext().getHostContext() as common.UIAbilityContext
+    const dir = `${context.cacheDir}/opened_audio`
+    try {
+      fileIo.mkdirSync(dir, true)
+    } catch (_error) {
+    }
+    const rawName = uri.slice(uri.lastIndexOf('/') + 1)
+    let name = rawName
+    try {
+      name = decodeURIComponent(rawName)
+    } catch (_error) {
+    }
+    const safe = (name || `audio_${Date.now()}`).replace(/[\\/:*?"<>|]+/g, '_')
+    const dest = `${dir}/${Date.now()}_${safe}`
+    let playable = false
+    try {
+      const src = this.openAudioSource(uri)
+      const dst = fileIo.openSync(dest,
+        fileIo.OpenMode.READ_WRITE | fileIo.OpenMode.CREATE | fileIo.OpenMode.TRUNC)
+      try {
+        const chunk = new ArrayBuffer(256 * 1024)
+        while (true) {
+          const count = fileIo.readSync(src.fd, chunk)
+          if (count <= 0) { break }
+          fileIo.writeSync(dst.fd, chunk.slice(0, count))
+        }
+        playable = true
+      } finally {
+        fileIo.closeSync(src)
+        fileIo.closeSync(dst)
+      }
+    } catch (error) {
+      console.error(`[HomeIndex] copy opened audio failed: ${JSON.stringify(error)}`)
+    }
+    const dot = safe.lastIndexOf('.')
+    const song: songItemType = {
+      id: `local:${Date.now()}`,
+      name: dot > 0 ? safe.slice(0, dot) : safe,
+      author: '本地音乐',
+      img: '',
+      url: '',
+      localUri: playable ? fileUri.getUriFromPath(dest) : uri,
+      localManaged: playable,
+      localFormat: dot > 0 ? safe.slice(dot + 1).toLowerCase() : ''
+    }
+    try {
+      await playerController.setQueue([song], 0, true)
+      setTimeout(() => {
+        this.pageStack.pushPathByName('PlayPage', null)
+      }, 240)
+    } catch (error) {
+      console.error(`[HomeIndex] play opened audio failed: ${JSON.stringify(error)}`)
     }
   }
 
@@ -149,6 +301,8 @@ struct HomeIndex {
       SettingsPage()
     } else if (name === 'DeviceManagementPage') {
       DeviceManagementPage()
+    } else if (name === 'DeviceDetailPage') {
+      DeviceDetailPage({ pageParam: param as DeviceDetailParam })
     } else if (name === 'FanClubListPage') {
       FanClubListPage()
     } else if (name === 'FanClubDetailPage') {
@@ -169,6 +323,8 @@ struct HomeIndex {
       AiSongStudioPage()
     } else if (name === 'ArtistPage') {
       ArtistPage({ pageParam: param as ArtistPageParam })
+    } else if (name === 'ArtistSongsPage') {
+      ArtistSongsPage({ pageParam: param as ArtistSongsPageParam })
     } else if (name === 'EventDetailPage') {
       EventDetailPage({ pageParam: param as EventDetailPageParam })
     } else if (name === 'AlbumDetailPage') {
@@ -209,34 +365,54 @@ struct HomeIndex {
       SatiPage()
     } else if (name === 'PlaylistCoverPreviewPage') {
       PlaylistCoverPreview({ pageParam: param as PlaylistCoverPreviewPageParam })
+    } else if (name === 'DecorationCenterPage') {
+      DecorationCenterPage()
+    } else if (name === 'DecorationEditorPage') {
+      DecorationEditorPage({ pageParam: param as DecorationEditorParam })
+    } else if (name === 'ImageCropPage') {
+      ImageCropPage({ pageParam: param as ImageCropPageParam })
+    } else if (name === 'ImagePreviewPage') {
+      ImagePreviewPage({ pageParam: param as ImagePreviewPageParam })
+    } else if (name === 'RingtonePage') {
+      RingtonePage({ pageParam: param as RingtonePageParam })
     }
   }
 
   @Builder
-  getTabBar(item: TabClass) {
+  getTabBar(item: TabClass, index: number) {
     Column({ space: 4 }) {
       Stack() {
         if (item.name === this.currentName) {
           Column()
-            .width(30)
-            .height(30)
-            .backgroundColor('#ef233c')
-            .borderRadius(15)
+            .width(Math.max(30, this.dockIconSide() + 4))
+            .height(Math.max(30, this.dockIconSide() + 4))
+            .backgroundColor(this.dockIndicator ? this.dockIndicator : TC.accent())
+            .borderRadius(Math.max(30, this.dockIconSide() + 4) / 2)
             .shadow({ radius: 10, color: 'rgba(239,35,60,0.28)', offsetY: 4 })
         }
-        Image(item.icon)
-          .width(21)
-          .height(21)
-          .fillColor(item.name === this.currentName ? Color.White : '#77777f')
+        if (this.dockIcon(index, item.name === this.currentName)) {
+          // 沙箱里的裸路径必须转成 file:// uri，否则 Image 什么都加载不出来
+          Image(DecorationMedia.displayUri(this.dockIcon(index, item.name === this.currentName)))
+            .width(this.dockIconSide())
+            .height(this.dockIconSide())
+            .objectFit(ImageFit.Contain)
+        } else {
+          Image(item.icon)
+            .width(21)
+            .height(21)
+            .fillColor(this.dockIconTint(item.name === this.currentName))
+        }
       }
-      .width(36)
-      .height(30)
+      .width(Math.max(36, this.dockIconSide()))
+      .height(Math.max(30, this.dockIconSide()))
       .alignContent(Alignment.Center)
 
-      Text(item.title)
-        .fontSize(10)
-        .fontColor(item.name === this.currentName ? '#ffffff' : '#77777f')
-        .fontWeight(item.name === this.currentName ? FontWeight.Medium : FontWeight.Regular)
+      if (this.dockShowText) {
+        Text(item.title)
+          .fontSize(this.dockTextSize)
+          .fontColor(this.dockTextTint(item.name === this.currentName))
+          .fontWeight(item.name === this.currentName ? FontWeight.Medium : FontWeight.Regular)
+      }
     }
     .width('100%')
     .alignItems(HorizontalAlign.Center)
@@ -248,8 +424,32 @@ struct HomeIndex {
   build() {
     Navigation(this.pageStack) {
       Stack() {
+        AppBackdrop()
+
+        // 底部导航背景图：画在 Tabs 之下，Tab 栏背景改透明透出。
+        // 模糊 / 不透明度 / 可读性蒙版与皮肤一致，蒙版压在最上层保证图标与文字可读。
+        if (this.dockBgImage) {
+          Stack() {
+            Image(DecorationMedia.displayUri(this.dockBgImage))
+              .width('100%')
+              .height('100%')
+              .objectFit(ImageFit.Cover)
+              .opacity(Math.max(0, Math.min(100, this.dockBgOpacity)) / 100)
+              .blur(Math.max(0, Math.min(60, this.dockBgBlur)))
+            if (this.dockBgScrim > 0) {
+              Column()
+                .width('100%')
+                .height('100%')
+                .backgroundColor(`rgba(0,0,0,${Math.max(0, Math.min(100, this.dockBgScrim)) / 100})`)
+            }
+          }
+          .width('100%')
+          .height(60)
+          .position({ x: 0, y: this.dockBarTop() })
+        }
+
         Tabs({ barPosition: BarPosition.End, index: this.currentIndex }) {
-          ForEach(tabsData, (item: TabClass) => {
+          ForEach(tabsData, (item: TabClass, index: number) => {
             TabContent() {
               if (item.name === 'recommend') {
                 Recommend({ onMenuClick: () => this.openSidebar() })
@@ -258,16 +458,18 @@ struct HomeIndex {
               } else if (item.name === 'moment') {
                 Moment()
               } else if (item.name === 'mine') {
-                Mine()
+                Mine({ onMenuClick: () => this.openSidebar() })
               }
             }
-            .tabBar(this.getTabBar(item))
+            .tabBar(this.getTabBar(item, index))
             .padding({ top: item.name === 'mine' ? 0 : this.topAvoidHeight })
-            .backgroundColor('#121215')
+            .backgroundColor(TC.pageBackground())
           })
         }
         .barHeight(60)
         .barMode(BarMode.Fixed)
+        .barBackgroundColor(this.dockBgImage ? 'rgba(0,0,0,0)' :
+          (this.dockBgColor ? this.dockBgColor : TC.navBackground()))
         .onChange((index: number) => {
           this.currentIndex = index
           this.currentName = tabsData[index].name
@@ -286,13 +488,20 @@ struct HomeIndex {
             onOpenMine: () => this.openMineFromSidebar()
           })
         }
+
+        StartupOverlay()
       }
       .width('100%')
+      .onAreaChange((_old: Area, area: Area) => {
+        // Area.height 已是 vp，再 px2vp 会让 Dock 背景图跑到屏幕中部
+        this.pageHeight = Number(area.height)
+      })
       .height('100%')
-      .backgroundColor('#121215')
+      .backgroundColor(TC.pageBackground())
     }
     .hideTitleBar(true)
     .mode(NavigationMode.Stack)
+    .backgroundColor(Color.Transparent)
     .navDestination(this.PageMap)
   }
 }

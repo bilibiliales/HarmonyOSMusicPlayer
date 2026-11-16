@@ -1,4 +1,5 @@
 import { SongMetadataCache } from './SongMetadataCache'
+import { SystemMediaImage } from './SystemMediaImage'
 import { fileIo } from '@kit.CoreFileKit'
 import { LocalLibrary } from './LocalLibrary'
 import { audio } from '@kit.AudioKit'
@@ -508,13 +509,17 @@ export class PlayerController {
         return
       }
       if (!this.metadataCurrent(revision, song, session)) { return }
+      // 封面：线上歌走 https url；本地/沙箱封面必须换成 PixelMap，
+      // 否则播控（锁屏、灵动岛）读不到应用沙箱文件，只会显示空封面。
+      const mediaImage = await SystemMediaImage.resolve(song)
+      if (!this.metadataCurrent(revision, song, session)) { return }
       const metadata: SessionMetadata = {
         assetId: song.id,
         title: song.name,
         artist: song.author,
         album: song.album || '',
         duration: song.duration || this.store?.duration || 0,
-        mediaImage: song.img || '',
+        mediaImage: mediaImage,
         lyric: this.lyricSongId === song.id + (song.localUri || '') ? this.systemLyric : '',
         previousAssetId: this.store && this.store.queue.length > 1 ? 'previous' : undefined,
         nextAssetId: this.store && this.store.queue.length > 1 ? 'next' : undefined

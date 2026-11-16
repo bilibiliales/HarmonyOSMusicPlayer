@@ -1,7 +1,10 @@
-import { AbilityConstant, ConfigurationConstant, UIAbility, Want } from '@kit.AbilityKit';
+import { AbilityConstant, Configuration, ConfigurationConstant, UIAbility, Want } from '@kit.AbilityKit';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { window } from '@kit.ArkUI';
 import { AppSettings } from '../services/AppSettings';
+import { ThemeService } from '../services/ThemeService';
+import { SkinService } from '../services/SkinService';
+import { DecorationStore } from '../services/DecorationStore';
 import { playerController } from '../services/PlayerController';
 import { PlaybackControlBridge } from '../services/PlaybackControlBridge';
 import { NearbyShareSession, SystemShareService } from '../services/SystemShareService';
@@ -9,6 +12,20 @@ import { NearbyShareSession, SystemShareService } from '../services/SystemShareS
 const DOMAIN = 0x0000;
 
 export default class EntryAbility extends UIAbility {
+  private mainWindow?: window.Window;
+
+  /** 沉浸式布局下，状态栏/导航条图标颜色跟随当前有效主题（深底白图标、浅底深图标）。 */
+  private updateSystemBar(isDark: boolean): void {
+    if (!this.mainWindow) { return; }
+    const contentColor: string = isDark ? '#FFFFFF' : '#111114';
+    const props: window.SystemBarProperties = {
+      statusBarContentColor: contentColor,
+      navigationBarContentColor: contentColor
+    };
+    this.mainWindow.setWindowSystemBarProperties(props)
+      .catch((err: Error) => hilog.warn(DOMAIN, 'systemBar', 'set bar properties failed: %{public}s', err.message));
+  }
+
   private handlePlaybackWant(want: Want): void {
     const action = want.parameters?.playbackAction;
     if (want.action === PlaybackControlBridge.CONTROL_ACTION && action === 'play') {
@@ -18,15 +35,38 @@ export default class EntryAbility extends UIAbility {
     }
   }
 
-  onCreate(want: Want, launchParam: AbilityConstant.LaunchParam): void {
-    try {
-      this.context.getApplicationContext().setColorMode(ConfigurationConstant.ColorMode.COLOR_MODE_NOT_SET);
-    } catch (err) {
-      hilog.error(DOMAIN, 'testTag', 'Failed to set colorMode. Cause: %{public}s', JSON.stringify(err));
+  /** 应用被系统的「打开方式 / FileOpen」拉起时，把音频 URI 交给界面层播放。 */
+  private handleOpenAudioWant(want: Want): void {
+    // 文件管理器既可能只给 action，也可能只给 linkFeature 或 UTD type，
+    // 三种都要认，否则注册成功也收不到文件。
+    const params = want.parameters;
+    const feature = params ? params['linkFeature'] : undefined;
+    const isFileOpen = want.action === 'ohos.want.action.viewData' ||
+      (typeof feature === 'string' && feature === 'FileOpen') ||
+      (typeof want.type === 'string' && want.type.indexOf('audio') >= 0);
+    if (!isFileOpen) { return; }
+    let uri: string = want.uri || '';
+    if (!uri && params) {
+      const alt = params['uri'];
+      if (typeof alt === 'string') { uri = alt; }
     }
+    if (!uri || uri.length === 0) { return; }
+    AppStorage.setOrCreate<string>('openAudioUri', uri);
+    const seq = AppStorage.get<number>('openAudioSeq') ?? 0;
+    AppStorage.setOrCreate<number>('openAudioSeq', seq + 1);
+    hilog.info(DOMAIN, 'testTag', 'Open audio request: %{public}s', uri);
+  }
+
+  onCreate(want: Want, launchParam: AbilityConstant.LaunchParam): void {
+    // 读取持久化的深浅色偏好与皮肤覆盖，并在首帧前生效，避免启动闪屏
+    ThemeService.init(this.context);
+    SkinService.init(this.context);
+    // 读取装扮（皮肤颜色会覆盖到 SkinService，其余发布到 AppStorage），首帧即生效
+    DecorationStore.init(this.context);
     AppSettings.context = this.context;
     SystemShareService.bindAbility(this.context);
     this.handlePlaybackWant(want);
+    this.handleOpenAudioWant(want);
     hilog.info(DOMAIN, 'testTag', '%{public}s', 'Ability onCreate');
   }
 
@@ -54,8 +94,11 @@ export default class EntryAbility extends UIAbility {
       
       try {
         const mainWindow: window.Window = windowStage.getMainWindowSync();  // 获取应用主窗口
+        this.mainWindow = mainWindow;
         await mainWindow.setWindowLayoutFullScreen(true); // 进入窗口沉浸式布局（非自由窗口状态）
         mainWindow.setWindowDecorVisible(false);  // 隐藏窗口标题栏，进入沉浸式布局（自由窗口状态）
+        this.updateSystemBar(ThemeService.isDark());      // 首帧同步一次
+        ThemeService.addModeListener((isDark: boolean) => this.updateSystemBar(isDark));
       } catch (e) {
         console.error(`Failed to set status bar to invisible`);
       }
@@ -64,6 +107,12 @@ export default class EntryAbility extends UIAbility {
 
   onNewWant(want: Want, launchParam: AbilityConstant.LaunchParam): void {
     this.handlePlaybackWant(want);
+    this.handleOpenAudioWant(want);
+  }
+
+  onConfigurationUpdate(newConfig: Configuration): void {
+    // 系统深浅色变化：仅在「跟随系统」时同步 UI，手动模式下忽略
+    ThemeService.onSystemColorModeChange(newConfig.colorMode ?? ConfigurationConstant.ColorMode.COLOR_MODE_NOT_SET);
   }
 
   onWindowStageDestroy(): void {

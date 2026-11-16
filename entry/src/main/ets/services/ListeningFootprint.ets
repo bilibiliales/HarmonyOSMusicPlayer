@@ -46,12 +46,80 @@ function parseDay(value: string | number, anchor?: Date): Date | undefined {
   return undefined
 }
 
-export function buildListeningPeriod(report: ListenReportData, monthly: boolean, now: Date = new Date()): ListeningPeriod {
+const WEEK_MS: number = 7 * 24 * 60 * 60 * 1000
+const DAY_MS: number = 24 * 60 * 60 * 1000
+
+/** 接口的 startTime / endTime 可能是毫秒、秒或日期串，统一成毫秒。 */
+export function listeningTimeValue(raw: number | string | undefined): number {
+  if (raw === undefined) { return 0 }
+  let value = 0
+  if (typeof raw === 'number') {
+    value = raw
+  } else {
+    const text = String(raw).trim()
+    if (/^\d{10,13}$/.test(text)) {
+      value = Number(text)
+    } else {
+      const date = parseDay(text)
+      return date ? date.getTime() : 0
+    }
+  }
+  if (value <= 0) { return 0 }
+  return value < 100000000000 ? value * 1000 : value
+}
+
+/**
+ * 以「不带 endTime 请求返回的 endTime」为唯一基准递减（不要再按本地今天推算）。
+ * 周：每期 -7 天（周六 0 点）；月：每期 -该月天数（月末 0 点）。
+ * offset = 0 返回 0，表示不传 endTime，即接口默认的本周 / 本月。
+ * 因为永远是基准减去正数，不可能产生比基准更新的日期。
+ */
+export function listeningPeriodEnd(period: string, baseEnd: number, offset: number): number {
+  if (offset === 0 || baseEnd <= 0) { return 0 }
+  if (period === 'week') { return baseEnd + offset * WEEK_MS }
+  let end = baseEnd
+  const step = offset < 0 ? -1 : 1
+  const count = Math.abs(offset)
+  for (let i = 0; i < count; i++) {
+    const d = new Date(end)
+    const days = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate()
+    end += step * days * DAY_MS
+  }
+  return end
+}
+
+/** 无数据时导航条显示的周期名，同样从接口基准推导。 */
+export function listeningPeriodTitle(period: string, baseEnd: number, offset: number): string {
+  if (baseEnd <= 0) { return period === 'week' ? '本周' : '本月' }
+  const value = listeningPeriodEnd(period, baseEnd, offset)
+  const end = new Date(value > 0 ? value : baseEnd)
+  if (period === 'month') { return `${end.getFullYear()}年${end.getMonth() + 1}月` }
+  const start = new Date(end.getFullYear(), end.getMonth(), end.getDate() - 6)
+  return `${start.getFullYear()}.${start.getMonth() + 1}.${start.getDate()} — ${end.getMonth() + 1}.${end.getDate()}`
+}
+
+/** 卡片文案用：本周 / 上周 / N 周前。 */
+export function listeningPeriodOffsetLabel(period: string, offset: number): string {
+  if (period === 'week') {
+    if (offset === 0) { return '本周' }
+    if (offset === -1) { return '上周' }
+    return `${-offset} 周前`
+  }
+  if (offset === 0) { return '本月' }
+  if (offset === -1) { return '上月' }
+  return `${-offset} 个月前`
+}
+
+export function buildListeningPeriod(report: ListenReportData, monthly: boolean, now: Date = new Date(), periodStart?: Date): ListeningPeriod {
   const details = report.listenTimeDistributionBlock?.durationDetails || []
   let anchor = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  let aligned = periodStart !== undefined
   const reportStart = report.startTime ? parseDay(report.startTime) : undefined
-  if (reportStart) {
+  if (periodStart) {
+    anchor = new Date(periodStart.getFullYear(), periodStart.getMonth(), periodStart.getDate())
+  } else if (reportStart) {
     anchor = reportStart
+    aligned = true
   } else {
     const dates: Date[] = []
     for (const detail of details) {
@@ -62,7 +130,7 @@ export function buildListeningPeriod(report: ListenReportData, monthly: boolean,
     if (dates.length) { anchor = dates[0] }
   }
   const start = monthly ? new Date(anchor.getFullYear(), anchor.getMonth(), 1) :
-    new Date(anchor.getFullYear(), anchor.getMonth(), anchor.getDate() - (reportStart ? 0 : anchor.getDay()))
+    new Date(anchor.getFullYear(), anchor.getMonth(), anchor.getDate() - (aligned ? 0 : anchor.getDay()))
   const count = monthly ? new Date(start.getFullYear(), start.getMonth() + 1, 0).getDate() : 7
   const weekdays: string[] = ['日', '一', '二', '三', '四', '五', '六']
   const days: ListeningDay[] = []

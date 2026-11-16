@@ -69,10 +69,12 @@ class MediaSessionRuntime implements MediaSessionApi {
       artist: metadata.artist,
       album: metadata.album,
       duration: metadata.duration,
-      mediaImage: metadata.mediaImage,
       lyric: metadata.lyric,
       previousAssetId: metadata.previousAssetId,
       nextAssetId: metadata.nextAssetId
+    }
+    if (metadata.mediaImage !== undefined) {
+      value.mediaImage = metadata.mediaImage
     }
     await this.session.setAVMetadata(value)
   }

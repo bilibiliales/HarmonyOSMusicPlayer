@@ -1,10 +1,10 @@
+import { SheetSkinFrame } from '../components/SheetSkin'
+import { SkinBackdrop } from '../components/SkinBackdrop'
 import { EventUpdates } from '../services/EventUpdates'
 import { EventPresentation } from '../services/EventPresentation'
 import { EventCard } from '../components/EventCard'
-import { common } from '@kit.AbilityKit'
 import { ListeningPlaylistService } from '../services/ListeningPlaylistService'
 import { ListeningPlaylistCard } from '../components/ListeningPlaylistCard'
-import { SystemShareService, NearbyShareSession, ShareLink } from '../services/SystemShareService'
 import {
   ArtistPageParam,
   EventDetailPageParam,
@@ -19,6 +19,7 @@ import {
   PrivateChatPageParam,
   PrivateMsgContent,
   SendMsgResponse,
+  SharePageParam,
   UserDetailResponse,
   UserEventItem,
   UserEventResponse,
@@ -35,10 +36,15 @@ import { parseVipInfo } from '../services/VipService'
 import { resizeImageUrl } from '../services/ImageUrl'
 import { AuthStore } from '../stores/AuthStore'
 import { RelationshipPageParam } from './RelationshipList'
-import { BubbleTip } from '../services/BubbleTip'
+import { TC } from '../services/ThemeColors'
+import { DetailTopBar } from '../components/DetailTopBar'
+import { ShareSheet } from '../components/ShareSheet'
+import { NoMoreFooter } from '../components/NoMoreFooter'
+import { ImagePreviewPageParam } from './ImagePreviewPage'
 
 @Component
 export struct UserProfilePage {
+  @StorageProp('skinVersion') skinVersionObs: number = 0
   @Consume('pageStack') pageStack: NavPathStack
   @Consume('topAvoidHeight') topAvoidHeight: number
   @Consume('authStore') authStore: AuthStore
@@ -60,7 +66,9 @@ export struct UserProfilePage {
   @State vipLevel: number = 0
   @State followsTarget: boolean = false
   @State followedByTarget: boolean = false
-  @State moreMenuVisible: boolean = false
+  @State shareSheetVisible: boolean = false
+  @State scrollOffset: number = 0
+  private scroller: Scroller = new Scroller()
 
   private getVipText(vipLevel: number): string {
     return vipLevel == 1 ? '壹'
@@ -436,66 +444,22 @@ export struct UserProfilePage {
     this.pageStack.pushPathByName('ArtistPage', param)
   }
 
-  private isOtherUser(): boolean {
-    return !!this.pageParam.uid && this.pageParam.uid !== this.authStore.userId
-  }
-
-  private async shareUserProfile(): Promise<void> {
-    this.moreMenuVisible = false
+  /** 统一走 ShareSheet（与专辑/歌单/歌手一致：系统分享 + 私信 + 碰一碰）。 */
+  private shareUserProfile(): void {
     if (!this.pageParam.uid) {
       return
     }
-    try {
-      await SystemShareService.showLink(this.getUIContext().getHostContext() as common.UIAbilityContext,
-        this.profileShareLink())
-    } catch (error) {
-      BubbleTip.show(this.getUIContext(), error instanceof Error ? error.message : '无法打开系统分享面板')
+    this.shareSheetVisible = true
+  }
+
+  private shareParam(): SharePageParam {
+    return {
+      type: 'user',
+      id: this.pageParam.uid,
+      name: this.detail?.profile.nickname || '用户',
+      img: this.detail?.profile.avatarUrl || '',
+      author: this.detail?.profile.signature || ''
     }
-  }
-
-  private nearbyShare: NearbyShareSession = new NearbyShareSession()
-
-  private profileShareLink(): ShareLink {
-    return { url: `https://music.163.com/user/home?id=${encodeURIComponent(this.pageParam.uid)}`,
-      title: this.detail?.profile.nickname || '用户', description: this.detail?.profile.signature || '分享用户主页',
-      label: '用户', image: this.detail?.profile.avatarUrl }
-  }
-
-  @Builder
-  private MoreMenuOption() {
-    Row({ space: 13 }) {
-      Stack() {
-        SymbolGlyph($r('sys.symbol.share')).fontSize(21).fontColor(['#ededf0'])
-      }.width(42).height(42).borderRadius(13).backgroundColor('#29292f')
-      Column({ space: 3 }) {
-        Text('分享').fontSize(14).fontWeight(FontWeight.Medium).fontColor('#ededf0')
-        Text('将这个用户主页分享给朋友').fontSize(10).fontColor('#77777f')
-      }.layoutWeight(1).alignItems(HorizontalAlign.Start)
-      SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(16).fontColor(['#55555d'])
-    }.width('100%').height(64).onClick(() => this.shareUserProfile())
-  }
-
-  @Builder
-  private MoreMenuOverlay() {
-    Stack({ alignContent: Alignment.Bottom }) {
-      Column().width('100%').height('100%').backgroundColor('rgba(0,0,0,0.58)')
-        .onClick(() => this.moreMenuVisible = false)
-      Column({ space: 4 }) {
-        Row() {
-          Column({ space: 3 }) {
-            Text('更多操作').fontSize(18).fontWeight(FontWeight.Bold).fontColor('#ffffff')
-            Text(this.detail?.profile.nickname || '').fontSize(10).fontColor('#77777f').maxLines(1)
-          }.layoutWeight(1).alignItems(HorizontalAlign.Start)
-          SymbolGlyph($r('sys.symbol.xmark_circle_fill')).fontSize(25).fontColor(['#686870'])
-            .onClick(() => this.moreMenuVisible = false)
-        }.width('100%').height(54)
-        this.MoreMenuOption()
-      }
-      .width('100%').height(174).padding({ left: 20, right: 20, top: 10, bottom: 24 })
-      .backgroundColor('#19191f').borderRadius({ topLeft: 28, topRight: 28 })
-      .shadow({ radius: 24, color: 'rgba(0,0,0,0.42)', offsetY: -4 })
-      .transition(TransitionEffect.translate({ y: 260 }).animation({ duration: 240, curve: Curve.EaseOut }))
-    }.width('100%').height('100%')
   }
 
   @Builder
@@ -512,17 +476,18 @@ export struct UserProfilePage {
         Column()
           .width('100%')
           .height('100%')
-          .backgroundColor('#1a1a2e')
+          .backgroundColor(TC.surfaceCardAlt())
       }
       Column()
         .width('100%')
         .height('100%')
-        .linearGradient({ angle: 180, colors: [['rgba(10,10,14,0.12)', 0], ['#121215', 1]] })
+        .linearGradient({ angle: 180, colors: [[TC.headerScrimTop(), 0], [TC.pageBackground(), 1]] })
       Column({ space: 10 }) {
         Stack({ alignContent: Alignment.BottomEnd }) {
           Image(resizeImageUrl(this.detail?.profile.avatarUrl || '', 180, 180))
             .width(88).height(88).sourceSize({ width: 180, height: 180 }).borderRadius(90).objectFit(ImageFit.Cover)
             .border({ width: 2, color: 'rgba(255,255,255,0.8)' })
+            .onClick(() => this.openAvatarPreview())
           if (this.detail?.profile.userType === 4) {
             Image($r('app.media.ic_singer')).width(26).height(26).borderRadius(13)
           }
@@ -530,11 +495,11 @@ export struct UserProfilePage {
         .width(88).height(88)
         Row({ space: 7 }) {
           Text(this.detail?.profile.nickname || '')
-            .fontSize(21).fontWeight(FontWeight.Bold).fontColor('#ffffff')
+            .fontSize(21).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary())
           if (this.detail?.profile.userType === 4) {
-            Text('歌手').fontSize(10).fontColor('#ff6577')
+            Text('歌手').fontSize(10).fontColor(TC.accentSoft())
               .padding({ left: 7, right: 7, top: 3, bottom: 3 })
-              .backgroundColor('#2b2024').borderRadius(8)
+              .backgroundColor(TC.accentContainer()).borderRadius(8)
           }
           if (this.vipActive) {
             Row({ space: 3 }) {
@@ -556,7 +521,7 @@ export struct UserProfilePage {
         .onClick(() => this.openArtist())
         if (this.detail?.profile.signature) {
           Text(this.detail.profile.signature)
-            .fontSize(12).fontColor('#aaaab2').maxLines(2).textAlign(TextAlign.Center).width('82%')
+            .fontSize(12).fontColor(TC.textBody()).maxLines(2).textAlign(TextAlign.Center).width('82%')
         }
 
         Row({ space: 8 }) {
@@ -567,11 +532,11 @@ export struct UserProfilePage {
           }
           if (this.detail?.profile.birthday && this.detail.profile.birthday > 0) {
             Text(this.formatBirthday(this.detail.profile.birthday))
-              .fontSize(11).fontColor('#999999')
+              .fontSize(11).fontColor(TC.textBody())
           }
           if (this.detail?.profile.province && this.detail.profile.province > 0) {
             Text(this.formatLocation(this.detail.profile.province, this.detail.profile.city || 0))
-              .fontSize(11).fontColor('#999999')
+              .fontSize(11).fontColor(TC.textBody())
           }
         }
         .margin({ top: 2 })
@@ -579,13 +544,13 @@ export struct UserProfilePage {
           Row({ space: 10 }) {
             Button(this.followButtonText())
               .width(112).height(36).fontSize(12)
-              .fontColor(this.isFollowActive() ? '#ef233c' : '#ffffff')
-              .backgroundColor(this.isFollowActive() ? '#00ffffff' : '#ef233c')
-              .border({ width: this.isFollowActive() ? 1 : 0, color: '#ef233c' })
+              .fontColor(this.isFollowActive() ? TC.accent() : TC.textOnAccent())
+              .backgroundColor(this.isFollowActive() ? '#00ffffff' : TC.accent())
+              .border({ width: this.isFollowActive() ? 1 : 0, color: TC.accent() })
               .borderRadius(18).onClick(() => this.follow())
             Button('私聊')
               .height(36).fontSize(12)
-              .fontColor($r('sys.color.white')).backgroundColor('#2a2a30')
+              .fontColor(TC.textPrimary()).backgroundColor(TC.surfaceRaised())
               .borderRadius(18).onClick(() => this.openChat())
           }
         }
@@ -605,16 +570,16 @@ export struct UserProfilePage {
       })
       }
       Text(`共公开 ${this.playlists.length} 个歌单`)
-        .width('100%').fontSize(13).fontColor('#92929a')
+        .width('100%').fontSize(13).fontColor(TC.textSecondary())
       ForEach(this.playlists.slice(0, 3), (item: playlistType) => {
         Row({ space: 12 }) {
           Image(item.cover).width(54).height(54).borderRadius(12).objectFit(ImageFit.Cover)
           Column({ space: 4 }) {
-            Text(item.name).fontSize(14).fontColor('#ededf0').maxLines(1)
-            Text(`${item.count} 首 · ${item.creator}`).fontSize(11).fontColor('#77777f')
+            Text(item.name).fontSize(14).fontColor(TC.textBody()).maxLines(1)
+            Text(`${item.count} 首 · ${item.creator}`).fontSize(11).fontColor(TC.textTertiary())
           }
           .layoutWeight(1).alignItems(HorizontalAlign.Start)
-          SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(15).fontColor(['#66666e'])
+          SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(15).fontColor([TC.textQuaternary()])
         }
         .height(68).onClick(() => this.pageStack.pushPathByName('PlaylistDetailPage', item))
       })
@@ -623,93 +588,95 @@ export struct UserProfilePage {
   }
 
   @Builder
+  private skin_CancelSheet() {
+    SheetSkinFrame() {
+      this.CancelSheet()
+    }
+  }
+
+  @Builder
   private CancelSheet() {
     Column({ space: 18 }) {
       Text(`确定取消关注「${this.detail?.profile.nickname || ''}」吗？`)
-        .fontSize(16).fontWeight(FontWeight.Bold).fontColor('#ffffff')
+        .fontSize(16).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary())
       Row({ space: 12 }) {
-        Button('暂不取消').layoutWeight(1).backgroundColor('#2a2a30')
+        Button('暂不取消').layoutWeight(1).backgroundColor(TC.surfaceRaised())
           .onClick(() => this.cancelSheetVisible = false)
-        Button('取消关注').layoutWeight(1).backgroundColor('#ef233c')
+        Button('取消关注').layoutWeight(1).fontColor(TC.textOnAccent()).backgroundColor(TC.accent())
           .onClick(() => this.cancelFollow())
       }
     }
     .width('100%').padding(24)
   }
 
-  @Builder
-  private ProfileNavigation() {
-    Column() {
-      Column().width('100%').height(this.topAvoidHeight)
-      Row() {
-        SymbolGlyph($r('sys.symbol.chevron_left'))
-          .fontSize(24).fontColor(['#ffffff']).width(44).height(44).onClick(() => this.pageStack.pop())
-        Text('用户主页').layoutWeight(1).fontSize(17).fontWeight(FontWeight.Bold)
-          .fontColor('#ffffff').textAlign(TextAlign.Center)
-        SymbolGlyph($r('sys.symbol.ellipsis_circle')).fontSize(22).fontColor(['#ffffff'])
-          .width(44).height(44)
-          .visibility(this.isOtherUser() ? Visibility.Visible : Visibility.Hidden)
-          .onClick(() => this.moreMenuVisible = true)
-      }
-      .height(54).width('100%').padding({ left: 6, right: 6 })
+  private openAvatarPreview(): void {
+    const url = this.detail?.profile.avatarUrl || ''
+    if (!url) {
+      return
     }
-    .width('100%')
-    .linearGradient({ angle: 180, colors: [['rgba(0,0,0,0.5)', 0], ['rgba(0,0,0,0)', 1]] })
+    const param: ImagePreviewPageParam = { url: url, name: this.detail?.profile.nickname || '头像' }
+    this.pageStack.pushPathByName('ImagePreviewPage', param)
   }
 
   build() {
     NavDestination() {
+      SkinBackdrop()
       Stack({ alignContent: Alignment.TopStart }) {
         Column() {
           if (this.loading) {
-            LoadingProgress().layoutWeight(1).width(46).color('#ef233c')
+            LoadingProgress().layoutWeight(1).width(46).color(TC.accent())
           } else if (!this.detail) {
             Column({ space: 12 }) {
-              Text(this.message || '无法加载用户主页').fontSize(13).fontColor('#77777f')
+              Text(this.message || '无法加载用户主页').fontSize(13).fontColor(TC.textTertiary())
             }
             .layoutWeight(1).justifyContent(FlexAlign.Center)
           } else {
-            Scroll() {
+            Scroll(this.scroller) {
               Column() {
                 this.Header()
                 Row() {
                   Row({ space: 4 }) {
                     Text(`${this.detail?.profile.follows || 0}`).fontSize(16).fontWeight(FontWeight.Bold)
-                      .fontColor('#ffffff')
-                    Text('关注').fontSize(12).fontColor('#888888')
+                      .fontColor(TC.textPrimary())
+                    Text('关注').fontSize(12).fontColor(TC.textTertiary())
                   }.onClick(() => this.openRelation('following', '关注'))
 
-                  Divider().vertical(true).height(16).color('#333333').margin({ left: 12, right: 12 })
+                  Divider().vertical(true).height(16).color(TC.textQuaternary()).margin({ left: 12, right: 12 })
 
                   Row({ space: 4 }) {
                     Text(`${this.detail?.profile.followeds || 0}`).fontSize(16).fontWeight(FontWeight.Bold)
-                      .fontColor('#ffffff')
-                    Text('粉丝').fontSize(12).fontColor('#888888')
+                      .fontColor(TC.textPrimary())
+                    Text('粉丝').fontSize(12).fontColor(TC.textTertiary())
                   }.onClick(() => this.openRelation('followers', '粉丝'))
 
-                  Divider().vertical(true).height(16).color('#333333').margin({ left: 12, right: 12 })
+                  Divider().vertical(true).height(16).color(TC.textQuaternary()).margin({ left: 12, right: 12 })
 
                   Text(`Lv.${this.detail?.level || 0}`).fontSize(16).fontWeight(FontWeight.Bold)
-                    .fontColor('#ffffff')
+                    .fontColor(TC.textPrimary())
 
-                  Divider().vertical(true).height(16).color('#333333').margin({ left: 12, right: 12 })
+                  Divider().vertical(true).height(16).color(TC.textQuaternary()).margin({ left: 12, right: 12 })
 
                   Row({ space: 4 }) {
                     Text(`${this.detail?.listenSongs || 0}`).fontSize(16).fontWeight(FontWeight.Bold)
-                      .fontColor('#ffffff')
-                    Text('首').fontSize(12).fontColor('#888888')
+                      .fontColor(TC.textPrimary())
+                    Text('首').fontSize(12).fontColor(TC.textTertiary())
                   }
                 }
                 .height(52).width('100%').justifyContent(FlexAlign.Center)
 
                 Row() {
                   ForEach(['home', 'playlists', 'events'], (tab: string) => {
-                    Text(tab === 'home' ? '主页' : tab === 'playlists' ? '歌单' : '动态')
-                      .layoutWeight(1).height(44).fontSize(14)
-                      .fontWeight(this.currentTab === tab ? FontWeight.Bold : FontWeight.Regular)
-                      .fontColor(this.currentTab === tab ? '#ffffff' : '#66666e')
-                      .textAlign(TextAlign.Center).onClick(() => this.currentTab = tab)
-                  })
+                    Column({ space: 8 }) {
+                      Text(tab === 'home' ? '主页' : tab === 'playlists' ? '歌单' : '动态')
+                        .fontSize(15)
+                        .fontWeight(this.currentTab === tab ? FontWeight.Bold : FontWeight.Regular)
+                        .fontColor(this.currentTab === tab ? TC.textPrimary() : TC.textTertiary())
+                      Column().width(this.currentTab === tab ? 28 : 0).height(3).borderRadius(2)
+                        .backgroundColor(TC.accent())
+                    }
+                    .layoutWeight(1).height(52).justifyContent(FlexAlign.Center)
+                    .onClick(() => this.currentTab = tab)
+                  }, (tab: string) => tab)
                 }
                 .width('100%')
 
@@ -721,8 +688,8 @@ export struct UserProfilePage {
                       Row({ space: 12 }) {
                         Image(item.cover).width(58).height(58).borderRadius(12).objectFit(ImageFit.Cover)
                         Column({ space: 5 }) {
-                          Text(item.name).fontSize(14).fontColor('#ededf0').maxLines(1)
-                          Text(`${item.count} 首`).fontSize(11).fontColor('#77777f')
+                          Text(item.name).fontSize(14).fontColor(TC.textBody()).maxLines(1)
+                          Text(`${item.count} 首`).fontSize(11).fontColor(TC.textTertiary())
                         }
                         .layoutWeight(1).alignItems(HorizontalAlign.Start)
                       }
@@ -739,29 +706,45 @@ export struct UserProfilePage {
                   }
                   .padding({ left: 16, right: 16, bottom: 28 })
                 }
+                NoMoreFooter()
               }
+              .width('100%').constraintSize({ minHeight: '100%' })
             }
             .layoutWeight(1).scrollBar(BarState.Off)
+            .onDidScroll(() => {
+              const y = this.scroller.currentOffset().yOffset
+              // 顶栏只用到 0~160 这段做渐显，钳住后长列表滚动时不再逐帧刷新页面
+              const barOffset = y > 170 ? 170 : y
+              if (barOffset !== this.scrollOffset) {
+                this.scrollOffset = barOffset
+              }
+            })
           }
         }
         .width('100%').height('100%')
-        .bindSheet(this.cancelSheetVisible, this.CancelSheet(), {
+        .bindSheet(this.cancelSheetVisible, this.skin_CancelSheet(), {
           height: '30%',
-          backgroundColor: '#19191f',
+          backgroundColor: TC.sheetBackground(),
           showClose: false,
           dragBar: false,
           onDisappear: () => this.cancelSheetVisible = false
         })
-        this.ProfileNavigation()
-        if (this.moreMenuVisible) {
-          this.MoreMenuOverlay()
+        DetailTopBar({
+          title: this.detail?.profile.nickname || '用户主页',
+          scrollOffset: this.scrollOffset,
+          onShare: () => this.shareUserProfile()
+        })
+        if (this.shareSheetVisible) {
+          ShareSheet({
+            shareParam: this.shareParam(),
+            visible: this.shareSheetVisible,
+            onClose: () => this.shareSheetVisible = false
+          })
         }
       }
-      .width('100%').height('100%').backgroundColor('#121215')
+      .width('100%').height('100%').backgroundColor(TC.pageBackground())
       .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP])
     }
     .hideTitleBar(true)
-    .onShown(() => this.nearbyShare.activate(() => SystemShareService.linkRecords(this.profileShareLink())))
-    .onHidden(() => this.nearbyShare.deactivate())
   }
 }

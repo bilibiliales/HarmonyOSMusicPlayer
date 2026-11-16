@@ -1,3 +1,4 @@
+import { SheetSkinFrame } from '../components/SheetSkin'
 import { ResourceComments } from '../components/ResourceComments'
 import { CommentResource } from '../models/CommentResource'
 import { CommentService } from '../services/CommentService'
@@ -36,12 +37,23 @@ import { AuthStore } from '../stores/AuthStore'
 import { PlayerStore } from '../stores/PlayerStore'
 import { ShareSheet } from '../components/ShareSheet'
 import { VinylRecord } from '../components/VinylRecord'
+import { PlayerBackdrop } from '../components/PlayerBackdrop'
+import { HeartBurst } from '../components/HeartBurst'
+import { RingtonePageParam } from './RingtonePage'
+import { PlayerStyleConfig } from '../models/decoration'
+import { DecoKeys } from '../services/DecorationRuntime'
+import { DecoColor } from '../services/DecorationColor'
 import { AppSettings } from '../services/AppSettings'
 import { BubbleTip } from '../services/BubbleTip'
 import { RectShape } from '@kit.ArkUI'
+import { TC } from '../services/ThemeColors'
 
 @Component
 export struct Play {
+  @StorageProp('skinVersion') skinVersionObs: number = 0
+  @StorageProp(DecoKeys.PLAYER_STYLE) @Watch('onPlayerStyleChanged') playerStyleRaw: string = ''
+  @State playerStyle: PlayerStyleConfig = new PlayerStyleConfig()
+  @State heartTrigger: number = 0
   @Consume('pageStack') pageStack: NavPathStack
   @Consume('topAvoidHeight') topAvoidHeight: number
   @Consume('playerStore') playerStore: PlayerStore
@@ -66,6 +78,12 @@ export struct Play {
   @State lyricUserScrolling: boolean = false
   @State lyricProgressPosition: number = 0
   @State lyricAppearance: LyricPreferences = AppSettings.lyricPreferences
+  /** 当前歌曲是否有译文 / 罗马音（决定歌词区左下角气泡是否出现）。 */
+  @State translationAvailable: boolean = false
+  @State romaAvailable: boolean = false
+  /** 译 / 音 的显示开关（会话内保持，不写盘）。 */
+  @State showTranslation: boolean = true
+  @State showRoma: boolean = false
   @State redCount: number = 0
   @State redCountLoading: boolean = false
   @State vinylOffsetX: number = 0
@@ -123,6 +141,62 @@ export struct Play {
     this.loadLikedState()
     this.loadLyrics()
     this.startLyricTracking()
+    this.playerStyle = PlayerStyleConfig.from(this.playerStyleRaw)
+  }
+
+  private onPlayerStyleChanged(): void {
+    this.playerStyle = PlayerStyleConfig.from(this.playerStyleRaw)
+  }
+
+  // ---- 播放器样式取色：装扮优先，未指定跟随主题（压图文字常白） ----
+  private psIcon(): ResourceColor {
+    // 只设了「文字色」装扮时，图标也跟着走，避免歌词区图标仍停留在默认白
+    if (this.playerStyle.iconColor) { return this.playerStyle.iconColor }
+    if (this.playerStyle.textColor) { return this.playerStyle.textColor }
+    return TC.textOnMedia()
+  }
+
+  private psText(): ResourceColor {
+    return this.playerStyle.textColor ? this.playerStyle.textColor : TC.textOnMedia()
+  }
+
+  private psDim(): ResourceColor {
+    return this.playerStyle.textColor ? DecoColor.alpha(this.playerStyle.textColor, 0.66) : TC.textOnMediaSecondary()
+  }
+
+  private psFaint(): ResourceColor {
+    return this.playerStyle.textColor ? DecoColor.alpha(this.playerStyle.textColor, 0.42) : TC.textOnMediaTertiary()
+  }
+
+  private psControl(): ResourceColor {
+    return this.playerStyle.controlColor ? this.playerStyle.controlColor : TC.textOnMedia()
+  }
+
+  private psControlSoft(): ResourceColor {
+    if (this.playerStyle.controlColor) {
+      return DecoColor.alpha(this.playerStyle.controlColor, 0.24)
+    }
+    return 'rgba(255,255,255,0.22)'
+  }
+
+  /** 进度条主色：装扮指定 > 控件色 > 主题。 */
+  private psProgress(): ResourceColor {
+    if (this.playerStyle.progressColor) {
+      return this.playerStyle.progressColor
+    }
+    return this.psControl()
+  }
+
+  private psProgressSoft(): ResourceColor {
+    const base = this.playerStyle.progressColor ? this.playerStyle.progressColor : this.playerStyle.controlColor
+    if (base) {
+      return DecoColor.alpha(base, 0.24)
+    }
+    return 'rgba(255,255,255,0.22)'
+  }
+
+  private vinylRenderSize(): number {
+    return this.playerStyle.vinylSize > 0 ? this.playerStyle.vinylSize : this.vinylDiameter
   }
 
   aboutToDisappear(): void {
@@ -243,7 +317,8 @@ export struct Play {
         result.push({
           time: this.parseLyricTime(tag),
           text: lyricText || '♪',
-          translation: ''
+          translation: '',
+          roma: ''
         })
       })
     })
@@ -288,6 +363,7 @@ export struct Play {
           duration: Number.isFinite(lineDuration) ? lineDuration : 0,
           text: lyricText,
           translation: '',
+          roma: '',
           words: words
         })
       }
@@ -296,27 +372,31 @@ export struct Play {
     return result
   }
 
-  private mergeTranslations(lines: LyricLine[], translations: LyricLine[]): LyricLine[] {
-    if (translations.length === 0) {
+  private mergeTranslations(lines: LyricLine[], translations: LyricLine[], romas: LyricLine[]): LyricLine[] {
+    if (translations.length === 0 && romas.length === 0) {
       return lines
     }
     return lines.map((line: LyricLine) => {
-      let translation = ''
-      for (let index = 0; index < translations.length; index++) {
-        if (Math.abs(translations[index].time - line.time) <= 80) {
-          translation = translations[index].text
-          break
-        }
-      }
       const merged: LyricLine = {
         time: line.time,
         duration: line.duration,
         text: line.text,
-        translation: translation,
+        translation: this.matchAuxiliary(translations, line.time),
+        roma: this.matchAuxiliary(romas, line.time),
         words: line.words
       }
       return merged
     })
+  }
+
+  /** 译文 / 罗马音与主歌词按时间对齐（容差 80ms）。 */
+  private matchAuxiliary(list: LyricLine[], time: number): string {
+    for (let index = 0; index < list.length; index++) {
+      if (Math.abs(list[index].time - time) <= 80) {
+        return list[index].text
+      }
+    }
+    return ''
   }
 
   private checkNetwork(): void {
@@ -354,6 +434,8 @@ export struct Play {
     this.lyricCanRetry = false
     this.lyricLines = []
     this.currentLyricIndex = -1
+    this.translationAvailable = false
+    this.romaAvailable = false
     this.lyricProgressPosition = this.playerStore.position
     this.preciseLyricsLoaded = false
     if (this.isNonCatalogAudio() && !this.playerStore.currentSong.localUri) {
@@ -374,9 +456,12 @@ export struct Play {
       const preciseLyrics = response.yrc?.lyric ? this.parseYrcLyrics(response.yrc.lyric) : []
       this.preciseLyricsLoaded = preciseLyrics.length > 0
       const original = preciseLyrics.length > 0 ? preciseLyrics : this.parseTimedLyrics(response.lrc?.lyric || '', true)
-      const translationSource = response.tlyric?.lyric || response.romalrc?.lyric || ''
-      const translations = this.parseTimedLyrics(translationSource, false)
-      this.lyricLines = this.mergeTranslations(original, translations)
+      const translations = this.parseTimedLyrics(response.tlyric?.lyric || '', false)
+      const romas = this.parseTimedLyrics(response.romalrc?.lyric || '', false)
+      this.lyricLines = this.mergeTranslations(original, translations, romas)
+      // 这首歌是否存在译文 / 罗马音，决定左下角「译 / 音」气泡是否出现
+      this.translationAvailable = this.lyricLines.some((line: LyricLine) => !!line.translation)
+      this.romaAvailable = this.lyricLines.some((line: LyricLine) => !!line.roma)
       if (this.lyricLines.length === 0) {
         this.lyricMessage = '歌词格式暂时无法解析'
       } else {
@@ -547,6 +632,19 @@ export struct Play {
     }, 3500)
   }
 
+  /**
+   * 点击歌词的行为（防误触）：
+   *  - 默认状态：点击任意歌词只返回唱片，不跳转进度；
+   *  - 暂停跟随状态（手动滑动浏览中）：点击歌词立即取消暂停跟随并跳转到对应进度。
+   */
+  private onLyricTap(line: LyricLine, index: number): void {
+    if (this.lyricUserScrolling) {
+      this.seekToLyric(line, index)
+      return
+    }
+    this.closeLyrics()
+  }
+
   private seekToLyric(line: LyricLine, index: number): void {
     if (this.lyricResumeTimer !== -1) {
       clearTimeout(this.lyricResumeTimer)
@@ -559,14 +657,17 @@ export struct Play {
     this.scrollToCurrentLyric(true)
   }
 
+  /**
+   * 歌词三色：
+   *  - 当前行的高亮歌词 = highlight（逐字已唱过部分 / 普通歌词整行）；
+   *  - 当前行还没被高亮的歌词 = pendingColor（逐字未唱到的底字）；
+   *  - 不在当前行的歌词 = otherLineColor（层次由 lyricLineOpacity 提供）。
+   */
   private lyricColor(index: number): string {
     if (index === this.currentLyricIndex) {
       return this.lyricAppearance.highlight
     }
-    if (index < this.currentLyricIndex) {
-      return 'rgba(255,255,255,0.25)'
-    }
-    return 'rgba(255,255,255,0.46)'
+    return this.lyricAppearance.otherLineColor
   }
 
   private lyricLineDistance(index: number): number {
@@ -630,6 +731,15 @@ export struct Play {
     return this.lyricLines.some((line: LyricLine) => !!line.words && line.words.length > 0)
   }
 
+  /** 歌词对齐：0 居左（默认）/ 1 居中。 */
+  private lyricCentered(): boolean {
+    return this.lyricAppearance.align === 1
+  }
+
+  private lyricTextAlign(): TextAlign {
+    return this.lyricCentered() ? TextAlign.Center : TextAlign.Start
+  }
+
   private lyricCharacterProgress(word: LyricWord, characterIndex: number, characterCount: number): number {
     if (characterCount <= 0 || word.duration <= 0) {
       return this.lyricProgressPosition + this.lyricAppearance.offset * 1000 >= word.start ? 1 : 0
@@ -642,14 +752,17 @@ export struct Play {
   @Builder
   private PrimaryLyricText(line: LyricLine, index: number) {
     if (index === this.currentLyricIndex && line.words && line.words.length > 0) {
-      Flex({ wrap: FlexWrap.Wrap }) {
+      Flex({
+        wrap: FlexWrap.Wrap,
+        justifyContent: this.lyricCentered() ? FlexAlign.Center : FlexAlign.Start
+      }) {
         ForEach(line.words, (word: LyricWord, wordIndex: number) => {
           ForEach(word.text.split(''), (character: string, characterIndex: number) => {
             Stack({ alignContent: Alignment.TopStart }) {
               Text(character)
                 .fontSize(this.lyricFontSize(index))
                 .fontWeight(FontWeight.Bold)
-                .fontColor('#ffffff')
+                .fontColor(this.lyricAppearance.pendingColor)
                 .lineHeight(this.lyricLineHeight(index))
               Text(character)
                 .fontSize(this.lyricFontSize(index))
@@ -668,6 +781,7 @@ export struct Play {
     } else {
       Text(line.text)
         .width('100%')
+        .textAlign(this.lyricTextAlign())
         .fontSize(this.lyricFontSize(index))
         .fontWeight(index === this.currentLyricIndex ? FontWeight.Bold : FontWeight.Medium)
         .fontColor(this.lyricColor(index))
@@ -846,6 +960,9 @@ export struct Play {
           this.likedSongIds = this.likedSongIds.filter((id: string) => id !== this.playerStore.currentSong.id)
         }
         this.redCount = Math.max(0, this.redCount + (nextLiked ? 1 : -1))
+        if (nextLiked) {
+          this.heartTrigger = this.heartTrigger + 1
+        }
         BubbleTip.show(this.getUIContext(), nextLiked ? '已加入我喜欢的音乐' : '已取消喜欢')
       }
     } catch (error) {
@@ -883,6 +1000,13 @@ export struct Play {
     if (!this.canComment()) { return }
     this.commentTarget = this.currentCommentResource()
     this.commentsVisible = true
+  }
+
+  @Builder
+  private skin_CommentsSheet() {
+    SheetSkinFrame() {
+      this.CommentsSheet()
+    }
   }
 
   @Builder
@@ -954,7 +1078,7 @@ export struct Play {
       if (AppSettings.askDownloadSaveMode) {
         const result = await this.getUIContext().getPromptAction().showActionMenu({
           title: '保存方式',
-          buttons: [{ text: '保存到下载目录', color: '#ef233c' }, { text: '另存为…', color: '#777777' }]
+          buttons: [{ text: '保存到下载目录', color: TC.accentMenu() }, { text: '另存为…', color: '#777777' }]
         })
         saveMode = result.index === 1 ? 'saveAs' : 'download'
       }
@@ -1160,14 +1284,14 @@ export struct Play {
   }
 
   @Builder
-  private CurrentArtistLinks(fontSize: number, color: string) {
+  private CurrentArtistLinks(fontSize: number, color: ResourceColor) {
     Row({ space: 4 }) {
       if (this.playerStore.currentSong.artists && this.playerStore.currentSong.artists.length > 0) {
         ForEach(this.playerStore.currentSong.artists, (artist: SongArtist, index: number) => {
           Text(artist.name).fontSize(fontSize).fontColor(color).maxLines(1)
             .onClick(() => this.openArtist(artist))
           if (index < (this.playerStore.currentSong.artists || []).length - 1) {
-            Text('/').fontSize(fontSize).fontColor('#66666e')
+            Text('/').fontSize(fontSize).fontColor(this.psFaint())
           }
         })
       } else {
@@ -1248,16 +1372,55 @@ export struct Play {
     this.loadLikedState()
   }
 
+  /**
+   * 「译 / 音」切换气泡：圈内文字、无底色，颜色跟随播放器装扮。
+   * 位置固定在歌词设置图标左侧（沉浸模式下在「退出沉浸」左侧），不遮歌词。
+   */
+  @Builder
+  private AuxBubble() {
+    if (this.translationAvailable || this.romaAvailable) {
+      Row({ space: 8 }) {
+        if (this.translationAvailable) {
+          Stack({ alignContent: Alignment.Center }) {
+            Text('译')
+              .fontSize(10)
+              .fontWeight(this.showTranslation ? FontWeight.Medium : FontWeight.Regular)
+              .fontColor(this.showTranslation ? this.psText() : this.psFaint())
+          }
+          .width(24)
+          .height(24)
+          .borderRadius(12)
+          .border({ width: 1, color: this.showTranslation ? this.psText() : this.psFaint() })
+          .onClick(() => { this.showTranslation = !this.showTranslation })
+        }
+        if (this.romaAvailable) {
+          Stack({ alignContent: Alignment.Center }) {
+            Text('音')
+              .fontSize(10)
+              .fontWeight(this.showRoma ? FontWeight.Medium : FontWeight.Regular)
+              .fontColor(this.showRoma ? this.psText() : this.psFaint())
+          }
+          .width(24)
+          .height(24)
+          .borderRadius(12)
+          .border({ width: 1, color: this.showRoma ? this.psText() : this.psFaint() })
+          .onClick(() => { this.showRoma = !this.showRoma })
+        }
+      }
+    }
+  }
+
   @Builder
   private LyricsPanel() {
     Column({ space: 8 }) {
       if (this.lyricsImmersive) {
-        Row() {
+        Row({ space: 10 }) {
           Blank()
+          this.AuxBubble()
           Row({ space: 5 }) {
             SymbolGlyph($r('sys.symbol.arrow_up_left_and_arrow_down_right'))
-              .fontSize(14).fontColor(['#d9d9de'])
-            Text('退出沉浸').fontSize(10).fontColor('#d9d9de')
+              .fontSize(14).fontColor([this.psIcon()])
+            Text('退出沉浸').fontSize(10).fontColor(this.psText())
           }
           .padding({ left: 10, right: 10, top: 7, bottom: 7 })
           .backgroundColor('rgba(255,255,255,0.08)')
@@ -1274,30 +1437,31 @@ export struct Play {
           Text('歌词')
             .fontSize(15)
             .fontWeight(FontWeight.Bold)
-            .fontColor('#ffffff')
-          Text(this.lyricUserScrolling ? '正在浏览，3.5 秒后恢复跟随' :
-            (this.hasPreciseLyrics() ? '逐字歌词 · 点击任意歌词可跳转' : '点击任意歌词可跳转播放'))
+            .fontColor(this.psText())
+          Text(this.lyricUserScrolling ? '已暂停跟随 · 点击歌词可跳转' :
+            (this.hasPreciseLyrics() ? '逐字歌词 · 点击歌词返回唱片' : '点击歌词返回唱片'))
             .fontSize(9)
-            .fontColor(this.lyricUserScrolling ? '#ff8b9a' : '#85858e')
+            .fontColor(this.lyricUserScrolling ? TC.accentSoft() : this.psDim())
         }
         .layoutWeight(1)
         .alignItems(HorizontalAlign.Start)
         Row({ space: 8 }) {
-          SymbolGlyph($r('sys.symbol.gearshape')).fontSize(18).fontColor(['#d9d9de'])
+          this.AuxBubble()
+          SymbolGlyph($r('sys.symbol.gearshape')).fontSize(18).fontColor([this.psIcon()])
             .onClick(() => this.activeSheet = 'lyricSettings')
           Row({ space: 5 }) {
             SymbolGlyph($r('sys.symbol.arrow_up_left_and_arrow_down_right'))
-              .fontSize(14).fontColor([this.lyricsImmersive ? '#ff7b8b' : '#d9d9de'])
+              .fontSize(14).fontColor([this.psIcon()])
             Text(this.lyricsImmersive ? '退出沉浸' : '沉浸歌词')
-              .fontSize(10).fontColor(this.lyricsImmersive ? '#ff7b8b' : '#d9d9de')
+              .fontSize(10).fontColor(this.psText())
           }
           .padding({ left: 10, right: 10, top: 7, bottom: 7 })
           .backgroundColor(this.lyricsImmersive ? 'rgba(239,35,60,0.16)' : 'rgba(255,255,255,0.08)')
           .borderRadius(14)
           .onClick(() => this.toggleLyricsImmersive())
           Row({ space: 5 }) {
-            SymbolGlyph($r('sys.symbol.music')).fontSize(14).fontColor(['#d9d9de'])
-            Text('返回唱片').fontSize(10).fontColor('#d9d9de')
+            SymbolGlyph($r('sys.symbol.music')).fontSize(14).fontColor([this.psIcon()])
+            Text('返回唱片').fontSize(10).fontColor(this.psText())
           }
           .padding({ left: 10, right: 10, top: 7, bottom: 7 })
           .backgroundColor('rgba(255,255,255,0.08)')
@@ -1311,19 +1475,19 @@ export struct Play {
 
       if (this.lyricsLoading) {
         Column({ space: 12 }) {
-          LoadingProgress().width(40).color('#ffffff')
-          Text('正在加载歌词…').fontSize(11).fontColor('#85858e')
+          LoadingProgress().width(40).color(this.psText())
+          Text('正在加载歌词…').fontSize(11).fontColor(this.psDim())
         }
         .layoutWeight(1)
         .justifyContent(FlexAlign.Center)
       } else if (this.lyricMessage) {
         Column({ space: 12 }) {
-          SymbolGlyph($r('sys.symbol.text_alignleft')).fontSize(40).fontColor(['#55555d'])
-          Text(this.lyricMessage).fontSize(12).fontColor('#85858e')
+          SymbolGlyph($r('sys.symbol.text_alignleft')).fontSize(40).fontColor([this.psFaint()])
+          Text(this.lyricMessage).fontSize(12).fontColor(this.psDim())
           if (this.lyricCanRetry) {
             Row({ space: 7 }) {
-              SymbolGlyph($r('sys.symbol.arrow_clockwise')).fontSize(17).fontColor(['#ffffff'])
-              Text('重新加载歌词').fontSize(12).fontColor('#ffffff')
+              SymbolGlyph($r('sys.symbol.arrow_clockwise')).fontSize(17).fontColor([this.psIcon()])
+              Text('重新加载歌词').fontSize(12).fontColor(this.psText())
             }
             .padding({ left: 14, right: 14, top: 9, bottom: 9 })
             .backgroundColor('rgba(255,255,255,0.10)').borderRadius(18)
@@ -1341,26 +1505,43 @@ export struct Play {
             ForEach(this.lyricLines, (line: LyricLine, index: number) => {
               ListItem() {
                 Row({ space: 10 }) {
-                  Column()
-                    .width(index === this.currentLyricIndex ? 3 : 0)
-                    .height(index === this.currentLyricIndex ? 28 : 0)
-                    .borderRadius(2)
-                    .backgroundColor(this.lyricAppearance.highlight)
+                  if (!this.lyricCentered()) {
+                    Column()
+                      .width(index === this.currentLyricIndex ? 3 : 0)
+                      .height(index === this.currentLyricIndex ? 28 : 0)
+                      .borderRadius(2)
+                      .backgroundColor(this.lyricAppearance.highlight)
+                  }
                   Column({ space: 5 }) {
                     this.PrimaryLyricText(line, index)
-                    if (line.translation) {
+                    if (line.translation && this.showTranslation) {
                       Text(line.translation)
                         .width('100%')
+                        .textAlign(this.lyricTextAlign())
                         .fontSize(index === this.currentLyricIndex ? 14 : 12)
-                        .fontColor(index === this.currentLyricIndex ? '#c8c8ce' : 'rgba(255,255,255,0.25)')
+                        .fontColor(index === this.currentLyricIndex ? this.lyricAppearance.pendingColor : this.lyricAppearance.otherLineColor)
                         .lineHeight(20)
+                    }
+                    if (line.roma && this.showRoma) {
+                      Text(line.roma)
+                        .width('100%')
+                        .textAlign(this.lyricTextAlign())
+                        .fontSize(index === this.currentLyricIndex ? 13 : 11)
+                        .fontColor(index === this.currentLyricIndex ? this.lyricAppearance.pendingColor : this.lyricAppearance.otherLineColor)
+                        .opacity(0.86)
+                        .lineHeight(18)
                     }
                   }
                   .layoutWeight(1)
-                  .alignItems(HorizontalAlign.Start)
+                  .alignItems(this.lyricCentered() ? HorizontalAlign.Center : HorizontalAlign.Start)
                 }
                 .width('100%')
-                .padding({ left: 22 + this.lyricAppearance.horizontal, right: 22, top: 3, bottom: 3 })
+                .padding({
+                  left: this.lyricCentered() ? 22 : 22 + this.lyricAppearance.horizontal,
+                  right: 22,
+                  top: 3,
+                  bottom: 3
+                })
                 .opacity(this.lyricLineOpacity(index))
                 .scale({
                   x: this.lyricLineScale(index),
@@ -1371,9 +1552,10 @@ export struct Play {
                   curve: curves.springMotion(0.56, 0.68, 0.24),
                   delay: this.lyricLineDelay(index)
                 })
-                .onClick(() => this.seekToLyric(line, index))
+                .onClick(() => this.onLyricTap(line, index))
               }
-            })
+            }, (line: LyricLine, index: number) =>
+              `${index}-${line.time}-${this.lyricCentered() ? 'c' : 'l'}-${this.showTranslation ? 1 : 0}-${this.showRoma ? 1 : 0}`)
             ListItem() {
               Column().height(this.lyricsImmersive ? 280 : 195)
             }
@@ -1393,8 +1575,8 @@ export struct Play {
 
           if (this.lyricUserScrolling) {
             Row({ space: 7 }) {
-              SymbolGlyph($r('sys.symbol.hand_draw')).fontSize(13).fontColor(['#ff8b9a'])
-              Text('已暂停自动跟随').fontSize(10).fontColor('#ffffff')
+              SymbolGlyph($r('sys.symbol.hand_draw')).fontSize(13).fontColor([TC.accentSoft()])
+              Text('已暂停自动跟随').fontSize(10).fontColor(this.psText())
             }
             .padding({ left: 11, right: 11, top: 7, bottom: 7 })
             .backgroundColor('rgba(22,18,22,0.86)')
@@ -1414,20 +1596,14 @@ export struct Play {
 
   @Builder
   private SmallAction(icon: Resource, text: string, onClick: () => void) {
-    Column({ space: 7 }) {
-      Stack() {
-        SymbolGlyph(icon)
-          .fontSize(21)
-          .fontColor(['#e8e8ec'])
-      }
-      .width(36)
-      .height(36)
-      .borderRadius(18)
-      .backgroundColor('rgba(255,255,255,0.08)')
-      Text(text)
-        .fontSize(10)
-        .fontColor('#a9a9b0')
+    // 只留图标：无底版、无文字。灰色在深浅画布下都可读，
+    // 后续可在「播放器样式」装扮里手动定义该颜色。
+    Row() {
+      SymbolGlyph(icon)
+        .fontSize(21)
+        .fontColor([this.playerStyle.iconColor ? this.playerStyle.iconColor : '#999999'])
     }
+    .justifyContent(FlexAlign.Center)
     .layoutWeight(1)
     .onClick(onClick)
   }
@@ -1437,12 +1613,12 @@ export struct Play {
     Column() {
       this.SheetHeader('选择播放音质', `当前：${this.playerStore.qualityTitle()} · 目标：${this.playerStore.requestedQualityTitle()}`)
       if (this.qualityLoading) {
-        LoadingProgress().width(36).height(36).color('#ef233c').margin({ top: 28 })
+        LoadingProgress().width(36).height(36).color(TC.accent()).margin({ top: 28 })
       } else if (this.qualityError) {
-        Text(`${this.qualityError} · 点击重试`).fontSize(14).fontColor('#a9a9b0').margin({ top: 28 })
+        Text(`${this.qualityError} · 点击重试`).fontSize(14).fontColor(TC.textQuaternary()).margin({ top: 28 })
           .onClick(() => this.loadMusicQualities())
       } else if (this.availableQualities.length === 0) {
-        Text('暂无可用音质').fontSize(14).fontColor('#888890').margin({ top: 28 })
+        Text('暂无可用音质').fontSize(14).fontColor(TC.textTertiary()).margin({ top: 28 })
       } else {
         List({ space: 4 }) {
         ForEach(this.availableQualities, (item: QualityOption) => {
@@ -1452,17 +1628,17 @@ export struct Play {
                 Text(item.title)
                   .fontSize(15)
                   .fontWeight(item.level === this.playerStore.quality ? FontWeight.Bold : FontWeight.Regular)
-                  .fontColor(item.level === this.playerStore.quality ? '#FE010D' : '#eeeeee')
+                  .fontColor(item.level === this.playerStore.quality ? TC.accent() : TC.textPrimary())
                 Text(item.description)
                   .fontSize(11)
-                  .fontColor('#777777')
+                  .fontColor(TC.textTertiary())
               }
               .layoutWeight(1)
               .alignItems(HorizontalAlign.Start)
               if (item.level === this.playerStore.quality) {
                 SymbolGlyph($r('sys.symbol.checkmark_circle_fill'))
                   .fontSize(22)
-                  .fontColor(['#ef233c'])
+                  .fontColor([TC.accent()])
               }
             }
             .width('100%')
@@ -1484,25 +1660,25 @@ export struct Play {
     Column() {
       this.SheetHeader('选择下载音质', this.downloadSongName)
       if (this.downloadQualityLoading) {
-        LoadingProgress().width(36).height(36).color('#ef233c').margin({ top: 28 })
+        LoadingProgress().width(36).height(36).color(TC.accent()).margin({ top: 28 })
       } else if (this.downloadQualityError) {
-        Text(`${this.downloadQualityError} · 点击重试`).fontSize(14).fontColor('#a9a9b0').margin({ top: 28 })
+        Text(`${this.downloadQualityError} · 点击重试`).fontSize(14).fontColor(TC.textQuaternary()).margin({ top: 28 })
           .onClick(() => this.openDownloadQualitySheet())
       } else if (this.downloadQualities.length === 0) {
-        Text('暂无可下载音质').fontSize(14).fontColor('#888890').margin({ top: 28 })
+        Text('暂无可下载音质').fontSize(14).fontColor(TC.textTertiary()).margin({ top: 28 })
       } else {
         Text('按原始音频格式保存，实际音质以账号可下载资源为准')
-          .fontSize(11).fontColor('#888890').padding({ left: 20, right: 20, bottom: 8 })
+          .fontSize(11).fontColor(TC.textTertiary()).padding({ left: 20, right: 20, bottom: 8 })
         List({ space: 4 }) {
           ForEach(this.downloadQualities, (item: QualityOption) => {
             ListItem() {
               Row({ space: 12 }) {
                 Column({ space: 4 }) {
                   Text(item.level === this.preferredDownloadLevel ? `${item.title} · 默认可用` : item.title)
-                    .fontSize(15).fontColor(item.level === this.preferredDownloadLevel ? '#ef233c' : '#eeeeee')
-                  Text(item.description).fontSize(11).fontColor('#777777')
+                    .fontSize(15).fontColor(item.level === this.preferredDownloadLevel ? TC.accent() : TC.textPrimary())
+                  Text(item.description).fontSize(11).fontColor(TC.textTertiary())
                 }.layoutWeight(1).alignItems(HorizontalAlign.Start)
-                SymbolGlyph($r('sys.symbol.arrow_down_circle')).fontSize(22).fontColor(['#a9a9b0'])
+                SymbolGlyph($r('sys.symbol.arrow_down_circle')).fontSize(22).fontColor([TC.textQuaternary()])
               }.width('100%').padding({ left: 20, right: 20, top: 12, bottom: 12 })
                 .onClick(() => this.downloadSong(item.level))
             }
@@ -1523,8 +1699,8 @@ export struct Play {
       this.SheetHeader(`播放队列 · ${this.playerStore.queue.length} 首`, this.playerStore.modeTitle())
       if (this.playerStore.queue.length === 0) {
         Column({ space: 10 }) {
-          SymbolGlyph($r('sys.symbol.music')).fontSize(38).fontColor(['#55555d'])
-          Text('播放列表为空').fontSize(14).fontColor('#888890')
+          SymbolGlyph($r('sys.symbol.music')).fontSize(38).fontColor([TC.textQuaternary()])
+          Text('播放列表为空').fontSize(14).fontColor(TC.textTertiary())
         }
         .layoutWeight(1).justifyContent(FlexAlign.Center)
       } else {
@@ -1533,19 +1709,19 @@ export struct Play {
             ListItem() {
               Row({ space: 12 }) {
                 if (index === this.playerStore.currentIndex) {
-                  SymbolGlyph($r('sys.symbol.text_alignleft')).width(24).fontSize(18).fontColor(['#FE010D'])
+                  SymbolGlyph($r('sys.symbol.text_alignleft')).width(24).fontSize(18).fontColor([TC.accent()])
                 } else {
-                  Text((index + 1).toString()).width(24).fontSize(12).fontColor('#66666e')
+                  Text((index + 1).toString()).width(24).fontSize(12).fontColor(TC.textQuaternary())
                     .textAlign(TextAlign.Center)
                 }
                 Column({ space: 3 }) {
                   Text(item.name).fontSize(14)
-                    .fontColor(index === this.playerStore.currentIndex ? '#FE010D' : '#e8e8eb').maxLines(1)
-                  Text(item.author).fontSize(11).fontColor('#77777f').maxLines(1)
+                    .fontColor(index === this.playerStore.currentIndex ? TC.accent() : TC.textPrimary()).maxLines(1)
+                  Text(item.author).fontSize(11).fontColor(TC.textTertiary()).maxLines(1)
                 }
                 .layoutWeight(1).alignItems(HorizontalAlign.Start)
                   .onClick(() => this.selectQueueSong(index))
-                SymbolGlyph($r('sys.symbol.xmark')).fontSize(15).fontColor(['#66666e'])
+                SymbolGlyph($r('sys.symbol.xmark')).fontSize(15).fontColor([TC.textQuaternary()])
                   .onClick(() => playerController.removeAt(index))
               }
               .height(58).padding({ left: 18, right: 18 })
@@ -1553,7 +1729,7 @@ export struct Play {
           })
         }
         .layoutWeight(1)
-        Text('清空播放列表').width('100%').height(48).fontSize(13).fontColor('#ef4058')
+        Text('清空播放列表').width('100%').height(48).fontSize(13).fontColor(TC.accentSoft())
           .textAlign(TextAlign.Center).onClick(async () => {
             await playerController.clearQueue()
           })
@@ -1567,13 +1743,13 @@ export struct Play {
       this.SheetHeader('歌曲选项', '刷新当前歌曲的封面、歌词和页面信息')
       Row({ space: 14 }) {
         if (this.pageReloading) {
-          LoadingProgress().width(24).height(24).color('#ffffff')
+          LoadingProgress().width(24).height(24).color(TC.textPrimary())
         } else {
-          SymbolGlyph($r('sys.symbol.arrow_clockwise')).fontSize(24).fontColor(['#ffffff'])
+          SymbolGlyph($r('sys.symbol.arrow_clockwise')).fontSize(24).fontColor([TC.textPrimary()])
         }
         Column({ space: 4 }) {
-          Text(this.pageReloading ? '正在重新加载…' : '重新加载').fontSize(15).fontColor('#ffffff')
-          Text('重新获取歌曲详情、封面与歌词').fontSize(11).fontColor('#77777f')
+          Text(this.pageReloading ? '正在重新加载…' : '重新加载').fontSize(15).fontColor(TC.textPrimary())
+          Text('重新获取歌曲详情、封面与歌词').fontSize(11).fontColor(TC.textTertiary())
         }
         .layoutWeight(1).alignItems(HorizontalAlign.Start)
       }
@@ -1581,13 +1757,13 @@ export struct Play {
       .enabled(!this.pageReloading).onClick(() => this.reloadSongPage())
       Row({ space: 14 }) {
         if (this.coverSaving) {
-          LoadingProgress().width(24).height(24).color('#ffffff')
+          LoadingProgress().width(24).height(24).color(TC.textPrimary())
         } else {
-          SymbolGlyph($r('sys.symbol.arrow_down_circle')).fontSize(24).fontColor(['#ffffff'])
+          SymbolGlyph($r('sys.symbol.arrow_down_circle')).fontSize(24).fontColor([TC.textPrimary()])
         }
         Column({ space: 4 }) {
-          Text(this.coverSaving ? '正在保存封面…' : '保存歌曲封面').fontSize(15).fontColor('#ffffff')
-          Text('将当前歌曲封面保存到系统图库').fontSize(11).fontColor('#77777f')
+          Text(this.coverSaving ? '正在保存封面…' : '保存歌曲封面').fontSize(15).fontColor(TC.textPrimary())
+          Text('将当前歌曲封面保存到系统图库').fontSize(11).fontColor(TC.textTertiary())
         }
         .layoutWeight(1).alignItems(HorizontalAlign.Start)
       }
@@ -1596,20 +1772,40 @@ export struct Play {
       .onClick(() => this.saveCoverFromMenu())
       Row({ space: 14 }) {
         if (this.simiInserting) {
-          LoadingProgress().width(24).height(24).color('#ffffff')
+          LoadingProgress().width(24).height(24).color(TC.textPrimary())
         } else {
-          SymbolGlyph($r('sys.symbol.plus_circle')).fontSize(24).fontColor(['#ffffff'])
+          SymbolGlyph($r('sys.symbol.plus_circle')).fontSize(24).fontColor([TC.textPrimary()])
         }
         Column({ space: 4 }) {
-          Text(this.simiInserting ? '正在插播…' : '插播相似歌曲').fontSize(15).fontColor('#ffffff')
-          Text('获取相似歌曲并插入到当前歌曲之后').fontSize(11).fontColor('#77777f')
+          Text(this.simiInserting ? '正在插播…' : '插播相似歌曲').fontSize(15).fontColor(TC.textPrimary())
+          Text('获取相似歌曲并插入到当前歌曲之后').fontSize(11).fontColor(TC.textTertiary())
         }
         .layoutWeight(1).alignItems(HorizontalAlign.Start)
       }
       .width('100%').height(68).padding({ left: 20, right: 20 })
       .enabled(!this.simiInserting && this.playerStore.currentSong.id.length > 0)
       .onClick(() => this.insertSimilarSong())
+      Row({ space: 14 }) {
+        SymbolGlyph($r('sys.symbol.bell_fill')).fontSize(22).fontColor([TC.textPrimary()])
+        Column({ space: 4 }) {
+          Text('设为铃声').fontSize(15).fontColor(TC.textPrimary())
+          Text('裁剪一段作为闹钟、短信、通知或来电铃声').fontSize(11).fontColor(TC.textTertiary())
+        }
+        .layoutWeight(1).alignItems(HorizontalAlign.Start)
+        SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(16).fontColor([TC.textTertiary()])
+      }
+      .width('100%').height(68).padding({ left: 20, right: 20 })
+      .enabled(this.playerStore.currentSong.id.length > 0)
+      .onClick(() => this.openRingtonePage())
     }
+  }
+
+  private openRingtonePage(): void {
+    const song = this.playerStore.currentSong
+    if (!song || !song.id) { return }
+    this.activeSheet = ''
+    const param: RingtonePageParam = { song: song }
+    this.pageStack.pushPathByName('RingtonePage', param)
   }
 
 
@@ -1619,8 +1815,8 @@ export struct Play {
       this.SheetHeader('收藏到歌单', '选择一个自己创建的歌单')
       if (this.playlists.length === 0) {
         Column({ space: 12 }) {
-          LoadingProgress().width(38).height(38).color('#ef233c')
-          Text('正在加载歌单…').fontSize(12).fontColor('#77777f')
+          LoadingProgress().width(38).height(38).color(TC.accent())
+          Text('正在加载歌单…').fontSize(12).fontColor(TC.textTertiary())
         }
         .layoutWeight(1)
         .justifyContent(FlexAlign.Center)
@@ -1635,14 +1831,14 @@ export struct Play {
                   .borderRadius(10)
                   .objectFit(ImageFit.Cover)
                 Column({ space: 4 }) {
-                  Text(item.name).fontSize(14).fontColor('#ededf0').maxLines(1)
-                  Text(`${item.count} 首`).fontSize(11).fontColor('#77777f')
+                  Text(item.name).fontSize(14).fontColor(TC.textBody()).maxLines(1)
+                  Text(`${item.count} 首`).fontSize(11).fontColor(TC.textTertiary())
                 }
                 .layoutWeight(1)
                 .alignItems(HorizontalAlign.Start)
                 SymbolGlyph($r('sys.symbol.plus_circle'))
                   .fontSize(22)
-                  .fontColor(['#ff6577'])
+                  .fontColor([TC.accentSoft()])
               }
               .height(66)
               .padding({ left: 18, right: 18 })
@@ -1659,14 +1855,14 @@ export struct Play {
   private SheetHeader(title: string, subtitle: string) {
     Row() {
       Column({ space: 4 }) {
-        Text(title).fontSize(17).fontWeight(FontWeight.Bold).fontColor('#ffffff')
-        Text(subtitle).fontSize(10).fontColor('#77777f')
+        Text(title).fontSize(17).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary())
+        Text(subtitle).fontSize(10).fontColor(TC.textTertiary())
       }
       .layoutWeight(1)
       .alignItems(HorizontalAlign.Start)
       SymbolGlyph($r('sys.symbol.xmark_circle_fill'))
         .fontSize(24)
-        .fontColor(['#686870'])
+        .fontColor([TC.textQuaternary()])
         .onClick(() => this.closeSheet())
     }
     .width('100%')
@@ -1680,7 +1876,7 @@ export struct Play {
       Column()
         .width('100%')
         .height('100%')
-        .backgroundColor('#050507')
+        .backgroundColor(TC.sheetBackground())
 
       Image(this.playerStore.currentSong.img)
         .width('100%')
@@ -1705,7 +1901,7 @@ export struct Play {
             .width('100%')
             .fontSize(18)
             .fontWeight(FontWeight.Bold)
-            .fontColor('#ffffff')
+            .fontColor(TC.textPrimary())
             .maxLines(1)
             .textOverflow({ overflow: TextOverflow.Ellipsis })
             .textAlign(TextAlign.Center)
@@ -1713,21 +1909,21 @@ export struct Play {
           Button() {
             Row({ space: 7 }) {
               if (this.coverSaving) {
-                LoadingProgress().width(18).height(18).color('#ffffff')
+                LoadingProgress().width(18).height(18).color(TC.textPrimary())
               } else {
                 SymbolGlyph($r('sys.symbol.arrow_down_circle'))
                   .fontSize(18)
-                  .fontColor(['#ffffff'])
+                  .fontColor([TC.textPrimary()])
               }
               Text(this.coverSaving ? '正在保存…' : '保存图片')
                 .fontSize(14)
                 .fontWeight(FontWeight.Medium)
-                .fontColor('#ffffff')
+                .fontColor(TC.textOnAccent())
             }
           }
           .width(176)
           .height(46)
-          .backgroundColor('#ef233c')
+          .backgroundColor(TC.accent())
           .borderRadius(23)
           .enabled(!this.coverSaving)
           .onClick(() => this.saveCoverToGallery())
@@ -1745,7 +1941,7 @@ export struct Play {
     }
     .width('100%')
     .height('100%')
-    .backgroundColor('#050507')
+    .backgroundColor(TC.sheetBackground())
   }
 
   @Builder
@@ -1774,8 +1970,8 @@ export struct Play {
         }
       }
       .width('100%')
-      .height(this.activeSheet === 'quality' || this.activeSheet === 'downloadQuality' ? '62%' : this.activeSheet === 'more' ? '38%' : '68%')
-      .backgroundColor('#19191f')
+      .height(this.activeSheet === 'quality' || this.activeSheet === 'downloadQuality' ? '62%' : this.activeSheet === 'more' ? '56%' : '68%')
+      .backgroundColor(TC.surfaceCard())
       .borderRadius({ topLeft: 28, topRight: 28 })
       .shadow({ radius: 28, color: 'rgba(0,0,0,0.45)', offsetY: -5 })
       .transition(TransitionEffect.translate({ y: 700 }).animation({ duration: 260, curve: Curve.EaseOut }))
@@ -1787,19 +1983,7 @@ export struct Play {
   build() {
     NavDestination() {
         Stack() {
-        Image(this.playerStore.currentSong.img)
-          .width('100%')
-          .height('100%')
-          .objectFit(ImageFit.Cover)
-          .blur(90)
-          .opacity(0.44)
-        Column()
-          .width('100%')
-          .height('100%')
-          .linearGradient({
-            angle: 180,
-            colors: [['rgba(12,12,16,0.42)', 0], ['rgba(15,15,20,0.82)', 0.58], ['#121215', 1]]
-          })
+        PlayerBackdrop({ style: this.playerStyle, coverUrl: this.playerStore.currentSong.img })
 
         Scroll() {
         Column() {
@@ -1808,20 +1992,20 @@ export struct Play {
             Row() {
             SymbolGlyph($r('sys.symbol.chevron_left'))
               .fontSize(24)
-              .fontColor(['#ffffff'])
+              .fontColor([this.psIcon()])
               .onClick(() => this.pageStack.pop())
             Column({ space: 2 }) {
-              Text('正在播放').fontSize(10).fontColor('#a2a2aa')
+              Text('正在播放').fontSize(10).fontColor(this.psDim())
               Text(this.playerStore.currentSong.album || '网易云音乐')
                 .fontSize(12)
-                .fontColor('#e4e4e8')
+                .fontColor(this.psText())
                 .maxLines(1)
                 .onClick(() => this.openCurrentAlbum())
             }
             .layoutWeight(1)
             SymbolGlyph($r('sys.symbol.ellipsis_circle'))
               .fontSize(24)
-              .fontColor(['#ffffff'])
+              .fontColor([this.psIcon()])
               .onClick(() => this.activeSheet = 'more')
             }
             .width('100%')
@@ -1838,12 +2022,19 @@ export struct Play {
                 VinylRecord({
                   coverUrl: this.playerStore.currentSong.img,
                   isPlaying: this.playerStore.isPlaying && !this.playerStore.isLoading,
-                  diameter: this.vinylDiameter
+                  diameter: this.vinylRenderSize(),
+                  backImage: this.playerStyle.vinylImage,
+                  coverRatio: this.playerStyle.coverRatio,
+                  coverOffsetX: this.playerStyle.coverX,
+                  coverOffsetY: this.playerStyle.coverY,
+                  coverRadius: this.playerStyle.coverRadius,
+                  vinylRadius: this.playerStyle.vinylRadius,
+                  vinylOpacity: this.playerStyle.vinylOpacity
                 })
               }
-              .width(this.vinylDiameter).height(this.vinylDiameter)
-              .borderRadius('50%')
-              .translate({ x: this.vinylOffsetX })
+              .width(this.vinylRenderSize()).height(this.vinylRenderSize())
+              .borderRadius(`${this.playerStyle.vinylRadius}%`)
+              .translate({ x: this.vinylOffsetX + this.playerStyle.vinylX, y: this.playerStyle.vinylY })
               .opacity(this.vinylOpacity)
               .shadow({
                 radius: 26,
@@ -1859,13 +2050,6 @@ export struct Play {
                   })
               )
 
-              Row({ space: 6 }) {
-                SymbolGlyph($r('sys.symbol.text_alignleft')).fontSize(13).fontColor(['#b8b8bf'])
-                Text('点击唱片查看滚动歌词').fontSize(10).fontColor('#b8b8bf')
-              }
-              .padding({ left: 11, right: 11, top: 7, bottom: 7 })
-              .backgroundColor('rgba(255,255,255,0.07)')
-              .borderRadius(15)
             }
             .width('100%')
             .layoutWeight(1)
@@ -1885,7 +2069,7 @@ export struct Play {
                 Text(this.playerStore.currentSong.name)
                   .fontSize(24)
                   .fontWeight(FontWeight.Bold)
-                  .fontColor('#ffffff')
+                  .fontColor(this.psText())
                   .maxLines(1)
                   .textOverflow({ overflow: TextOverflow.Ellipsis })
                   .layoutWeight(1)
@@ -1893,14 +2077,14 @@ export struct Play {
                   Text('VIP')
                     .fontSize(9)
                     .fontWeight(FontWeight.Bold)
-                    .fontColor('#ff4058')
+                    .fontColor(TC.accentSoft())
                     .padding({ left: 5, right: 5, top: 2, bottom: 2 })
                     .border({ width: 1, color: '#ff4058' })
                     .borderRadius(4)
                 }
               }
               .width('100%')
-              this.CurrentArtistLinks(14, '#a6a6ae')
+              this.CurrentArtistLinks(14, this.psDim())
             }
             .layoutWeight(1)
             .alignItems(HorizontalAlign.Start)
@@ -1909,9 +2093,9 @@ export struct Play {
             Column({ space: 3 }) {
               SymbolGlyph(this.liked ? $r('sys.symbol.heart_fill') : $r('sys.symbol.heart'))
                 .fontSize(27)
-                .fontColor([this.liked ? '#ff4058' : '#ffffff'])
+                .fontColor([this.liked ? '#ff4058' : this.psIcon()])
               Text(this.redCountLoading ? '…' : this.formatMetricCount(this.redCount))
-                .fontSize(9).fontColor('#9b9ba3')
+                .fontSize(9).fontColor(this.psDim())
             }
             .onClick(() => this.toggleLike())
             }
@@ -1920,10 +2104,10 @@ export struct Play {
             Column({ space: 3 }) {
               SymbolGlyph($r('sys.symbol.ellipsis_bubble'))
                 .fontSize(25)
-                .fontColor(['#ffffff'])
+                .fontColor([this.psIcon()])
               Text((this.playerStore.currentSong.commentCount || 0).toString())
                 .fontSize(9)
-                .fontColor('#9b9ba3')
+                .fontColor(this.psDim())
             }
             .onClick(() => this.openComments())
             }
@@ -1939,25 +2123,25 @@ export struct Play {
               max: Math.max(this.playerStore.duration, 1)
             })
               .width('100%')
-              .blockColor('#ffffff')
+              .blockColor(this.psProgress())
               .blockSize({ width: 11, height: 11 })
-              .selectedColor('#ffffff')
-              .trackColor('rgba(255,255,255,0.22)')
+              .selectedColor(this.psProgress())
+              .trackColor(this.psProgressSoft())
               .trackThickness(2)
               .onChange((value: number, mode: SliderChangeMode) => this.handleProgressChange(value, mode))
             Row() {
-              Text(this.formatTime(this.progressPosition())).fontSize(10).fontColor('#92929a')
+              Text(this.formatTime(this.progressPosition())).fontSize(10).fontColor(this.psDim())
               Row({ space: 4 }) {
-                Text(this.playerStore.qualityTitle()).fontSize(10).fontColor('#d8d8dd')
+                Text(this.playerStore.qualityTitle()).fontSize(10).fontColor(this.psText())
                 if (!this.isNonCatalogAudio()) {
-                  SymbolGlyph($r('sys.symbol.chevron_up')).fontSize(10).fontColor(['#8d8d95'])
+                  SymbolGlyph($r('sys.symbol.chevron_up')).fontSize(10).fontColor([this.psFaint()])
                 }
               }
               .padding({ left: 8, right: 8, top: 4, bottom: 4 })
               .backgroundColor('rgba(255,255,255,0.08)')
               .borderRadius(10)
               .onClick(() => { if (!this.isNonCatalogAudio()) { this.openQualitySheet() } })
-              Text(this.formatTime(this.playerStore.duration)).fontSize(10).fontColor('#92929a')
+              Text(this.formatTime(this.playerStore.duration)).fontSize(10).fontColor(this.psDim())
             }
             .width('100%')
             .justifyContent(FlexAlign.SpaceBetween)
@@ -1969,26 +2153,26 @@ export struct Play {
             Column({ space: 4 }) {
               SymbolGlyph(this.modeSymbol())
                 .fontSize(24)
-                .fontColor(['#dedee2'])
-              Text(this.playerStore.modeTitle()).fontSize(8).fontColor('#77777f')
+                .fontColor([this.psIcon()])
+              Text(this.playerStore.modeTitle()).fontSize(8).fontColor(this.psFaint())
             }
             .width(60)
             .onClick(() => playerController.cycleMode())
 
             SymbolGlyph($r('sys.symbol.backward_fill'))
               .fontSize(31)
-              .fontColor(['#ffffff'])
+              .fontColor([this.psIcon()])
               .opacity(this.switchingSong ? 0.45 : 1)
               .onClick(() => this.switchSong(-1))
 
             Stack() {
               if (this.playerStore.isLoading) {
-                LoadingProgress().width(58).height(58).color('#ffffff')
+                LoadingProgress().width(58).height(58).color(this.psIcon())
               } else {
                 SymbolGlyph(this.playerStore.isPlaying ? $r('sys.symbol.pause_circle_fill') :
                   $r('sys.symbol.play_circle_fill'))
                   .fontSize(64)
-                  .fontColor(['#ffffff'])
+                  .fontColor([this.psIcon()])
               }
             }
             .width(72)
@@ -1997,15 +2181,15 @@ export struct Play {
 
             SymbolGlyph($r('sys.symbol.forward_end_fill'))
               .fontSize(31)
-              .fontColor(['#ffffff'])
+              .fontColor([this.psIcon()])
               .opacity(this.switchingSong ? 0.45 : 1)
               .onClick(() => this.switchSong(1))
 
             Column({ space: 4 }) {
               SymbolGlyph($r('sys.symbol.list_bullet'))
                 .fontSize(24)
-                .fontColor(['#dedee2'])
-              Text(`${this.playerStore.queue.length} 首`).fontSize(8).fontColor('#77777f')
+                .fontColor([this.psIcon()])
+              Text(`${this.playerStore.queue.length} 首`).fontSize(8).fontColor(this.psFaint())
             }
             .width(60)
             .onClick(() => this.activeSheet = 'queue')
@@ -2029,13 +2213,13 @@ export struct Play {
             }
             }
             .width('100%')
-            .constraintSize({ minHeight: 60 })
-            .padding({ left: 16, right: 16, bottom: 18 })
+            .constraintSize({ minHeight: 50 })
+            .padding({ left: 16, right: 16, bottom: 10 })
 
             if (this.playerStore.errorMessage) {
               Text(this.playerStore.errorMessage)
                 .fontSize(10)
-                .fontColor('#ef4058')
+                .fontColor(TC.accentSoft())
                 .maxLines(2)
                 .textAlign(TextAlign.Center)
                 .padding({ left: 20, right: 20, bottom: 8 })
@@ -2064,12 +2248,15 @@ export struct Play {
         if (this.coverPreviewVisible) {
           this.CoverPreview()
         }
+
+        HeartBurst({ trigger: this.heartTrigger })
+          .position({ x: '68%', y: '40%' })
         }
         .width('100%')
         .height('100%')
-        .backgroundColor('#121215')
-        .bindSheet(this.commentsVisible, this.CommentsSheet(), {
-          height: '72%', backgroundColor: '#19191f', showClose: false, dragBar: true,
+        .backgroundColor(TC.pageBackground())
+        .bindSheet(this.commentsVisible, this.skin_CommentsSheet(), {
+          height: '72%', backgroundColor: TC.sheetBackground(), showClose: false, dragBar: true,
           onDisappear: () => this.commentsVisible = false
         })
     }
@@ -2082,6 +2269,8 @@ interface LyricLine {
   duration?: number
   text: string
   translation: string
+  /** 罗马音（romalrc），没有则为空串。 */
+  roma: string
   words?: LyricWord[]
 }
 

@@ -1,10 +1,10 @@
 import { LyricPreferences } from '../models/lyricPreferences'
 import { common } from '@kit.AbilityKit'
+import { deviceInfo } from '@kit.BasicServicesKit'
 import { preferences } from '@kit.ArkData'
 import { fileIo } from '@kit.CoreFileKit'
 import { formBindingData, formProvider } from '@kit.FormKit'
 import { ApiClient } from './ApiClient'
-import { DeviceService } from './DeviceService'
 import { AuthStore } from '../stores/AuthStore'
 import { PlayerStore } from '../stores/PlayerStore'
 import { PlayMode, songItemType } from '../models/music'
@@ -76,8 +76,31 @@ export class AppSettings {
    */
   static streamingPlaybackEnabled: boolean = true
 
-  // 本机上报到设备中心的别名
-  static deviceAlias: string = 'HarmonyOS 音乐播放器'
+  // 本机上报到设备中心的别名。默认取设备对外传播名（deviceInfo.marketName，
+  // 例如「HUAWEI Mate 60 Pro」），不再使用应用名。
+  static deviceAlias: string = ''
+
+  private static readonly LEGACY_DEVICE_ALIAS: string = 'HarmonyOS 音乐播放器'
+
+  /** 本机的默认设备名：marketName（对外传播名）> productModel > brand。 */
+  static localDeviceName(): string {
+    const candidates: string[] = [deviceInfo.marketName, deviceInfo.productModel, deviceInfo.brand]
+    for (const value of candidates) {
+      if (typeof value === 'string' && value.trim().length > 0) {
+        return value.trim()
+      }
+    }
+    return 'HarmonyOS 设备'
+  }
+
+  /** 归一化设备别名：空值或旧版默认名一律回落到本机型号名。 */
+  static resolveDeviceAlias(value: preferences.ValueType): string {
+    const text: string = typeof value === 'string' ? value.trim() : ''
+    if (text.length === 0 || text === AppSettings.LEGACY_DEVICE_ALIAS) {
+      return AppSettings.localDeviceName()
+    }
+    return text
+  }
 
   /**
    * Guards the media session gate against the `true` default above: until the
@@ -86,7 +109,7 @@ export class AppSettings {
    */
   static settingsLoaded: boolean = false
 
-  static aiBaseUrl: string = 'https://neteaseapi.gksm.store'
+  static aiBaseUrl: string = 'https://api.enzymeym.top'
   static aiApiKey: string = ''
   static aiModel: string = 'gpt-3.5-turbo'
   static defaultPlayMode: PlayMode = PlayMode.LOOP
@@ -109,7 +132,8 @@ export class AppSettings {
     AppSettings.backgroundPlaybackEnabled = typeof backgroundValue === 'boolean' ? backgroundValue : true
     AppSettings.streamingPlaybackEnabled = await store.get(AppSettings.STREAMING_PLAYBACK_KEY, true) === true
     AppSettings.settingsLoaded = true
-    AppSettings.deviceAlias = (await store.get(AppSettings.DEVICE_ALIAS_KEY, AppSettings.deviceAlias)) as string || AppSettings.deviceAlias
+    AppSettings.deviceAlias = AppSettings.resolveDeviceAlias(await store.get(AppSettings.DEVICE_ALIAS_KEY,
+      AppSettings.LEGACY_DEVICE_ALIAS))
     // 上报本机设备别名到设备中心（该接口无需登录）
     AppSettings.reportDeviceName().catch(() => {})
     const urlValue = await store.get(AppSettings.API_BASE_URL_KEY, ApiClient.baseUrl)
@@ -133,7 +157,7 @@ export class AppSettings {
   }
 
   static async saveDeviceAlias(context: common.Context, name: string): Promise<void> {
-    const alias = (name || '').trim() || AppSettings.deviceAlias
+    const alias = AppSettings.resolveDeviceAlias(name)
     const store = await preferences.getPreferences(context, AppSettings.STORE_NAME)
     await store.put(AppSettings.DEVICE_ALIAS_KEY, alias)
     await store.flush()
@@ -142,8 +166,11 @@ export class AppSettings {
   }
 
   // 把本机别名上报到设备中心：/deviceinfo/center/upload?deviceName=XXXXX
+  // 直接走 ApiClient，避免与 DeviceService 形成循环依赖。
   static async reportDeviceName(): Promise<void> {
-    await DeviceService.uploadDeviceName(AppSettings.deviceAlias)
+    await ApiClient.get<Object>('/deviceinfo/center/upload', [
+      { key: 'deviceName', value: AppSettings.deviceAlias }
+    ])
   }
 
   static async loadAuth(authStore: AuthStore): Promise<void> {

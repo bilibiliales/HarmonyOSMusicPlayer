@@ -1,10 +1,12 @@
 import { EventPicture } from '../models/api'
 import { EventPresentation } from '../services/EventPresentation'
+import { TC } from '../services/ThemeColors'
 
 let nextEventImageId: number = 0
 
 @Component
 export struct EventImages {
+  @StorageProp('skinVersion') skinVersionObs: number = 0
   @Consume('topAvoidHeight') topAvoidHeight: number
   @Prop pictures: EventPicture[] = []
   @State loadedRatio: number = 1
@@ -80,8 +82,8 @@ export struct EventImages {
       }.width('100%').height('100%').index(this.previewIndex).indicator(false).loop(false)
         .onChange((index: number) => this.previewIndex = index)
       Row({ space: 16 }) {
-        Text((this.previewIndex + 1) + ' / ' + this.pictures.length).fontSize(14).fontColor('#ffffff')
-        SymbolGlyph($r('sys.symbol.xmark_circle_fill')).fontSize(28).fontColor(['#ffffff'])
+        Text((this.previewIndex + 1) + ' / ' + this.pictures.length).fontSize(14).fontColor(TC.textOnMedia())
+        SymbolGlyph($r('sys.symbol.xmark_circle_fill')).fontSize(28).fontColor([TC.textOnMedia()])
           .onClick(() => this.closePreview())
       }.padding({ top: this.topAvoidHeight + 12, right: 18 })
         .opacity(this.previewVisible ? 1 : 0)

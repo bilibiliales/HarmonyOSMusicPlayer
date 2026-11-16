@@ -1,4 +1,5 @@
 import { ApiClient } from './ApiClient'
+import { SongUrlService } from './SongUrlService'
 import { ApiParam, DjDetailResponse, DjRadioItem, SongUrlResponse, mapApiSong } from '../models/api'
 import { ProgramItem } from '../models/home'
 import { songItemType } from '../models/music'
@@ -96,7 +97,18 @@ export class RadioService {
   }
 
   static async audio(trackId: string): Promise<SongAudioResource> {
-    // Programme IDs and audio track IDs differ. Old mp3Url values are no longer valid.
+    // 节目音频同样走下载链接接口（standard 档），拿到真实地址与 size；
+    // 拿不到时回退到旧的 /song/url（部分节目只有旧接口返回地址）。
+    try {
+      const resolved = await SongUrlService.resolve(trackId, 'standard')
+      if (resolved) {
+        return { url: resolved.url, requestedLevel: '', selectedLevel: 'standard',
+          actualLevel: resolved.level || 'standard', size: resolved.size || 0, type: resolved.type || '',
+          encodeType: resolved.encodeType || '', trial: !!resolved.freeTrialInfo }
+      }
+    } catch (_error) {
+      // 继续走下面的旧接口兜底
+    }
     const result = await ApiClient.get<SongUrlResponse>('/song/url', [
       { key: 'id', value: trackId }, { key: 'br', value: '320000' }
     ])

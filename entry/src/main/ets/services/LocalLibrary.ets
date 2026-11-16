@@ -21,6 +21,8 @@ export interface LocalTrack {
   artists?: SongArtist[]
   duration?: number
   cover?: string
+  /** 线上封面原始地址（沙箱封面文件解码失败或缺失时的兜底）。 */
+  coverUrl?: string
   lrc?: string
   yrc?: string
   translation?: string
@@ -78,9 +80,11 @@ export class LocalLibrary {
   static cached(): LocalTrack[] { return LocalLibrary.index.tracks.slice() }
 
   static song(track: LocalTrack): songItemType {
+    const remote = (track.coverUrl || '').length > 0 ? track.coverUrl :
+      (/^https?:\/\//.test(track.cover || '') ? track.cover : '')
     return { id: track.songId || 'local:' + track.uri, name: track.name, author: track.artist || '本地音乐',
-      img: track.cover || '', url: '', duration: track.duration, localLrc: track.lrc, localYrc: track.yrc,
-      localTranslation: track.translation, localUri: track.uri, localManaged: track.managed,
+      img: track.cover || remote || '', remoteImg: remote, url: '', duration: track.duration, localLrc: track.lrc,
+      localYrc: track.yrc, localTranslation: track.translation, localUri: track.uri, localManaged: track.managed,
       localFormat: track.format, album: track.album || '本地音乐', albumId: track.albumId, artists: track.artists }
   }
 
@@ -191,6 +195,8 @@ export class LocalLibrary {
   }
 
   private static async cacheMetadata(track: LocalTrack, song: songItemType, persist: boolean = true): Promise<void> {
+    // 保留线上封面地址：播控（锁屏 / 灵动岛）需要一份系统可读取的封面。
+    if (/^https?:\/\//.test(song.img || '')) { track.coverUrl = song.img }
     await Promise.all([
       SongMetadataCache.lyrics(song).then((lyrics) => {
         track.lrc = SongMetadataCache.lrc(lyrics)

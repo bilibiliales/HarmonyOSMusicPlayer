@@ -15,6 +15,7 @@
  * resolved, loaded or called.
  */
 import { common } from '@kit.AbilityKit'
+import { image } from '@kit.ImageKit'
 
 /** Playback states sent to the system media session (decoupled from AVSession enums). */
 export class SessionPlaybackState {
@@ -39,7 +40,11 @@ export interface SessionMetadata {
   artist: string
   album: string
   duration: number
-  mediaImage: string
+  /**
+   * 网络封面传 https url；本地封面传 PixelMap——播控进程读不到应用沙箱，
+   * 传沙箱 uri 只会得到空封面。
+   */
+  mediaImage: string | image.PixelMap | undefined
   lyric: string
   previousAssetId?: string
   nextAssetId?: string

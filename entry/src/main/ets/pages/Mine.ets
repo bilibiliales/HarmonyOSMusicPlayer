@@ -1,4 +1,6 @@
+import { SheetSkinFrame } from '../components/SheetSkin'
 import { EventUpdates } from '../services/EventUpdates'
+import { DecorationMedia } from '../services/DecorationMedia'
 import { EventPresentation } from '../services/EventPresentation'
 import { EventCard } from '../components/EventCard'
 import { ListeningPlaylistService } from '../services/ListeningPlaylistService'
@@ -39,6 +41,9 @@ import { RelationshipPageParam } from './RelationshipList'
 import { PublishEventPageParam } from './PublishEvent'
 import { PlaylistEditorPageParam } from './PlaylistEditor'
 import { ProfileEditorPageParam } from './ProfileEditor'
+import { TC } from '../services/ThemeColors'
+import { DecoKeys } from '../services/DecorationRuntime'
+import { ImagePreviewPageParam } from './ImagePreviewPage'
 
 interface SubTabItem {
   name: string
@@ -64,6 +69,17 @@ export interface UserProfile {
 
 @Component
 export struct Mine {
+  @StorageProp('skinVersion') skinVersionObs: number = 0
+  @StorageProp(DecoKeys.HOME_BG) homeBg: string = ''
+  @StorageProp(DecoKeys.HOME_BG_BLUR) homeBgBlur: number = 0
+  @StorageProp(DecoKeys.HOME_BG_OPACITY) homeBgOpacity: number = 100
+  @StorageProp(DecoKeys.HOME_BG_FADE) homeBgFade: number = 100
+  @StorageProp(DecoKeys.AVATAR_FRAME) avatarFrame: string = ''
+  @StorageProp(DecoKeys.VIP_BADGES) vipBadges: string = ''
+  @StorageProp(DecoKeys.SVIP_BADGES) svipBadges: string = ''
+  @State homeBgVersion: number = 0
+  /** 由宿主（Index）注入：点击右上角菜单图标时展开侧边栏。 */
+  onMenuClick: () => void = () => {}
   @Consume('pageStack') pageStack: NavPathStack
   @Consume('topAvoidHeight') topAvoidHeight: number
   @Consume('authStore') @Watch('onAuthStoreChanged') authStore: AuthStore
@@ -155,6 +171,20 @@ export struct Mine {
     }
     this.loadUserData()
     this.loadVipInfo()
+  }
+
+  private vipBadgeSrc(): string {
+    if (this.vipLevel <= 0) { return '' }
+    const index = this.vipLevel - 1
+    if (index < 0) { return '' }
+    // SVIP 优先用 SVIP 贴图，未配置时回退同等级的 VIP 贴图
+    if (this.vipSvip) {
+      const svip = this.svipBadges ? this.svipBadges.split('\n') : []
+      if (index < svip.length && svip[index]) { return svip[index] }
+    }
+    if (!this.vipBadges) { return '' }
+    const parts = this.vipBadges.split('\n')
+    return index < parts.length ? parts[index] : ''
   }
 
   private getVipText(vipLevel: number): string {
@@ -738,6 +768,15 @@ export struct Mine {
     await Promise.all(requests)
   }
 
+  private openAvatarPreview(): void {
+    const url = this.userProfile.avatar || ''
+    if (!url) {
+      return
+    }
+    const param: ImagePreviewPageParam = { url: url, name: this.userProfile.nickName || '头像' }
+    this.pageStack.pushPathByName('ImagePreviewPage', param)
+  }
+
   build() {
     Stack({ alignContent: Alignment.BottomEnd }) {
       Column() {
@@ -772,16 +811,16 @@ export struct Mine {
 
       if (this.currentTab === 'moment' && this.authStore.loggedIn) {
         Stack() {
-          SymbolGlyph($r('sys.symbol.plus_circle_fill')).fontSize(31).fontColor(['#ffffff'])
+          SymbolGlyph($r('sys.symbol.plus_circle_fill')).fontSize(31).fontColor([TC.textOnAccent()])
         }
-        .width(58).height(58).borderRadius(29).backgroundColor('#ef233c')
+        .width(58).height(58).borderRadius(29).backgroundColor(TC.accent())
         .shadow({ radius: 18, color: 'rgba(239,35,60,0.38)', offsetY: 7 })
         .margin({ right: 20, bottom: 84 }).onClick(() => this.openPublishEvent())
       }
     }
     .width('100%')
     .height('100%')
-    .backgroundColor('#121215')
+    .backgroundColor(TC.pageBackground())
     .onAppear(() => {
       // TabContent can stay mounted while another page is on top of it.  Run
       // the same synchronization on appear for the initial state, while the
@@ -791,9 +830,9 @@ export struct Mine {
         this.loadRecentData()
       }
     })
-    .bindSheet(this.importSheetVisible, this.ImportSheetContent(), {
+    .bindSheet(this.importSheetVisible, this.skin_ImportSheetContent(), {
       height: '70%',
-      backgroundColor: '#19191f',
+      backgroundColor: TC.sheetBackground(),
       showClose: false,
       dragBar: true,
       onDisappear: () => this.importSheetVisible = false
@@ -803,7 +842,15 @@ export struct Mine {
   @Builder
   HeaderSection() {
     Stack({ alignContent: Alignment.BottomStart }) {
-      if (this.userProfile.avatar) {
+      if (this.homeBg) {
+        Image(this.homeBg)
+          .width('100%')
+          .height('100%')
+          .objectFit(ImageFit.Cover)
+          .scale({ x: 1.06, y: 1.06 })
+          .blur(this.homeBgBlur)
+          .opacity(Math.max(0, Math.min(100, this.homeBgOpacity)) / 100)
+      } else if (this.userProfile.avatar) {
         Image(this.userProfile.avatar)
           .width('100%')
           .height('100%')
@@ -814,54 +861,78 @@ export struct Mine {
         Column()
           .width('100%')
           .height('100%')
-          .backgroundColor('#1a1a2e')
+          .backgroundColor(TC.surfaceCardAlt())
       }
       Column()
         .width('100%')
         .height('100%')
-        .linearGradient({ angle: 180, colors: [['rgba(15,15,20,0.22)', 0], ['#121215', 1]] })
+        .linearGradient({ angle: 180, colors: [[TC.headerScrimTop(), 0], [TC.pageBackground(), 1]] })
+        // 装扮头图的「向下渐隐」：只影响这张蒙版，文字仍由主题/皮肤保证对比度
+        .opacity(this.homeBg ? Math.max(0, Math.min(100, this.homeBgFade)) / 100 : 1)
 
       Column({ space: 8 }) {
-        if (this.userProfile.avatar) {
-          Image(this.userProfile.avatar)
+        Stack() {
+          if (this.userProfile.avatar) {
+            Image(this.userProfile.avatar)
+              .width(72)
+              .height(72)
+              .borderRadius(36)
+              .objectFit(ImageFit.Cover)
+              .border({ width: 2, color: '#ffffff' })
+              .onClick(() => this.openAvatarPreview())
+          } else {
+            Stack() {
+              SymbolGlyph($r('sys.symbol.person_crop_circle_fill'))
+                .fontSize(52)
+                .fontColor([TC.textSecondary()])
+            }
             .width(72)
             .height(72)
             .borderRadius(36)
-            .objectFit(ImageFit.Cover)
+            .backgroundColor(TC.surfaceRaised())
             .border({ width: 2, color: '#ffffff' })
-        } else {
-          Stack() {
-            SymbolGlyph($r('sys.symbol.person_crop_circle_fill'))
-              .fontSize(52)
-              .fontColor(['#cccccc'])
           }
-          .width(72)
-          .height(72)
-          .borderRadius(36)
-          .backgroundColor('#2a2a3e')
-          .border({ width: 2, color: '#ffffff' })
+          if (this.avatarFrame) {
+            Image(this.avatarFrame)
+              .width(104)
+              .height(104)
+              .objectFit(ImageFit.Contain)
+              .hitTestBehavior(HitTestMode.None)
+          }
         }
+        .width(104)
+        .height(104)
+        .alignContent(Alignment.Center)
 
         Row({ space: 6 }) {
           Text(this.userProfile.nickName)
-            .fontColor(Color.White)
+            .fontColor(TC.textPrimary())
             .fontSize(20)
             .fontWeight(FontWeight.Bold)
 
           if (this.vipActive) {
             Row({ space: 3 }) {
-              Image(this.vipSvip ? $r('app.media.ic_svip') : $r('app.media.ic_vip'))
-                .width(this.vipSvip ? 40 : 34)
-                .height(18)
-                .objectFit(ImageFit.Contain)
+              if (this.vipBadgeSrc()) {
+                // 自定义贴图里自带等级文字，不再渲染「壹贰叁…」，也不套等级胶囊底色
+                Image(DecorationMedia.displayUri(this.vipBadgeSrc()))
+                  .width(60)
+                  .height(20)
+                  .objectFit(ImageFit.Contain)
+              } else {
+                Image(this.vipSvip ? $r('app.media.ic_svip') : $r('app.media.ic_vip'))
+                  .width(this.vipSvip ? 40 : 34)
+                  .height(18)
+                  .objectFit(ImageFit.Contain)
 
-              Text(`${this.getVipText(this.vipLevel)}`)
-                .fontSize(10)
-                .fontWeight(FontWeight.Regular)
-                .fontColor(this.vipSvip ? '#fff8e1b9' : '#ffe8d1cc')
+                Text(`${this.getVipText(this.vipLevel)}`)
+                  .fontSize(10)
+                  .fontWeight(FontWeight.Regular)
+                  .fontColor(this.vipSvip ? '#fff8e1b9' : '#ffe8d1cc')
+              }
             }
-            .padding({ left: 0, right: 6, top: 0, bottom: 0 })
-            .backgroundColor(this.vipSvip ? '#ff2d2516' : '#ff372c2c')
+            .padding({ left: 0, right: this.vipBadgeSrc() ? 0 : 6, top: 0, bottom: 0 })
+            .backgroundColor(this.vipBadgeSrc() ? 'rgba(0,0,0,0)' :
+              (this.vipSvip ? '#ff2d2516' : '#ff372c2c'))
             .borderRadius(16)
           }
         }
@@ -869,7 +940,7 @@ export struct Mine {
         if (this.userProfile.rawSignature) {
           Text(this.userProfile.signature)
             .fontSize(13)
-            .fontColor('#cccccc')
+            .fontColor(TC.textSecondary())
             .maxLines(2)
             .textOverflow({ overflow: TextOverflow.Ellipsis })
             .textAlign(TextAlign.Center)
@@ -885,11 +956,11 @@ export struct Mine {
             }
             if (this.userProfile.birthday > 0) {
               Text(this.formatBirthday(this.userProfile.birthday))
-                .fontSize(11).fontColor('#999999')
+                .fontSize(11).fontColor(TC.textBody())
             }
             if (this.userProfile.province > 0) {
               Text(this.formatLocation(this.userProfile.province, Number(this.userProfile.city) || 0))
-                .fontSize(11).fontColor('#999999')
+                .fontSize(11).fontColor(TC.textBody())
             }
           }
           .margin({ top: 4 })
@@ -901,11 +972,19 @@ export struct Mine {
 
       if (this.authStore.loggedIn) {
         Stack() {
-          SymbolGlyph($r('sys.symbol.square_and_pencil')).fontSize(19).fontColor(['#ffffff'])
+          SymbolGlyph($r('sys.symbol.square_and_pencil')).fontSize(19).fontColor([TC.textOnMedia()])
         }
-        .width(40).height(40).borderRadius(14).backgroundColor('rgba(20,20,25,0.55)')
+        .width(36).height(36).borderRadius(18).backgroundColor('rgba(0,0,0,0.35)')
         .position({ right: 18, top: this.topAvoidHeight + 28 }).onClick(() => this.openProfileEditor())
       }
+
+      // 左上角菜单：展开侧边栏（常白图标 + 半透明圆底，浅色模式同样清晰）
+      Stack() {
+        SymbolGlyph($r('sys.symbol.line_3_horizontal')).fontSize(19).fontColor([TC.textOnMedia()])
+      }
+      .width(36).height(36).borderRadius(18).backgroundColor('rgba(0,0,0,0.35)')
+      .position({ left: 18, top: this.topAvoidHeight + 28 })
+      .onClick(() => this.onMenuClick())
     }
     .width('100%')
     .height(this.topAvoidHeight + 220)
@@ -924,55 +1003,55 @@ export struct Mine {
       Row({ space: 4 }) {
         Text(`${this.userProfile.followCount}`)
           .fontSize(16)
-          .fontColor('#ffffff')
+          .fontColor(TC.textPrimary())
           .fontWeight(FontWeight.Bold)
         Text('关注')
           .fontSize(12)
-          .fontColor('#888888')
+          .fontColor(TC.textTertiary())
       }
       .onClick(() => {
         const param: RelationshipPageParam = { type: 'following', title: '关注' }
         this.openProtectedPage('FollowingPage', param)
       })
 
-      Divider().vertical(true).height(16).color('#333333').margin({ left: 16, right: 16 })
+      Divider().vertical(true).height(16).color(TC.textQuaternary()).margin({ left: 16, right: 16 })
 
       Row({ space: 4 }) {
         Text(`${this.userProfile.fanCount}`)
           .fontSize(16)
-          .fontColor('#ffffff')
+          .fontColor(TC.textPrimary())
           .fontWeight(FontWeight.Bold)
         Text('粉丝')
           .fontSize(12)
-          .fontColor('#888888')
+          .fontColor(TC.textTertiary())
       }
       .onClick(() => {
         const param: RelationshipPageParam = { type: 'followers', title: '粉丝' }
         this.openProtectedPage('FollowersPage', param)
       })
 
-      Divider().vertical(true).height(16).color('#333333').margin({ left: 16, right: 16 })
+      Divider().vertical(true).height(16).color(TC.textQuaternary()).margin({ left: 16, right: 16 })
 
       Row({ space: 4 }) {
         Text(`Lv.${this.userProfile.level}`)
           .fontSize(16)
-          .fontColor('#ffffff')
+          .fontColor(TC.textPrimary())
           .fontWeight(FontWeight.Bold)
       }
       .onClick(() => {
         this.openProtectedPage('UserLevelPage')
       })
 
-      Divider().vertical(true).height(16).color('#333333').margin({ left: 16, right: 16 })
+      Divider().vertical(true).height(16).color(TC.textQuaternary()).margin({ left: 16, right: 16 })
 
       Row({ space: 4 }) {
         Text(`${this.userProfile.listenHours}`)
           .fontSize(16)
-          .fontColor('#ffffff')
+          .fontColor(TC.textPrimary())
           .fontWeight(FontWeight.Bold)
         Text('小时')
           .fontSize(12)
-          .fontColor('#888888')
+          .fontColor(TC.textTertiary())
       }
       .onClick(() => {
         this.openProtectedPage('ListeningStatsPage')
@@ -981,7 +1060,6 @@ export struct Mine {
     .width('100%')
     .height(48)
     .justifyContent(FlexAlign.Center)
-    .backgroundColor('rgba(18,18,21,0.65)')
   }
 
   @Builder
@@ -992,7 +1070,7 @@ export struct Mine {
           Column() {
             Text(item.title)
               .fontSize(18)
-              .fontColor(this.currentTab === item.name ? '#ffffff' : '#666666')
+              .fontColor(this.currentTab === item.name ? TC.textPrimary() : TC.textTertiary())
               .fontWeight(this.currentTab === item.name ? FontWeight.Medium : FontWeight.Regular)
               .transition({ type: TransitionType.All })
               .padding({ top: 4, bottom: 4 })
@@ -1000,7 +1078,7 @@ export struct Mine {
             Column()
               .width(20)
               .height(2)
-              .backgroundColor(this.currentTab === item.name ? '#c0392b' : Color.Transparent)
+              .backgroundColor(this.currentTab === item.name ? TC.accent() : Color.Transparent)
               .borderRadius(1)
               .margin({ top: 4 })
               .animation({ duration: 250, curve: Curve.EaseInOut })
@@ -1034,36 +1112,35 @@ export struct Mine {
         Row({ space: 12 }) {
           SymbolGlyph($r('sys.symbol.person_crop_circle_fill'))
             .fontSize(26)
-            .fontColor(['#ff6577'])
+            .fontColor([TC.accentSoft()])
           Column({ space: 4 }) {
             Text('登录后查看近期内容')
               .fontSize(14)
               .fontWeight(FontWeight.Medium)
-              .fontColor('#ffffff')
+              .fontColor(TC.textPrimary())
             Text('登录后同步你的听歌记录与歌单')
               .fontSize(11)
-              .fontColor('#77777f')
+              .fontColor(TC.textTertiary())
           }
           .layoutWeight(1)
           .alignItems(HorizontalAlign.Start)
           Button('去登录')
             .fontSize(12)
-            .fontColor('#ffffff')
-            .backgroundColor('#ef233c')
-            .borderRadius(16)
+            .backgroundColor(TC.accent())
+            .borderRadius(20)
             .onClick(() => this.pageStack.pushPathByName('LoginPage', null))
         }
         .width('100%')
         .padding(14)
         .margin({ left: 14, right: 14, top: 10, bottom: 6 })
-        .backgroundColor('#1d1d23')
+        .backgroundColor(TC.surfaceCardAlt())
         .borderRadius(16)
       } else {
         this.RecentPlaylistsSection()
         this.RecentAlbumsSection()
         Text('已通过分页参数查询全部可见收藏内容，该列表仅自己可见')
           .fontSize(11)
-          .fontColor('#666666')
+          .fontColor(TC.textQuaternary())
           .width('100%')
           .textAlign(TextAlign.Center)
           .margin({ top: 16, bottom: 64 })
@@ -1080,8 +1157,8 @@ export struct Mine {
       Column().width('100%').height('100%').backgroundColor('rgba(0,0,0,0.35)')
       SymbolGlyph(kind === 'recent' ? $r('sys.symbol.clock') :
         kind === 'record' ? $r('sys.symbol.sort') : $r('sys.symbol.heart_fill'))
-        .fontSize(26).fontColor(['#ffffff'])
-    }.width('100%').height('100%').backgroundColor('#2a2a2a').borderRadius(8).clip(true)
+        .fontSize(26).fontColor([TC.textPrimary()])
+    }.width('100%').height('100%').backgroundColor(TC.surfaceRaised()).borderRadius(8).clip(true)
   }
 
   @Builder
@@ -1095,11 +1172,11 @@ export struct Mine {
         Column({ space: 4 }) {
           Text('我喜欢的音乐')
             .fontSize(14)
-            .fontColor('#ededf0')
+            .fontColor(TC.textBody())
             .fontWeight(FontWeight.Medium)
           Text(`${this.likedSongIds.length}首`)
             .fontSize(11)
-            .fontColor('#77777f')
+            .fontColor(TC.textTertiary())
         }
         .layoutWeight(1)
         .alignItems(HorizontalAlign.Start)
@@ -1107,7 +1184,7 @@ export struct Mine {
 
         SymbolGlyph($r('sys.symbol.play_fill'))
           .fontSize(22)
-          .fontColor(['#ffffff'])
+          .fontColor([TC.textPrimary()])
           .onClick(() => {
             if (this.likedSongs.length > 0) {
               const likedPlaylist: playlistType = {
@@ -1141,12 +1218,12 @@ export struct Mine {
       Row() {
         Text('创建的歌单')
           .fontSize(14)
-          .fontColor('#ffffff')
+          .fontColor(TC.textPrimary())
           .fontWeight(FontWeight.Medium)
           .layoutWeight(1)
         Text(`${this.createdPlaylists.length}`)
           .fontSize(12)
-          .fontColor('#77777f')
+          .fontColor(TC.textTertiary())
       }
       .width('100%')
       .padding({ left: 16, right: 16, top: 12, bottom: 6 })
@@ -1163,12 +1240,12 @@ export struct Mine {
           Column({ space: 4 }) {
             Text(item.name)
               .fontSize(13)
-              .fontColor('#ededf0')
+              .fontColor(TC.textBody())
               .maxLines(1)
               .textOverflow({ overflow: TextOverflow.Ellipsis })
             Text(`${item.count}首`)
               .fontSize(11)
-              .fontColor('#77777f')
+              .fontColor(TC.textTertiary())
           }
           .layoutWeight(1)
           .alignItems(HorizontalAlign.Start)
@@ -1182,12 +1259,12 @@ export struct Mine {
       Row() {
         Text('收藏的歌单')
           .fontSize(14)
-          .fontColor('#ffffff')
+          .fontColor(TC.textPrimary())
           .fontWeight(FontWeight.Medium)
           .layoutWeight(1)
         Text(`${this.collectedPlaylists.length > 0 ? this.collectedPlaylists.length : this.subscribedPlaylists.length}`)
           .fontSize(12)
-          .fontColor('#77777f')
+          .fontColor(TC.textTertiary())
       }
       .width('100%')
       .padding({ left: 16, right: 16, top: 12, bottom: 6 })
@@ -1202,12 +1279,12 @@ export struct Mine {
           Column({ space: 4 }) {
             Text(item.name)
               .fontSize(13)
-              .fontColor('#ededf0')
+              .fontColor(TC.textBody())
               .maxLines(1)
               .textOverflow({ overflow: TextOverflow.Ellipsis })
             Text(`${item.count}首 · ${item.creator}`)
               .fontSize(11)
-              .fontColor('#77777f')
+              .fontColor(TC.textTertiary())
           }
           .layoutWeight(1)
           .alignItems(HorizontalAlign.Start)
@@ -1227,12 +1304,12 @@ export struct Mine {
       Row() {
         Text('收藏的专辑')
           .fontSize(14)
-          .fontColor('#ffffff')
+          .fontColor(TC.textPrimary())
           .fontWeight(FontWeight.Medium)
           .layoutWeight(1)
         Text(`${this.subscribedAlbums.length}`)
           .fontSize(12)
-          .fontColor('#77777f')
+          .fontColor(TC.textTertiary())
       }
       .width('100%')
       .padding({ left: 16, right: 16, top: 12, bottom: 6 })
@@ -1240,7 +1317,7 @@ export struct Mine {
       if (this.subscribedAlbums.length === 0) {
         Text('暂无收藏专辑')
           .fontSize(12)
-          .fontColor('#77777f')
+          .fontColor(TC.textTertiary())
           .width('100%')
           .textAlign(TextAlign.Center)
           .margin({ top: 12, bottom: 12 })
@@ -1249,9 +1326,9 @@ export struct Mine {
           Row({ space: 12 }) {
             Image(item.picUrl).width(48).height(48).borderRadius(8).objectFit(ImageFit.Cover)
             Column({ space: 3 }) {
-              Text(item.name).fontSize(13).fontColor('#ededf0').maxLines(1)
+              Text(item.name).fontSize(13).fontColor(TC.textBody()).maxLines(1)
               Text(item.artists.map((artist) => artist.name).join(' / '))
-                .fontSize(11).fontColor('#77777f').maxLines(1)
+                .fontSize(11).fontColor(TC.textTertiary()).maxLines(1)
             }
             .layoutWeight(1).alignItems(HorizontalAlign.Start)
           }
@@ -1270,26 +1347,25 @@ export struct Mine {
         Row({ space: 12 }) {
           SymbolGlyph($r('sys.symbol.person_crop_circle_fill'))
             .fontSize(26)
-            .fontColor(['#ff6577'])
+            .fontColor([TC.accentSoft()])
           Column({ space: 4 }) {
             Text('登录后查看真实歌单')
               .fontSize(14)
               .fontWeight(FontWeight.Medium)
-              .fontColor('#ffffff')
+              .fontColor(TC.textPrimary())
           }
           .layoutWeight(1)
           .alignItems(HorizontalAlign.Start)
           Button('去登录')
             .fontSize(12)
-            .fontColor('#ffffff')
-            .backgroundColor('#ef233c')
-            .borderRadius(16)
+            .backgroundColor(TC.accent())
+            .borderRadius(20)
             .onClick(() => this.pageStack.pushPathByName('LoginPage', null))
         }
         .width('100%')
         .padding(14)
         .margin({ left: 14, right: 14, top: 10, bottom: 6 })
-        .backgroundColor('#1d1d23')
+        .backgroundColor(TC.surfaceCardAlt())
         .borderRadius(16)
       }
 
@@ -1297,11 +1373,11 @@ export struct Mine {
         Text('近期')
           .layoutWeight(1)
           .fontSize(12)
-          .fontColor(this.musicCategory === 'recent' ? '#ffffff' : '#66666e')
+          .fontColor(this.musicCategory === 'recent' ? TC.textPrimary() : TC.textTertiary())
           .fontWeight(this.musicCategory === 'recent' ? FontWeight.Bold : FontWeight.Regular)
           .textAlign(TextAlign.Center)
           .padding({ top: 5, bottom: 5 })
-          .backgroundColor(this.musicCategory === 'recent' ? '#25252c' : Color.Transparent)
+          .backgroundColor(this.musicCategory === 'recent' ? TC.surfaceRaised() : Color.Transparent)
           .borderRadius(14)
           .onClick(() => {
             this.musicCategory = 'recent'
@@ -1310,31 +1386,31 @@ export struct Mine {
         Text(`创建 ${this.createdPlaylists.length}`)
           .layoutWeight(1)
           .fontSize(12)
-          .fontColor(this.musicCategory === 'created' ? '#ffffff' : '#66666e')
+          .fontColor(this.musicCategory === 'created' ? TC.textPrimary() : TC.textTertiary())
           .fontWeight(this.musicCategory === 'created' ? FontWeight.Bold : FontWeight.Regular)
           .textAlign(TextAlign.Center)
           .padding({ top: 5, bottom: 5 })
-          .backgroundColor(this.musicCategory === 'created' ? '#25252c' : Color.Transparent)
+          .backgroundColor(this.musicCategory === 'created' ? TC.surfaceRaised() : Color.Transparent)
           .borderRadius(18)
           .onClick(() => this.musicCategory = 'created')
         Text(`收藏 ${this.subscribedPlaylists.length}`)
           .layoutWeight(1)
           .fontSize(12)
-          .fontColor(this.musicCategory === 'subscribed' ? '#ffffff' : '#66666e')
+          .fontColor(this.musicCategory === 'subscribed' ? TC.textPrimary() : TC.textTertiary())
           .fontWeight(this.musicCategory === 'subscribed' ? FontWeight.Bold : FontWeight.Regular)
           .textAlign(TextAlign.Center)
           .padding({ top: 5, bottom: 5 })
-          .backgroundColor(this.musicCategory === 'subscribed' ? '#25252c' : Color.Transparent)
+          .backgroundColor(this.musicCategory === 'subscribed' ? TC.surfaceRaised() : Color.Transparent)
           .borderRadius(18)
           .onClick(() => this.musicCategory = 'subscribed')
         Text(`专辑 ${this.subscribedAlbums.length}`)
           .layoutWeight(1)
           .fontSize(12)
-          .fontColor(this.musicCategory === 'albums' ? '#ffffff' : '#66666e')
+          .fontColor(this.musicCategory === 'albums' ? TC.textPrimary() : TC.textTertiary())
           .fontWeight(this.musicCategory === 'albums' ? FontWeight.Bold : FontWeight.Regular)
           .textAlign(TextAlign.Center)
           .padding({ top: 5, bottom: 5 })
-          .backgroundColor(this.musicCategory === 'albums' ? '#25252c' : Color.Transparent)
+          .backgroundColor(this.musicCategory === 'albums' ? TC.surfaceRaised() : Color.Transparent)
           .borderRadius(18)
           .onClick(() => {
             this.musicCategory = 'albums'
@@ -1353,7 +1429,7 @@ export struct Mine {
           Text(this.musicCategory === 'created' ? '我创建的歌单' :
             this.musicCategory === 'subscribed' ? '我收藏的歌单' : '我收藏的专辑')
             .fontSize(14)
-            .fontColor('#ffffff')
+            .fontColor(TC.textPrimary())
             .fontWeight(FontWeight.Medium)
 
           Blank()
@@ -1361,7 +1437,7 @@ export struct Mine {
           if (this.musicCategory !== 'albums') {
             SymbolGlyph(this.viewMode === 'list' ? $r('sys.symbol.square_grid_2x2') : $r('sys.symbol.list_bullet'))
               .fontSize(20)
-              .fontColor(['#888888'])
+              .fontColor([TC.textTertiary()])
               .onClick(() => {
                 this.viewMode = this.viewMode === 'list' ? 'card' : 'list'
               })
@@ -1405,7 +1481,7 @@ export struct Mine {
             Row({ space: 6 }) {
               Text(item.name)
                 .fontSize(14)
-                .fontColor('#e9e9e7')
+                .fontColor(TC.textBody())
                 .maxLines(1)
                 .textOverflow({ overflow: TextOverflow.Ellipsis })
 
@@ -1418,7 +1494,7 @@ export struct Mine {
 
             Text(`${item.count}首 · ${item.creator}`)
               .fontSize(12)
-              .fontColor('#888888')
+              .fontColor(TC.textTertiary())
           }
           .layoutWeight(1)
           .alignItems(HorizontalAlign.Start)
@@ -1426,7 +1502,7 @@ export struct Mine {
 
           SymbolGlyph($r('sys.symbol.ellipsis_circle'))
             .fontSize(18)
-            .fontColor(['#666666'])
+            .fontColor([TC.textQuaternary()])
         }
         .width('100%')
         .height(72)
@@ -1456,14 +1532,14 @@ export struct Mine {
 
             Text(item.name)
               .fontSize(12)
-              .fontColor('#e9e9e7')
+              .fontColor(TC.textBody())
               .maxLines(1)
               .textOverflow({ overflow: TextOverflow.Ellipsis })
               .width('100%')
 
             Text(`${item.count}首`)
               .fontSize(11)
-              .fontColor('#888888')
+              .fontColor(TC.textTertiary())
               .width('100%')
           }
           .width('100%')
@@ -1483,16 +1559,16 @@ export struct Mine {
     Column() {
       if (this.albumsLoading) {
         Column({ space: 10 }) {
-          LoadingProgress().width(40).color('#ef233c')
-          Text('正在加载收藏专辑…').fontSize(12).fontColor('#77777f')
+          LoadingProgress().width(40).color(TC.accent())
+          Text('正在加载收藏专辑…').fontSize(12).fontColor(TC.textTertiary())
         }
         .width('100%').height(180).justifyContent(FlexAlign.Center)
       } else if (this.subscribedAlbums.length === 0) {
         Column({ space: 10 }) {
           SymbolGlyph($r('sys.symbol.music'))
-            .fontSize(40).fontColor(['#55555d'])
+            .fontSize(40).fontColor([TC.textQuaternary()])
           Text(this.authStore.loggedIn ? '暂时没有收藏专辑' : '登录后查看收藏专辑')
-            .fontSize(12).fontColor('#77777f')
+            .fontSize(12).fontColor(TC.textTertiary())
         }
         .width('100%').height(180).justifyContent(FlexAlign.Center)
       } else {
@@ -1500,13 +1576,13 @@ export struct Mine {
           Row({ space: 12 }) {
             Image(item.picUrl).width(58).height(58).borderRadius(12).objectFit(ImageFit.Cover)
             Column({ space: 5 }) {
-              Text(item.name).fontSize(14).fontColor('#ededf0').maxLines(1)
+              Text(item.name).fontSize(14).fontColor(TC.textBody()).maxLines(1)
               Text(`${item.artists.map((artist) => artist.name).join(' / ')} · ${item.size} 首`)
-                .fontSize(11).fontColor('#77777f').maxLines(1)
+                .fontSize(11).fontColor(TC.textTertiary()).maxLines(1)
                 .textOverflow({ overflow: TextOverflow.Ellipsis })
             }
             .layoutWeight(1).alignItems(HorizontalAlign.Start)
-            SymbolGlyph($r('sys.symbol.ellipsis_circle')).fontSize(18).fontColor(['#66666e'])
+            SymbolGlyph($r('sys.symbol.ellipsis_circle')).fontSize(18).fontColor([TC.textQuaternary()])
           }
           .height(72).padding({ left: 16, right: 16 })
           .onClick(() => this.navigateToAlbum(item))
@@ -1523,18 +1599,18 @@ export struct Mine {
         Stack() {
           SymbolGlyph($r('sys.symbol.plus_circle'))
             .fontSize(28)
-            .fontColor(['#ff7c7c7c'])
+            .fontColor([TC.textTertiary()])
         }
         .width(56)
         .height(56)
         .borderRadius(8)
-        .backgroundColor('#2a2a2a')
+        .backgroundColor(TC.surfaceRaised())
         .alignContent(Alignment.Center)
 
         Column() {
           Text('新建歌单')
             .fontSize(14)
-            .fontColor('#e9e9e7')
+            .fontColor(TC.textBody())
         }
         .layoutWeight(1)
         .alignItems(HorizontalAlign.Start)
@@ -1559,21 +1635,21 @@ export struct Mine {
         Stack() {
           SymbolGlyph($r('sys.symbol.arrow_up_circle'))
             .fontSize(28)
-            .fontColor(['#ff7c7c7c'])
+            .fontColor([TC.textTertiary()])
         }
         .width(56)
         .height(56)
         .borderRadius(8)
-        .backgroundColor('#2a2a2a')
+        .backgroundColor(TC.surfaceRaised())
         .alignContent(Alignment.Center)
 
         Column() {
           Text('导入外部歌单')
             .fontSize(14)
-            .fontColor('#e9e9e7')
+            .fontColor(TC.textBody())
           Text('轻松导入其他APP里的歌单')
             .fontSize(11)
-            .fontColor('#888888')
+            .fontColor(TC.textTertiary())
             .width('100%')
         }
         .layoutWeight(1)
@@ -1593,6 +1669,13 @@ export struct Mine {
   }
 
   @Builder
+  private skin_ImportSheetContent() {
+    SheetSkinFrame() {
+      this.ImportSheetContent()
+    }
+  }
+
+  @Builder
   ImportSheetContent() {
     Column() {
       Row() {
@@ -1600,16 +1683,16 @@ export struct Mine {
           Text('导入外部歌单')
             .fontSize(17)
             .fontWeight(FontWeight.Bold)
-            .fontColor('#ffffff')
+            .fontColor(TC.textPrimary())
           Text('支持文字或链接导入')
             .fontSize(10)
-            .fontColor('#77777f')
+            .fontColor(TC.textTertiary())
         }
         .layoutWeight(1)
         .alignItems(HorizontalAlign.Start)
         SymbolGlyph($r('sys.symbol.xmark_circle_fill'))
           .fontSize(24)
-          .fontColor(['#686870'])
+          .fontColor([TC.textQuaternary()])
           .onClick(() => this.importSheetVisible = false)
       }
       .height(66)
@@ -1618,19 +1701,19 @@ export struct Mine {
       Row() {
         Text('文字导入')
           .fontSize(13)
-          .fontColor(this.importMode === 'text' ? '#ffffff' : '#66666e')
+          .fontColor(this.importMode === 'text' ? TC.textPrimary() : TC.textTertiary())
           .fontWeight(this.importMode === 'text' ? FontWeight.Bold : FontWeight.Regular)
           .padding({ left: 14, right: 14, top: 8, bottom: 8 })
-          .backgroundColor(this.importMode === 'text' ? '#25252c' : Color.Transparent)
+          .backgroundColor(this.importMode === 'text' ? TC.surfaceRaised() : Color.Transparent)
           .borderRadius(14)
           .onClick(() => this.importMode = 'text')
 
         Text('链接导入')
           .fontSize(13)
-          .fontColor(this.importMode === 'link' ? '#ffffff' : '#66666e')
+          .fontColor(this.importMode === 'link' ? TC.textPrimary() : TC.textTertiary())
           .fontWeight(this.importMode === 'link' ? FontWeight.Bold : FontWeight.Regular)
           .padding({ left: 14, right: 14, top: 8, bottom: 8 })
-          .backgroundColor(this.importMode === 'link' ? '#25252c' : Color.Transparent)
+          .backgroundColor(this.importMode === 'link' ? TC.surfaceRaised() : Color.Transparent)
           .borderRadius(14)
           .onClick(() => this.importMode = 'link')
       }
@@ -1641,15 +1724,15 @@ export struct Mine {
         Column() {
           Text('每行一首歌，格式：歌名 歌手')
             .fontSize(11)
-            .fontColor('#77777f')
+            .fontColor(TC.textTertiary())
             .width('100%')
             .margin({ bottom: 8 })
           TextArea({ text: this.importText, placeholder: 'アイニーブルー ZLMS\nファンタズマ sasakure.UK' })
             .width('100%')
             .height(160)
-            .fontColor('#ffffff')
-            .placeholderColor('#55555d')
-            .backgroundColor('#1d1d23')
+            .fontColor(TC.textPrimary())
+            .placeholderColor(TC.textQuaternary())
+            .backgroundColor(TC.surfaceCardAlt())
             .borderRadius(12)
             .onChange((value: string) => {
               this.importText = value
@@ -1661,15 +1744,15 @@ export struct Mine {
         Column() {
           Text('每行一个歌单链接（支持QQ音乐、酷狗等）')
             .fontSize(11)
-            .fontColor('#77777f')
+            .fontColor(TC.textTertiary())
             .width('100%')
             .margin({ bottom: 8 })
           TextArea({ text: this.importLinkText, placeholder: 'https://i.y.qq.com/n2/m/share/details/taoge.html?id=xxx' })
             .width('100%')
             .height(160)
-            .fontColor('#ffffff')
-            .placeholderColor('#55555d')
-            .backgroundColor('#1d1d23')
+            .fontColor(TC.textPrimary())
+            .placeholderColor(TC.textQuaternary())
+            .backgroundColor(TC.surfaceCardAlt())
             .borderRadius(12)
             .onChange((value: string) => {
               this.importLinkText = value
@@ -1683,15 +1766,14 @@ export struct Mine {
         .width('90%')
         .height(44)
         .fontSize(15)
-        .fontColor('#ffffff')
-        .backgroundColor('#ef233c')
+        .backgroundColor(TC.accent())
         .borderRadius(22)
         .margin({ top: 20 })
         .enabled(!this.importLoading && (this.importText.length > 0 || this.importLinkText.length > 0))
         .onClick(() => this.startPlaylistImport())
 
       if (this.importLoading) {
-        LoadingProgress().width(28).color('#ef233c').margin({ top: 12 })
+        LoadingProgress().width(28).color(TC.accent()).margin({ top: 12 })
       }
     }
     .width('100%')
@@ -1703,19 +1785,19 @@ export struct Mine {
       if (!this.authStore.loggedIn) {
         Column({ space: 10 }) {
           SymbolGlyph($r('sys.symbol.person_crop_circle_fill'))
-            .fontSize(40).fontColor(['#55555d'])
-          Text('登录后查看订阅电台').fontSize(13).fontColor('#77777f')
-          Button('去登录').fontSize(12).fontColor('#ffffff').backgroundColor('#ef233c')
-            .borderRadius(16).onClick(() => this.pageStack.pushPathByName('LoginPage', null))
+            .fontSize(40).fontColor([TC.textQuaternary()])
+          Text('登录后查看订阅电台').fontSize(13).fontColor(TC.textTertiary())
+          Button('去登录').fontSize(12).fontColor(TC.textOnAccent()).backgroundColor(TC.accent())
+            .borderRadius(20).onClick(() => this.pageStack.pushPathByName('LoginPage', null))
         }
         .width('100%').height(200).justifyContent(FlexAlign.Center)
       } else if (this.djLoading && this.djRadios.length === 0) {
-        LoadingProgress().width(46).color('#ef233c')
+        LoadingProgress().width(46).color(TC.accent())
           .margin({ top: 60 })
       } else if (this.djRadios.length === 0) {
         Column({ space: 10 }) {
-          SymbolGlyph($r('sys.symbol.podcast')).fontSize(40).fontColor(['#55555d'])
-          Text('还没有订阅电台').fontSize(13).fontColor('#77777f')
+          SymbolGlyph($r('sys.symbol.podcast')).fontSize(40).fontColor([TC.textQuaternary()])
+          Text('还没有订阅电台').fontSize(13).fontColor(TC.textTertiary())
         }
         .width('100%').height(200).justifyContent(FlexAlign.Center)
       } else {
@@ -1723,14 +1805,14 @@ export struct Mine {
           Row({ space: 12 }) {
             Image(item.picUrl).width(56).height(56).borderRadius(12).objectFit(ImageFit.Cover)
             Column({ space: 4 }) {
-              Text(item.name).fontSize(14).fontColor('#ededf0').maxLines(1)
+              Text(item.name).fontSize(14).fontColor(TC.textBody()).maxLines(1)
                 .textOverflow({ overflow: TextOverflow.Ellipsis })
               Text(item.desc || `${item.programCount}期节目 · ${item.subCount}人订阅`)
-                .fontSize(11).fontColor('#77777f').maxLines(1)
+                .fontSize(11).fontColor(TC.textTertiary()).maxLines(1)
                 .textOverflow({ overflow: TextOverflow.Ellipsis })
             }
             .layoutWeight(1).alignItems(HorizontalAlign.Start)
-            SymbolGlyph($r('sys.symbol.ellipsis_circle')).fontSize(18).fontColor(['#66666e'])
+            SymbolGlyph($r('sys.symbol.ellipsis_circle')).fontSize(18).fontColor([TC.textQuaternary()])
           }
           .width('100%').height(72).padding({ left: 16, right: 16 }).onClick(() => {
             const param: RadioPageParam = { id: String(item.id), name: item.name, cover: item.picUrl }
@@ -1738,19 +1820,19 @@ export struct Mine {
           })
         })
         if (this.djHasMore) {
-          Text('加载更多').width('100%').height(44).fontSize(12).fontColor('#77777f')
+          Text('加载更多').width('100%').height(44).fontSize(12).fontColor(TC.textTertiary())
             .textAlign(TextAlign.Center).onClick(() => this.loadDjRadios())
         }
       }
 
       Row({ space: 12 }) {
         Stack() {
-          SymbolGlyph($r('sys.symbol.plus_circle')).fontSize(28).fontColor(['#ff7c7c7c'])
+          SymbolGlyph($r('sys.symbol.plus_circle')).fontSize(28).fontColor([TC.textTertiary()])
         }
-        .width(56).height(56).borderRadius(8).backgroundColor('#2a2a2a').alignContent(Alignment.Center)
+        .width(56).height(56).borderRadius(8).backgroundColor(TC.surfaceRaised()).alignContent(Alignment.Center)
         Column() {
-          Text('创建播客').fontSize(14).fontColor('#e9e9e7')
-          Text('在网易云音乐创建你的电台').fontSize(11).fontColor('#888888')
+          Text('创建播客').fontSize(14).fontColor(TC.textBody())
+          Text('在网易云音乐创建你的电台').fontSize(11).fontColor(TC.textTertiary())
         }
         .layoutWeight(1).alignItems(HorizontalAlign.Start).justifyContent(FlexAlign.Center)
       }
@@ -1765,19 +1847,19 @@ export struct Mine {
       if (!this.authStore.loggedIn) {
         Column({ space: 10 }) {
           SymbolGlyph($r('sys.symbol.person_crop_circle_fill'))
-            .fontSize(40).fontColor(['#55555d'])
-          Text('登录后查看笔记').fontSize(13).fontColor('#77777f')
-          Button('去登录').fontSize(12).fontColor('#ffffff').backgroundColor('#ef233c')
-            .borderRadius(16).onClick(() => this.pageStack.pushPathByName('LoginPage', null))
+            .fontSize(40).fontColor([TC.textQuaternary()])
+          Text('登录后查看笔记').fontSize(13).fontColor(TC.textTertiary())
+          Button('去登录').fontSize(12).fontColor(TC.textOnAccent()).backgroundColor(TC.accent())
+            .borderRadius(20).onClick(() => this.pageStack.pushPathByName('LoginPage', null))
         }
         .width('100%').height(200).justifyContent(FlexAlign.Center)
       } else if (this.eventsLoading && this.userEvents.length === 0) {
-        LoadingProgress().width(46).color('#ef233c')
+        LoadingProgress().width(46).color(TC.accent())
           .margin({ top: 60 })
       } else if (this.userEvents.length === 0) {
         Column({ space: 10 }) {
-          SymbolGlyph($r('sys.symbol.ellipsis_bubble')).fontSize(40).fontColor(['#55555d'])
-          Text('还没有笔记').fontSize(13).fontColor('#77777f')
+          SymbolGlyph($r('sys.symbol.ellipsis_bubble')).fontSize(40).fontColor([TC.textQuaternary()])
+          Text('还没有笔记').fontSize(13).fontColor(TC.textTertiary())
         }
         .width('100%').height(200).justifyContent(FlexAlign.Center)
       } else {
@@ -1787,11 +1869,11 @@ export struct Mine {
             .margin({ bottom: 8 })
         }, (item: UserEventItem) => item.id.toString())
         if (this.eventsHasMore) {
-          Text('加载更多').width('100%').height(44).fontSize(12).fontColor('#77777f')
+          Text('加载更多').width('100%').height(44).fontSize(12).fontColor(TC.textTertiary())
             .textAlign(TextAlign.Center).onClick(() => this.loadUserEvents())
         }
         if (this.eventMessage) {
-          Text(this.eventMessage).width('100%').fontSize(10).fontColor('#ff7587')
+          Text(this.eventMessage).width('100%').fontSize(10).fontColor(TC.accentSoft())
             .textAlign(TextAlign.Center).padding({ bottom: 8 })
         }
       }

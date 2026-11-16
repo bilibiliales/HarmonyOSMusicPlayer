@@ -3,6 +3,114 @@
     {
       "name": "start_window_background",
       "value": "#FF000000"
+    },
+    {
+      "name": "primary_light",
+      "value": "#ec5c87"
+    },
+    {
+      "name": "primary_dark",
+      "value": "#4bb0c4"
+    },
+    {
+      "name": "page_background",
+      "value": "#121215"
+    },
+    {
+      "name": "nav_background",
+      "value": "#121215"
+    },
+    {
+      "name": "surface_card",
+      "value": "#1b1b20"
+    },
+    {
+      "name": "surface_card_alt",
+      "value": "#1f1f24"
+    },
+    {
+      "name": "surface_inset",
+      "value": "#24242a"
+    },
+    {
+      "name": "surface_raised",
+      "value": "#2a2a30"
+    },
+    {
+      "name": "chip_background",
+      "value": "#29292f"
+    },
+    {
+      "name": "sheet_background",
+      "value": "#1b1b20"
+    },
+    {
+      "name": "text_primary",
+      "value": "#ffffff"
+    },
+    {
+      "name": "text_body",
+      "value": "#ededf0"
+    },
+    {
+      "name": "text_secondary",
+      "value": "#92929a"
+    },
+    {
+      "name": "text_tertiary",
+      "value": "#77777f"
+    },
+    {
+      "name": "text_quaternary",
+      "value": "#66666e"
+    },
+    {
+      "name": "text_on_accent",
+      "value": "#ffffff"
+    },
+    {
+      "name": "text_on_media",
+      "value": "#ffffff"
+    },
+    {
+      "name": "accent",
+      "value": "#ef233c"
+    },
+    {
+      "name": "accent_soft",
+      "value": "#ff6577"
+    },
+    {
+      "name": "divider",
+      "value": "#303038"
+    },
+    {
+      "name": "border_subtle",
+      "value": "#2a2a30"
+    },
+    {
+      "name": "scrim",
+      "value": "#000000"
+    },
+    {
+      "name": "text_on_media_secondary",
+      "value": "#CCFFFFFF"
+    },
+    {
+      "name": "text_on_media_tertiary",
+      "value": "#99FFFFFF"
+    },
+    {
+      "name": "header_scrim_top",
+      "value": "#38121215"
+    },
+    {
+      "name": "header_scrim_mid",
+      "value": "#B3121215"
+    },
+    {
+      "name": "accent_container",
+      "value": "#2B2024"
     }
   ]
 }

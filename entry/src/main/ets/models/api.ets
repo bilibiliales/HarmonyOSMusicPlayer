@@ -21,6 +21,8 @@ export interface ApiArtist {
   fansCount?: number
   briefDesc?: string
   followed?: boolean
+  /** 译名（相似歌手等列表里以浅色括号展示）。 */
+  transNames?: string[]
 }
 
 export interface ApiAlbum {
@@ -161,8 +163,21 @@ export interface ArtistRankInfo {
 
 export interface ArtistDetailArtist extends ApiArtist {
   transNames?: string[]
-  identifyTag?: string
+  identifyTag?: string[]
   rank?: ArtistRankInfo
+}
+
+/** 歌手绑定的官方用户头像认证信息。 */
+export interface ArtistAvatarDetail {
+  userType?: number
+  identityLevel?: number
+  identityIconUrl?: string
+}
+
+/** 歌手详情里绑定的普通用户（可拿到 uid 用于拉动态）。 */
+export interface ArtistDetailUser extends ApiUser {
+  authenticated?: boolean
+  avatarDetail?: ArtistAvatarDetail
 }
 
 export interface ArtistExpertIdentity {
@@ -176,6 +191,8 @@ export interface ArtistDetailData {
   identify?: ArtistIdentifyInfo
   artist?: ArtistDetailArtist
   secondaryExpertIdentiy?: ArtistExpertIdentity[]
+  user?: ArtistDetailUser
+  eventCount?: number
 }
 
 export interface ArtistDetailResponse {
@@ -187,6 +204,62 @@ export interface ArtistDetailResponse {
 export interface SimilarArtistResponse {
   code: number
   artists?: ApiArtist[]
+}
+
+/** /artist/follow/count：歌手粉丝数、关注数。 */
+export interface ArtistFollowCountData {
+  isFollow?: boolean
+  fansCnt?: number
+  followCnt?: number
+  followDay?: string
+  followDayCnt?: number
+  follow?: boolean
+}
+
+export interface ArtistFollowCountResponse {
+  code: number
+  message?: string
+  data?: ArtistFollowCountData
+}
+
+/** /artist/fans：歌手粉丝列表（偏移分页）。 */
+export interface ArtistFanProfile {
+  userId?: number
+  nickname?: string
+  avatarUrl?: string
+  signature?: string
+  followed?: boolean
+  mutual?: boolean
+  userType?: number
+  authStatus?: number
+  follows?: number
+  followeds?: number
+}
+
+export interface ArtistFanItem {
+  userProfile?: ArtistFanProfile
+}
+
+export interface ArtistFansResponse {
+  code: number
+  message?: string
+  data?: ArtistFanItem[]
+}
+
+/** /artist/songs：歌手全部歌曲，offset 分页，total 为总数。 */
+export interface ArtistSongsResponse {
+  code: number
+  songs?: ApiSong[]
+  more?: boolean
+  total?: number
+}
+
+/** 「全部歌曲」页入参。 */
+export interface ArtistSongsPageParam {
+  id: string
+  name: string
+  total?: number
+  cover?: string
 }
 
 export interface ApiSong {
@@ -1526,7 +1599,7 @@ export interface EventLikeResponse {
 }
 
 export interface SharePageParam {
-  type: 'song' | 'playlist' | 'album' | 'event'
+  type: 'song' | 'playlist' | 'album' | 'event' | 'artist' | 'user'
   id: string
   name: string
   img: string

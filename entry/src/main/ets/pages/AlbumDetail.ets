@@ -1,3 +1,5 @@
+import { SheetSkinFrame } from '../components/SheetSkin'
+import { SkinBackdrop } from '../components/SkinBackdrop'
 import { ResourceComments } from '../components/ResourceComments'
 import { CommentResource } from '../models/CommentResource'
 import {
@@ -16,10 +18,14 @@ import { ApiClient } from '../services/ApiClient'
 import { playerController } from '../services/PlayerController'
 import { AuthStore } from '../stores/AuthStore'
 import { ShareSheet } from '../components/ShareSheet'
+import { DetailTopBar } from '../components/DetailTopBar'
+import { NoMoreFooter } from '../components/NoMoreFooter'
 import { PlaylistCoverPreviewPageParam } from './PlaylistCoverPreview'
+import { TC } from '../services/ThemeColors'
 
 @Component
 export struct AlbumDetail {
+  @StorageProp('skinVersion') skinVersionObs: number = 0
   @Consume('pageStack') pageStack: NavPathStack
   @Consume('topAvoidHeight') topAvoidHeight: number
   @Consume('authStore') authStore: AuthStore
@@ -43,6 +49,10 @@ export struct AlbumDetail {
   @State descExpanded: boolean = false
   @State commentSheetVisible: boolean = false
   @State shareSheetVisible: boolean = false
+  @State scrollOffset: number = 0
+  /** 操作行是否已冻结在顶栏下沿（只在跨阈值时翻转，避免逐帧驱动布局）。 */
+  @State private frozen: boolean = false
+  private scroller: Scroller = new Scroller()
   private shareParam: SharePageParam = { type: 'album', id: '', name: '', img: '' }
 
   aboutToAppear(): void {
@@ -59,6 +69,13 @@ export struct AlbumDetail {
 
   private commentResource(): CommentResource {
     return { id: this.pageParam.id, type: 3, title: this.albumName }
+  }
+
+  @Builder
+  private skin_CommentsSheetBuilder() {
+    SheetSkinFrame() {
+      this.CommentsSheetBuilder()
+    }
   }
 
   @Builder
@@ -167,15 +184,15 @@ export struct AlbumDetail {
     Row({ space: 4 }) {
       if (this.albumArtists.length > 0) {
         ForEach(this.albumArtists, (artist: ApiArtist, index: number) => {
-          Text(artist.name).fontSize(12).fontColor('#d0d0d6').maxLines(1)
+          Text(artist.name).fontSize(12).fontColor(TC.textBody()).maxLines(1)
             .onClick(() => this.openArtist((artist.id || 0).toString(), artist.name,
               artist.picUrl || artist.img1v1Url || ''))
           if (index < this.albumArtists.length - 1) {
-            Text('/').fontSize(12).fontColor('#77777f')
+            Text('/').fontSize(12).fontColor(TC.textTertiary())
           }
         })
       } else {
-        Text(this.albumArtist).fontSize(12).fontColor('#b0b0b8').maxLines(1)
+        Text(this.albumArtist).fontSize(12).fontColor(TC.textBody()).maxLines(1)
       }
     }
     .width('100%')
@@ -186,14 +203,14 @@ export struct AlbumDetail {
     Row({ space: 4 }) {
       if (item.artists && item.artists.length > 0) {
         ForEach(item.artists, (artist: SongArtist, index: number) => {
-          Text(artist.name).fontSize(11).fontColor('#8d8d96').maxLines(1)
+          Text(artist.name).fontSize(11).fontColor(TC.textSecondary()).maxLines(1)
             .onClick(() => this.openArtist(artist.id, artist.name, artist.picUrl || ''))
           if (index < item.artists!.length - 1) {
-            Text('/').fontSize(11).fontColor('#5f5f67')
+            Text('/').fontSize(11).fontColor(TC.textQuaternary())
           }
         })
       } else {
-        Text(item.author).fontSize(11).fontColor('#77777f').maxLines(1)
+        Text(item.author).fontSize(11).fontColor(TC.textTertiary()).maxLines(1)
       }
     }
     .width('100%')
@@ -222,26 +239,127 @@ export struct AlbumDetail {
 
 
 
+  /** 操作行：播放全部 + 收藏 / 评论 / 分享，滚动内容与吸顶浮层共用。 */
+  @Builder
+  private ActionBar() {
+    Row({ space: 10 }) {
+      Button() {
+        Row({ space: 5 }) {
+          SymbolGlyph($r('sys.symbol.play_fill')).fontSize(14).fontColor([TC.textOnAccent()])
+          Text('播放全部').fontSize(13).fontColor(TC.textOnAccent()).fontWeight(FontWeight.Medium)
+        }
+      }
+      .layoutWeight(1)
+      .height(38)
+      .backgroundColor(TC.accent())
+      .borderRadius(19)
+      .type(ButtonType.Normal)
+      .onClick(() => this.playAll())
+
+      Button() {
+        Row({ space: 4 }) {
+          SymbolGlyph(this.isSub ? $r('sys.symbol.heart_fill') : $r('sys.symbol.heart'))
+            .fontSize(14)
+            .fontColor([this.isSub ? TC.accent() : TC.textPrimary()])
+          Text(this.isSub ? '已收藏' : '收藏')
+            .fontSize(12)
+            .fontColor(this.isSub ? TC.accent() : TC.textPrimary())
+        }
+      }
+      .height(38)
+      .backgroundColor(this.isSub ? 'rgba(239,35,60,0.12)' : TC.surfaceInset())
+      .borderRadius(19)
+      .type(ButtonType.Normal)
+      .padding({ left: 14, right: 14 })
+      .onClick(() => this.toggleSub())
+
+      Button() {
+        Row({ space: 4 }) {
+          SymbolGlyph($r('sys.symbol.ellipsis_bubble')).fontSize(14).fontColor([TC.textBody()])
+          Text(this.formatCount(this.commentCount)).fontSize(11).fontColor(TC.textBody())
+        }
+      }
+      .height(38)
+      .backgroundColor(TC.surfaceRaised())
+      .borderRadius(19)
+      .type(ButtonType.Normal)
+      .padding({ left: 12, right: 12 })
+      .onClick(() => this.openCommentSheet())
+
+      Button() {
+        Row({ space: 4 }) {
+          SymbolGlyph($r('sys.symbol.share')).fontSize(14).fontColor([TC.textBody()])
+          Text(this.formatCount(this.shareCount)).fontSize(11).fontColor(TC.textBody())
+        }
+      }
+      .height(38)
+      .backgroundColor(TC.surfaceRaised())
+      .borderRadius(19)
+      .type(ButtonType.Normal)
+      .padding({ left: 12, right: 12 })
+      .onClick(() => this.shareSheetVisible = true)
+    }
+    .width('100%')
+    .padding({ left: 16, right: 16, top: 12, bottom: 8 })
+  }
+
+  /** 操作行在内容流里的原始 y（头图高度）。 */
+  private actionBarBaseY(): number {
+    return 320 + this.topAvoidHeight
+  }
+
+  /** 冻结阈值：操作行顶端撞到顶栏下沿时的滚动量。 */
+  private freezeThreshold(): number {
+    return this.actionBarBaseY() - this.topAvoidHeight - 54
+  }
+
+  /**
+   * 跟随阶段：操作行直接放在内容流里，由原生滚动 1:1 带走。
+   * 不参与任何逐帧计算，所以绝对跟手、不掉帧。
+   */
+  @Builder
+  private FlowActionBar() {
+    Column() {
+      this.ActionBar()
+    }
+    .width('100%')
+    .opacity(this.frozen ? 0 : 1)
+  }
+
+  /** 冻结阶段：撞到顶栏下沿后由浮层接管，位置固定、只在跨阈值时切换一次。 */
+  @Builder
+  private FrozenActionBar() {
+    Column() {
+      this.ActionBar()
+    }
+    .width('100%')
+    .backgroundColor(Color.Transparent)
+    .backdropBlur(30)
+    .position({ x: 0, y: this.topAvoidHeight + 54 })
+    .zIndex(3)
+  }
+
   build() {
     NavDestination() {
+      SkinBackdrop()
       if (this.loading) {
         Column() {
-          LoadingProgress().width(42).height(42).color('#ef233c')
+          LoadingProgress().width(42).height(42).color(TC.accent())
         }
         .width('100%')
         .height('100%')
         .justifyContent(FlexAlign.Center)
       } else if (this.message.length > 0 && this.songs.length === 0) {
         Column({ space: 12 }) {
-          SymbolGlyph($r('sys.symbol.exclamationmark_circle')).fontSize(38).fontColor(['#55555d'])
-          Text(this.message).fontSize(13).fontColor('#77777f')
+          SymbolGlyph($r('sys.symbol.exclamationmark_circle')).fontSize(38).fontColor([TC.textQuaternary()])
+          Text(this.message).fontSize(13).fontColor(TC.textTertiary())
         }
         .width('100%')
         .height('100%')
         .justifyContent(FlexAlign.Center)
       } else {
         Stack({ alignContent: Alignment.TopStart }) {
-          Scroll() {
+          Scroll(this.scroller) {
             Column() {
               Stack({ alignContent: Alignment.Bottom }) {
                 Image(this.albumCover)
@@ -255,7 +373,7 @@ export struct AlbumDetail {
                   .height(320 + this.topAvoidHeight)
                   .linearGradient({
                     angle: 180,
-                    colors: [['rgba(18,18,21,0.0)', 0], ['rgba(18,18,21,0.95)', 1]]
+                    colors: [['#00000000', 0], [TC.pageBackground(), 1]]
                   })
                 Row({ space: 16 }) {
                   Image(this.albumCover)
@@ -269,20 +387,20 @@ export struct AlbumDetail {
                     Text(this.albumName)
                       .fontSize(18)
                       .fontWeight(FontWeight.Bold)
-                      .fontColor('#ffffff')
+                      .fontColor(TC.textPrimary())
                       .maxLines(2)
                       .textOverflow({ overflow: TextOverflow.Ellipsis })
                     this.AlbumArtistLinks()
                     if (this.albumPublishTime.length > 0 || this.albumCompany.length > 0) {
                       Text(`${this.albumPublishTime}${this.albumCompany.length > 0 ? ' · ' + this.albumCompany : ''}`)
                         .fontSize(10)
-                        .fontColor('#77777f')
+                        .fontColor(TC.textTertiary())
                         .maxLines(1)
                     }
                     if (this.albumType.length > 0) {
                       Text(this.albumType)
                         .fontSize(10)
-                        .fontColor('#ef233c')
+                        .fontColor(TC.accent())
                         .backgroundColor('rgba(239,35,60,0.12)')
                         .padding({ left: 6, right: 6, top: 2, bottom: 2 })
                         .borderRadius(4)
@@ -299,78 +417,23 @@ export struct AlbumDetail {
               .height(320 + this.topAvoidHeight)
               .alignContent(Alignment.Bottom)
 
-              Row({ space: 10 }) {
-                Button() {
-                  Row({ space: 5 }) {
-                    SymbolGlyph($r('sys.symbol.play_fill')).fontSize(14).fontColor([Color.White])
-                    Text('播放全部').fontSize(13).fontColor(Color.White).fontWeight(FontWeight.Medium)
-                  }
-                }
-                .layoutWeight(1)
-                .height(38)
-                .backgroundColor('#ef233c')
-                .borderRadius(19)
-                .type(ButtonType.Normal)
-                .onClick(() => this.playAll())
-
-                Button() {
-                  Row({ space: 4 }) {
-                    SymbolGlyph(this.isSub ? $r('sys.symbol.heart_fill') : $r('sys.symbol.heart'))
-                      .fontSize(14)
-                      .fontColor([this.isSub ? '#ef233c' : '#ffffff'])
-                    Text(this.isSub ? '已收藏' : '收藏')
-                      .fontSize(12)
-                      .fontColor(this.isSub ? '#ef233c' : '#ffffff')
-                  }
-                }
-                .height(38)
-                .backgroundColor(this.isSub ? 'rgba(239,35,60,0.12)' : '#2a2a2e')
-                .borderRadius(19)
-                .type(ButtonType.Normal)
-                .padding({ left: 14, right: 14 })
-                .onClick(() => this.toggleSub())
-
-                Button() {
-                  Row({ space: 4 }) {
-                    SymbolGlyph($r('sys.symbol.ellipsis_bubble')).fontSize(14).fontColor(['#b0b0b8'])
-                    Text(this.formatCount(this.commentCount)).fontSize(11).fontColor('#b0b0b8')
-                  }
-                }
-                .height(38)
-                .backgroundColor('#2a2a2e')
-                .borderRadius(19)
-                .type(ButtonType.Normal)
-                .padding({ left: 12, right: 12 })
-                .onClick(() => this.openCommentSheet())
-
-                Button() {
-                  Row({ space: 4 }) {
-                    SymbolGlyph($r('sys.symbol.share')).fontSize(14).fontColor(['#b0b0b8'])
-                    Text(this.formatCount(this.shareCount)).fontSize(11).fontColor('#b0b0b8')
-                  }
-                }
-                .height(38)
-                .backgroundColor('#2a2a2e')
-                .borderRadius(19)
-                .type(ButtonType.Normal)
-                .padding({ left: 12, right: 12 })
-                .onClick(() => this.shareSheetVisible = true)
-              }
-              .width('100%')
-              .padding({ left: 16, right: 16, top: 12, bottom: 8 })
+              // 操作行本身就在内容流里（跟随阶段零 JS 参与）
+              this.FlowActionBar()
 
               if (this.albumDesc.length > 0) {
                 Column() {
                   Text(this.albumDesc)
                     .fontSize(12)
-                    .fontColor('#9999a0')
+                    .fontColor(TC.textSecondary())
                     .lineHeight(18)
-                    .maxLines(this.descExpanded ? 100 : 2)
+                    .maxLines(this.descExpanded ? 100 : 3)
                     .textOverflow({ overflow: TextOverflow.Ellipsis })
-                  if (this.albumDesc.length > 60) {
+                    // 收起态高度固定为 3 行（18×3），与文字多少无关
+                    .constraintSize({ minHeight: this.descExpanded ? 0 : 54 })
+                  if (this.albumDesc.length > 78) {
                     Text(this.descExpanded ? '收起' : '展开')
                       .fontSize(11)
-                      .fontColor('#ef233c')
+                      .fontColor(TC.accent())
                       .margin({ top: 4 })
                       .onClick(() => this.descExpanded = !this.descExpanded)
                   }
@@ -383,11 +446,11 @@ export struct AlbumDetail {
               Row() {
                 Text(`歌曲 ${this.songs.length}`)
                   .fontSize(13)
-                  .fontColor('#ffffff')
+                  .fontColor(TC.textPrimary())
                   .fontWeight(FontWeight.Medium)
                 Text(`${this.formatCount(this.subCount)}人收藏 · ${this.formatCount(this.shareCount)}次分享`)
                   .fontSize(10)
-                  .fontColor('#77777f')
+                  .fontColor(TC.textTertiary())
                   .layoutWeight(1)
                   .textAlign(TextAlign.End)
               }
@@ -401,12 +464,12 @@ export struct AlbumDetail {
                       Text((index + 1).toString())
                         .width(28)
                         .fontSize(12)
-                        .fontColor('#77777f')
+                        .fontColor(TC.textTertiary())
                         .textAlign(TextAlign.Center)
                       Column({ space: 3 }) {
                         Text(item.name)
                           .fontSize(14)
-                          .fontColor('#ededf0')
+                          .fontColor(TC.textBody())
                           .maxLines(1)
                           .textOverflow({ overflow: TextOverflow.Ellipsis })
                         this.SongArtistLinks(item)
@@ -422,43 +485,36 @@ export struct AlbumDetail {
                 })
               }
               .width('100%')
+              NoMoreFooter()
             }
             .width('100%')
+            .constraintSize({ minHeight: '100%' })
           }
           .width('100%')
           .layoutWeight(1)
           .scrollBar(BarState.Off)
-
-          Row() {
-            Row() {
-              SymbolGlyph($r('sys.symbol.chevron_left'))
-                .fontSize(22)
-                .fontColor(['#ffffff'])
+          .onDidScroll(() => {
+            const y = this.scroller.currentOffset().yOffset
+            // 顶栏只用到 0~160 这段做渐显，钳住后长列表滚动时不再逐帧刷新页面
+            const barOffset = y > 170 ? 170 : y
+            if (barOffset !== this.scrollOffset) {
+              this.scrollOffset = barOffset
             }
-            .width(36)
-            .height(36)
-            .borderRadius(18)
-            .backgroundColor('rgba(0,0,0,0.35)')
-            .justifyContent(FlexAlign.Center)
-            .onClick(() => this.pageStack.pop())
-
-            Column().layoutWeight(1)
-
-            Row() {
-              SymbolGlyph($r('sys.symbol.share'))
-                .fontSize(18)
-                .fontColor(['#ffffff'])
+            const f = y >= this.freezeThreshold()
+            if (f !== this.frozen) {
+              this.frozen = f
             }
-            .width(36)
-            .height(36)
-            .borderRadius(18)
-            .backgroundColor('rgba(0,0,0,0.35)')
-            .justifyContent(FlexAlign.Center)
-            .onClick(() => this.shareSheetVisible = true)
+          })
+
+          DetailTopBar({
+            title: this.albumName || '专辑',
+            scrollOffset: this.scrollOffset,
+            onShare: () => this.shareSheetVisible = true
+          })
+          // 冻结后由浮层接管，未冻结时不构建（省掉无谓的模糊开销）
+          if (this.frozen) {
+            this.FrozenActionBar()
           }
-          .width('100%')
-          .padding({ left: 16, right: 16, top: this.topAvoidHeight + 14 })
-
           if (this.shareSheetVisible) {
             ShareSheet({
               shareParam: this.shareParam,
@@ -469,9 +525,9 @@ export struct AlbumDetail {
         }
         .width('100%')
         .height('100%')
-        .bindSheet(this.commentSheetVisible, this.CommentsSheetBuilder(), {
+        .bindSheet(this.commentSheetVisible, this.skin_CommentsSheetBuilder(), {
           height: '68%',
-          backgroundColor: '#19191f',
+          backgroundColor: TC.sheetBackground(),
           showClose: false,
           dragBar: true,
           onDisappear: () => this.commentSheetVisible = false
@@ -481,10 +537,10 @@ export struct AlbumDetail {
       Column()
         .width('100%')
         .height('100%')
-        .backgroundColor('#121215')
+        .backgroundColor(TC.pageBackground())
     }
     .hideTitleBar(true)
-    .backgroundColor('#121215')
+    .backgroundColor(TC.pageBackground())
   }
 
 }

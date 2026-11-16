@@ -1,3 +1,5 @@
+import { SheetSkinFrame } from '../components/SheetSkin'
+import { SkinBackdrop } from '../components/SkinBackdrop'
 import { CommentService } from '../services/CommentService'
 import { ResourceComments } from '../components/ResourceComments'
 import { CommentResource } from '../models/CommentResource'
@@ -17,12 +19,16 @@ import { ApiClient } from '../services/ApiClient'
 import { playerController } from '../services/PlayerController'
 import { AuthStore } from '../stores/AuthStore'
 import { ShareSheet } from '../components/ShareSheet'
+import { DetailTopBar } from '../components/DetailTopBar'
+import { NoMoreFooter } from '../components/NoMoreFooter'
 import { PlaylistCoverPreviewPageParam } from './PlaylistCoverPreview'
 import { PlaylistEditorPageParam } from './PlaylistEditor'
 import { PlaylistSongManagerPageParam } from './PlaylistSongManager'
+import { TC } from '../services/ThemeColors'
 
 @Component
 export struct PlaylistDetail {
+  @StorageProp('skinVersion') skinVersionObs: number = 0
   @Consume('pageStack') pageStack: NavPathStack
   @Consume('topAvoidHeight') topAvoidHeight: number
   @Consume('authStore') authStore: AuthStore
@@ -36,6 +42,11 @@ export struct PlaylistDetail {
   @State message: string = ''
   @State searchVisible: boolean = false
   @State keyword: string = ''
+  @State scrollOffset: number = 0
+  /** 操作行是否已冻结在顶栏下沿（只在跨阈值时翻转，避免逐帧驱动布局）。 */
+  @State private frozen: boolean = false
+  @State creatorAvatar: string = ''
+  private scroller: Scroller = new Scroller()
   @State shareCount: number = 0
   @State commentCount: number = 0
   @State collectCount: number = 0
@@ -131,6 +142,7 @@ export struct PlaylistDetail {
       ])
       if (response.code === 200 && response.playlist) {
         this.creatorId = response.playlist.creator.userId?.toString() || ''
+        this.creatorAvatar = response.playlist.creator.avatarUrl || ''
         this.playlist = {
           id: response.playlist.id.toString(),
           name: response.playlist.name,
@@ -401,6 +413,13 @@ export struct PlaylistDetail {
   }
 
   @Builder
+  private skin_CommentSheet() {
+    SheetSkinFrame() {
+      this.CommentSheet()
+    }
+  }
+
+  @Builder
   private CommentSheet() {
     ResourceComments({
       resource: this.commentResource(),
@@ -412,9 +431,9 @@ export struct PlaylistDetail {
   @Builder
   private StatAction(icon: Resource, title: string, count: number, onClick: () => void, active: boolean = false) {
     Row({ space: 7 }) {
-      SymbolGlyph(icon).fontSize(20).fontColor([active ? '#ff6577' : '#ededf0'])
-      Text(title).fontSize(12).fontColor(active ? '#ff6577' : '#d0d0d5')
-      Text(this.formatCount(count)).fontSize(11).fontColor('#77777f')
+      SymbolGlyph(icon).fontSize(20).fontColor([active ? TC.accentSoft() : TC.textPrimary()])
+      Text(title).fontSize(12).fontColor(active ? TC.accentSoft() : TC.textBody())
+      Text(this.formatCount(count)).fontSize(11).fontColor(TC.textTertiary())
     }
     .layoutWeight(1).height(44).justifyContent(FlexAlign.Center)
     .onClick(onClick)
@@ -425,13 +444,13 @@ export struct PlaylistDetail {
   private MenuOption(icon: Resource, title: string, description: string, danger: boolean, action: () => void) {
     Row({ space: 13 }) {
       Stack() {
-        SymbolGlyph(icon).fontSize(21).fontColor([danger ? '#ff6577' : '#ededf0'])
-      }.width(42).height(42).borderRadius(13).backgroundColor(danger ? '#342126' : '#29292f')
+        SymbolGlyph(icon).fontSize(21).fontColor([danger ? TC.accentSoft() : TC.textPrimary()])
+      }.width(42).height(42).borderRadius(13).backgroundColor(danger ? TC.accentContainer() : '#29292f')
       Column({ space: 3 }) {
-        Text(title).fontSize(14).fontWeight(FontWeight.Medium).fontColor(danger ? '#ff6577' : '#ededf0')
-        Text(description).fontSize(10).fontColor('#77777f')
+        Text(title).fontSize(14).fontWeight(FontWeight.Medium).fontColor(danger ? TC.accentSoft() : TC.textPrimary())
+        Text(description).fontSize(10).fontColor(TC.textTertiary())
       }.layoutWeight(1).alignItems(HorizontalAlign.Start)
-      SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(16).fontColor(['#55555d'])
+      SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(16).fontColor([TC.textQuaternary()])
     }.width('100%').height(64).onClick(action)
   }
 
@@ -440,10 +459,10 @@ export struct PlaylistDetail {
     Column({ space: 4 }) {
       Row() {
         Column({ space: 3 }) {
-          Text('管理歌单').fontSize(18).fontWeight(FontWeight.Bold).fontColor('#ffffff')
-          Text(this.playlist.name).fontSize(10).fontColor('#77777f').maxLines(1)
+          Text('管理歌单').fontSize(18).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary())
+          Text(this.playlist.name).fontSize(10).fontColor(TC.textTertiary()).maxLines(1)
         }.layoutWeight(1).alignItems(HorizontalAlign.Start)
-        SymbolGlyph($r('sys.symbol.xmark_circle_fill')).fontSize(25).fontColor(['#686870'])
+        SymbolGlyph($r('sys.symbol.xmark_circle_fill')).fontSize(25).fontColor([TC.textQuaternary()])
           .onClick(() => this.ownerMenuVisible = false)
       }.width('100%').height(54)
       this.MenuOption($r('sys.symbol.square_and_pencil'), '编辑歌单', '修改名称、简介、标签、封面与可见范围', false,
@@ -464,10 +483,10 @@ export struct PlaylistDetail {
     Column({ space: 5 }) {
       Row() {
         Column({ space: 3 }) {
-          Text('歌曲操作').fontSize(18).fontWeight(FontWeight.Bold).fontColor('#ffffff')
-          Text(this.selectedSongName).fontSize(10).fontColor('#77777f').maxLines(1)
+          Text('歌曲操作').fontSize(18).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary())
+          Text(this.selectedSongName).fontSize(10).fontColor(TC.textTertiary()).maxLines(1)
         }.layoutWeight(1).alignItems(HorizontalAlign.Start)
-        SymbolGlyph($r('sys.symbol.xmark_circle_fill')).fontSize(25).fontColor(['#686870'])
+        SymbolGlyph($r('sys.symbol.xmark_circle_fill')).fontSize(25).fontColor([TC.textQuaternary()])
           .onClick(() => this.songMenuVisible = false)
       }.width('100%').height(54)
       this.MenuOption($r('sys.symbol.arrow_up_circle'), '置顶', '移动到歌单第一首', false,
@@ -480,15 +499,15 @@ export struct PlaylistDetail {
   @Builder
   private DeleteConfirmSheet() {
     Column({ space: 16 }) {
-      SymbolGlyph($r('sys.symbol.exclamationmark_triangle_fill')).fontSize(38).fontColor(['#ff765f'])
-      Text('删除这个歌单？').fontSize(18).fontWeight(FontWeight.Bold).fontColor('#ffffff')
-      Text(`“${this.playlist.name}”删除后无法恢复。`).fontSize(12).lineHeight(19).fontColor('#8b8b93')
+      SymbolGlyph($r('sys.symbol.exclamationmark_triangle_fill')).fontSize(38).fontColor([TC.accentSoft()])
+      Text('删除这个歌单？').fontSize(18).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary())
+      Text(`“${this.playlist.name}”删除后无法恢复。`).fontSize(12).lineHeight(19).fontColor(TC.textTertiary())
         .textAlign(TextAlign.Center)
       Row({ space: 10 }) {
-        Button('取消').layoutWeight(1).height(44).fontSize(13).fontColor('#d0d0d5')
-          .backgroundColor('#29292f').borderRadius(14).onClick(() => this.deleteConfirmVisible = false)
-        Button(this.deleting ? '删除中' : '确认删除').layoutWeight(1).height(44).fontSize(13).fontColor('#ffffff')
-          .backgroundColor('#ef233c').borderRadius(14).enabled(!this.deleting).onClick(() => this.deletePlaylist())
+        Button('取消').layoutWeight(1).height(44).fontSize(13).fontColor(TC.textBody())
+          .backgroundColor(TC.chipBackground()).borderRadius(14).onClick(() => this.deleteConfirmVisible = false)
+        Button(this.deleting ? '删除中' : '确认删除').layoutWeight(1).height(44).fontSize(13).fontColor(TC.textPrimary())
+          .backgroundColor(TC.accent()).borderRadius(14).enabled(!this.deleting).onClick(() => this.deletePlaylist())
       }.width('100%')
     }.width('100%').height('100%').justifyContent(FlexAlign.Center)
       .padding({ left: 22, right: 22, bottom: 18 })
@@ -515,7 +534,7 @@ export struct PlaylistDetail {
       }
       .width('100%')
       .height(kind === 'owner' ? 360 : kind === 'song' ? 238 : 290)
-      .backgroundColor('#19191f')
+      .backgroundColor(TC.surfaceCard())
       .borderRadius({ topLeft: 28, topRight: 28 })
       .shadow({ radius: 24, color: 'rgba(0,0,0,0.42)', offsetY: -4 })
       .transition(TransitionEffect.translate({ y: 420 }).animation({ duration: 240, curve: Curve.EaseOut }))
@@ -523,47 +542,103 @@ export struct PlaylistDetail {
     .width('100%').height('100%')
   }
 
+  /** 操作行：播放全部 + 收藏 / 评论 / 分享，滚动内容与吸顶浮层共用。 */
+  @Builder
+  private ActionBar() {
+    Row({ space: 10 }) {
+      Button() {
+        Row({ space: 6 }) {
+          SymbolGlyph($r('sys.symbol.play_fill')).fontSize(15).fontColor([TC.textOnAccent()])
+          Text(`播放全部 ${this.filteredSongs().length}`).fontSize(13).fontWeight(FontWeight.Medium)
+            .fontColor(TC.textOnAccent())
+        }
+      }
+      .layoutWeight(1).height(40).backgroundColor(TC.accent()).borderRadius(20)
+      .type(ButtonType.Normal).enabled(!this.loading && this.filteredSongs().length > 0)
+      .onClick(() => this.playAt(0))
+
+      if (!this.playlist.specialType) {
+        Button() {
+          Row({ space: 4 }) {
+            SymbolGlyph(this.subscribed ? $r('sys.symbol.heart_fill') : $r('sys.symbol.heart'))
+              .fontSize(14).fontColor([this.subscribed ? TC.accent() : TC.textSecondary()])
+            Text(this.formatCount(this.collectCount)).fontSize(10)
+              .fontColor(this.subscribed ? TC.accent() : TC.textSecondary())
+          }
+        }
+        .height(40).backgroundColor(this.subscribed ? 'rgba(239,35,60,0.12)' : TC.surfaceInset())
+        .borderRadius(20).type(ButtonType.Normal).padding({ left: 12, right: 12 })
+        .onClick(() => this.toggleSubscribe())
+
+        Button() {
+          Row({ space: 4 }) {
+            SymbolGlyph($r('sys.symbol.ellipsis_bubble')).fontSize(14).fontColor([TC.textBody()])
+            Text(this.formatCount(this.commentCount)).fontSize(10).fontColor(TC.textBody())
+          }
+        }
+        .height(40).backgroundColor(TC.surfaceRaised()).borderRadius(20).type(ButtonType.Normal)
+        .padding({ left: 12, right: 12 }).onClick(() => this.openComments())
+
+        Button() {
+          Row({ space: 4 }) {
+            SymbolGlyph($r('sys.symbol.share')).fontSize(14).fontColor([TC.textBody()])
+            Text(this.formatCount(this.shareCount)).fontSize(10).fontColor(TC.textBody())
+          }
+        }
+        .height(40).backgroundColor(TC.surfaceRaised()).borderRadius(20).type(ButtonType.Normal)
+        .padding({ left: 12, right: 12 }).onClick(() => this.sharePlaylist())
+      }
+    }
+    .width('100%').height(62).padding({ left: 16, right: 16, top: 10, bottom: 10 })
+  }
+
+  /** 操作行在内容流里的原始 y（头图 + 听歌排行切换条）。 */
+  private actionBarBaseY(): number {
+    return 280 + this.topAvoidHeight + (this.playlist.specialType === 'record' ? 46 : 0)
+  }
+
+  /** 冻结阈值：操作行顶端撞到顶栏下沿时的滚动量。 */
+  private freezeThreshold(): number {
+    return this.actionBarBaseY() - this.topAvoidHeight - 54
+  }
+
+  /** 跟随阶段：操作行在内容流里，由原生滚动 1:1 带走（零 JS 参与）。 */
+  @Builder
+  private FlowActionBar() {
+    Column() {
+      this.ActionBar()
+    }
+    .width('100%')
+    .opacity(this.frozen ? 0 : 1)
+  }
+
+  /** 冻结阶段：撞到顶栏下沿后由浮层接管，位置固定、只在跨阈值时切换一次。 */
+  @Builder
+  private FrozenActionBar() {
+    Column() {
+      this.ActionBar()
+    }
+    .width('100%')
+    .backgroundColor(Color.Transparent)
+    .backdropBlur(30)
+    .position({ x: 0, y: this.topAvoidHeight + 54 })
+    .zIndex(3)
+  }
+
   build() {
     NavDestination() {
-      Stack() {
-        Column() {
+      SkinBackdrop()
+      Stack({ alignContent: Alignment.TopStart }) {
+        Scroll(this.scroller) {
+          Column() {
           Stack({ alignContent: Alignment.BottomStart }) {
             Image(this.playlist.cover).width('100%').height('100%').objectFit(ImageFit.Cover).blur(48).opacity(0.55)
             Column().width('100%').height('100%')
-              .linearGradient({ angle: 180, colors: [['rgba(15,15,20,0.22)', 0], ['#121215', 1]] })
+              .linearGradient({ angle: 180, colors: [[TC.headerScrimTop(), 0], [TC.pageBackground(), 1]] })
 
             Column() {
-              Row() {
-                SymbolGlyph($r('sys.symbol.chevron_left')).fontSize(24).fontColor(['#ffffff'])
-                  .onClick(() => this.pageStack.pop())
-                if (this.searchVisible) {
-                  TextInput({ text: this.keyword, placeholder: '搜索歌单内歌曲' })
-                    .layoutWeight(1).height(38).fontColor('#ffffff').placeholderColor('#888890')
-                    .backgroundColor('rgba(20,20,25,0.62)').borderRadius(14)
-                    .onChange((value: string) => this.keyword = value)
-                } else {
-                  Text('歌单').layoutWeight(1).fontSize(17).fontWeight(FontWeight.Bold)
-                    .fontColor('#ffffff').textAlign(TextAlign.Center)
-                }
-                SymbolGlyph(this.searchVisible ? $r('sys.symbol.xmark_circle_fill') : $r('sys.symbol.magnifyingglass'))
-                  .fontSize(21).fontColor(['#ffffff']).margin({ right: 16 })
-                  .onClick(() => {
-                    this.searchVisible = !this.searchVisible
-                    if (!this.searchVisible) this.keyword = ''
-                  })
-                if (!this.playlist.specialType) {
-                  SymbolGlyph($r('sys.symbol.ellipsis_circle')).fontSize(22).fontColor(['#ffffff'])
-                  .onClick(() => {
-                    if (this.isOwner()) {
-                      this.ownerMenuVisible = true
-                    } else {
-                      this.sharePlaylist()
-                    }
-                  })
-                }
-              }
-              .width('100%').height(56 + this.topAvoidHeight)
-              .padding({ top: this.topAvoidHeight })
+              // 顶栏由 DetailTopBar 悬浮绘制，这里保留等高占位
+              Column().width('100%').height(54 + this.topAvoidHeight)
 
               Row({ space: 16 }) {
                 if (this.playlist.specialType) {
@@ -576,9 +651,9 @@ export struct PlaylistDetail {
                       Image(FM_ICON).width(48).height(48).borderRadius(24)
                     } else {
                     SymbolGlyph(this.playlist.specialType === 'recent' ? $r('sys.symbol.clock') : $r('sys.symbol.sort'))
-                      .fontSize(48).fontColor(['#ffffff'])
+                      .fontSize(48).fontColor([TC.textPrimary()])
                     }
-                  }.width(120).height(120).borderRadius(14).clip(true).backgroundColor('#25252c')
+                  }.width(120).height(120).borderRadius(14).clip(true).backgroundColor(TC.surfaceRaised())
                 } else {
                 Image(this.playlist.cover).width(120).height(120).borderRadius(14).objectFit(ImageFit.Cover)
                   .shadow({ radius: 18, color: 'rgba(0,0,0,0.32)', offsetY: 8 })
@@ -595,17 +670,22 @@ export struct PlaylistDetail {
                   })
                 }
                 Column({ space: 8 }) {
-                  Text(this.playlist.name).fontSize(20).fontWeight(FontWeight.Bold).fontColor('#ffffff').maxLines(3)
+                  Text(this.playlist.name).fontSize(20).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary()).maxLines(3)
                   Row({ space: 5 }) {
-                    SymbolGlyph($r('sys.symbol.person_crop_circle_fill')).fontSize(15).fontColor(['#b8b8c0'])
-                    Text(this.playlist.creator).fontSize(12).fontColor('#d0d0d6').maxLines(1)
+                    if (this.creatorAvatar) {
+                      Image(this.creatorAvatar).width(18).height(18).borderRadius(9)
+                        .objectFit(ImageFit.Cover).backgroundColor(TC.surfaceInset())
+                    } else {
+                      SymbolGlyph($r('sys.symbol.person_crop_circle_fill')).fontSize(15).fontColor([TC.textBody()])
+                    }
+                    Text(this.playlist.creator).fontSize(12).fontColor(TC.textBody()).maxLines(1)
                   }
                   .onClick(() => this.openCreatorProfile())
                   Text(this.playlist.specialType ? `${this.playlist.count} 首歌曲` :
                     `${this.playlist.count} 首歌曲 · ${this.formatCount(this.playCount)} 次播放`)
-                    .fontSize(11).fontColor('#77777f')
+                    .fontSize(11).fontColor(TC.textTertiary())
                   if (this.playlistTags.length > 0) {
-                    Text(this.playlistTags.join(' · ')).fontSize(10).fontColor('#ef6577').maxLines(1)
+                    Text(this.playlistTags.join(' · ')).fontSize(10).fontColor(TC.accentSoft()).maxLines(1)
                   }
                 }
                 .layoutWeight(1).alignItems(HorizontalAlign.Start)
@@ -619,103 +699,60 @@ export struct PlaylistDetail {
           if (this.playlist.specialType === 'record') {
             Row({ space: 28 }) {
               Column({ space: 7 }) {
-                Text('最近一周').fontSize(14).fontColor(this.recordType === 1 ? '#ffffff' : '#77777f')
+                Text('最近一周').fontSize(14).fontColor(this.recordType === 1 ? TC.textPrimary() : TC.textTertiary())
                   .fontWeight(this.recordType === 1 ? FontWeight.Bold : FontWeight.Regular)
                 Column().width(24).height(3).borderRadius(2)
-                  .backgroundColor(this.recordType === 1 ? '#ef233c' : 'transparent')
+                  .backgroundColor(this.recordType === 1 ? TC.accent() : 'transparent')
               }.height(46).justifyContent(FlexAlign.Center).onClick(() => this.switchRecordType(1))
               Column({ space: 7 }) {
-                Text('全部时间').fontSize(14).fontColor(this.recordType === 0 ? '#ffffff' : '#77777f')
+                Text('全部时间').fontSize(14).fontColor(this.recordType === 0 ? TC.textPrimary() : TC.textTertiary())
                   .fontWeight(this.recordType === 0 ? FontWeight.Bold : FontWeight.Regular)
                 Column().width(24).height(3).borderRadius(2)
-                  .backgroundColor(this.recordType === 0 ? '#ef233c' : 'transparent')
+                  .backgroundColor(this.recordType === 0 ? TC.accent() : 'transparent')
               }.height(46).justifyContent(FlexAlign.Center).onClick(() => this.switchRecordType(0))
             }.width('100%').height(46).padding({ left: 20, right: 20 })
           }
 
-          Row({ space: 10 }) {
-            Button() {
-              Row({ space: 6 }) {
-                SymbolGlyph($r('sys.symbol.play_fill')).fontSize(15).fontColor(['#ffffff'])
-                Text(`播放全部 ${this.filteredSongs().length}`).fontSize(13).fontWeight(FontWeight.Medium)
-                  .fontColor('#ffffff')
-              }
-            }
-            .layoutWeight(1).height(40).backgroundColor('#ef233c').borderRadius(20)
-            .type(ButtonType.Normal).enabled(!this.loading && this.filteredSongs().length > 0)
-            .onClick(() => this.playAt(0))
-
-            if (!this.playlist.specialType) {
-            Button() {
-              Row({ space: 4 }) {
-                SymbolGlyph(this.subscribed ? $r('sys.symbol.heart_fill') : $r('sys.symbol.heart'))
-                  .fontSize(14).fontColor([this.subscribed ? '#ef4058' : '#b0b0b8'])
-                Text(this.formatCount(this.collectCount)).fontSize(10)
-                  .fontColor(this.subscribed ? '#ef4058' : '#b0b0b8')
-              }
-            }
-            .height(40).backgroundColor(this.subscribed ? 'rgba(239,35,60,0.12)' : '#27272d')
-            .borderRadius(20).type(ButtonType.Normal).padding({ left: 12, right: 12 })
-            .onClick(() => this.toggleSubscribe())
-
-            Button() {
-              Row({ space: 4 }) {
-                SymbolGlyph($r('sys.symbol.ellipsis_bubble')).fontSize(14).fontColor(['#b0b0b8'])
-                Text(this.formatCount(this.commentCount)).fontSize(10).fontColor('#b0b0b8')
-              }
-            }
-            .height(40).backgroundColor('#27272d').borderRadius(20).type(ButtonType.Normal)
-            .padding({ left: 12, right: 12 }).onClick(() => this.openComments())
-
-            Button() {
-              Row({ space: 4 }) {
-                SymbolGlyph($r('sys.symbol.share')).fontSize(14).fontColor(['#b0b0b8'])
-                Text(this.formatCount(this.shareCount)).fontSize(10).fontColor('#b0b0b8')
-              }
-            }
-            .height(40).backgroundColor('#27272d').borderRadius(20).type(ButtonType.Normal)
-            .padding({ left: 12, right: 12 }).onClick(() => this.sharePlaylist())
-            }
-          }
-          .width('100%').height(62).padding({ left: 16, right: 16, top: 10, bottom: 10 })
+          // 操作行本身就在内容流里（跟随阶段零 JS 参与）
+          this.FlowActionBar()
 
           if (this.loading) {
-            LoadingProgress().layoutWeight(1).width(46).color('#ef233c')
+            LoadingProgress().width(46).height(46).color(TC.accent()).margin({ top: 80 })
           } else if (this.message && this.songList.length === 0) {
             Column({ space: 12 }) {
-              Text(this.message).fontSize(12).fontColor('#77777f')
-              Button('重试').fontColor('#ff6577').backgroundColor('#2b2024')
+              Text(this.message).fontSize(12).fontColor(TC.textTertiary())
+              Button('重试').fontColor(TC.accentSoft()).backgroundColor(TC.accentContainer())
                 .onClick(() => {
                   this.loading = true
                   this.message = ''
                   this.loadDetail()
                 })
             }
-            .layoutWeight(1).justifyContent(FlexAlign.Center)
+            .width('100%').height(160).justifyContent(FlexAlign.Center)
           } else {
             List() {
               ForEach(this.filteredSongs(), (item: songItemType, index: number) => {
                 ListItem() {
                   Row({ space: 12 }) {
                     Text((index + 1).toString()).width(26).fontSize(12)
-                      .fontColor(index < 3 ? '#ff6577' : '#66666e').textAlign(TextAlign.Center)
+                      .fontColor(index < 3 ? TC.accentSoft() : TC.textTertiary()).textAlign(TextAlign.Center)
                       .onClick(() => this.playAt(index))
                     Column({ space: 4 }) {
-                      Text(item.name).fontSize(14).fontColor('#ededf0').maxLines(1)
+                      Text(item.name).fontSize(14).fontColor(TC.textBody()).maxLines(1)
                         .textOverflow({ overflow: TextOverflow.Ellipsis })
                       Text(`${item.author}${item.album ? ` · ${item.album}` : ''}`)
-                        .fontSize(11).fontColor('#77777f').maxLines(1)
+                        .fontSize(11).fontColor(TC.textTertiary()).maxLines(1)
                         .textOverflow({ overflow: TextOverflow.Ellipsis })
                     }
                     .layoutWeight(1).alignItems(HorizontalAlign.Start).onClick(() => this.playAt(index))
                     if (this.playlist.specialType === 'record') {
                       Row({ space: 4 }) {
-                        SymbolGlyph($r('sys.symbol.play_fill')).fontSize(12).fontColor(['#888890'])
-                        Text(`${item.playCount || 0}`).fontSize(12).fontColor('#888890')
+                        SymbolGlyph($r('sys.symbol.play_fill')).fontSize(12).fontColor([TC.textTertiary()])
+                        Text(`${item.playCount || 0}`).fontSize(12).fontColor(TC.textTertiary())
                       }
                     }
                     if (this.isOwner()) {
-                      SymbolGlyph($r('sys.symbol.ellipsis_circle')).fontSize(19).fontColor(['#66666e'])
+                      SymbolGlyph($r('sys.symbol.ellipsis_circle')).fontSize(19).fontColor([TC.textQuaternary()])
                       .onClick(() => this.openSongMenu(item))
                     }
                   }
@@ -725,19 +762,70 @@ export struct PlaylistDetail {
               if (this.filteredSongs().length === 0) {
                 ListItem() {
                   Text(this.keyword ? '没有找到匹配歌曲' : '暂无歌曲').width('100%').height(120).fontSize(12)
-                    .fontColor('#77777f').textAlign(TextAlign.Center)
+                    .fontColor(TC.textTertiary()).textAlign(TextAlign.Center)
                 }
               }
             }
-            .layoutWeight(1).backgroundColor('#121215')
+            .width('100%').backgroundColor(TC.pageBackground())
           }
 
           if (this.message && this.songList.length > 0) {
-            Text(this.message).width('100%').fontSize(10).fontColor('#ff6577')
+            Text(this.message).width('100%').fontSize(10).fontColor(TC.accentSoft())
               .textAlign(TextAlign.Center).padding({ bottom: 6 })
           }
+          NoMoreFooter()
+          }
+          .constraintSize({ minHeight: '100%' })
+          .width('100%')
         }
-        .width('100%').height('100%').backgroundColor('#121215')
+        .width('100%').height('100%')
+        .backgroundColor(TC.pageBackground())
+        .scrollBar(BarState.Off)
+        .onDidScroll(() => {
+          const y = this.scroller.currentOffset().yOffset
+          // 顶栏只用到 0~160 这段做渐显，钳住后长列表滚动时不再逐帧刷新页面
+          const barOffset = y > 170 ? 170 : y
+          if (barOffset !== this.scrollOffset) {
+            this.scrollOffset = barOffset
+          }
+          const f = y >= this.freezeThreshold()
+          if (f !== this.frozen) {
+            this.frozen = f
+          }
+        })
+
+        DetailTopBar({
+          title: '歌单',
+          scrollOffset: this.scrollOffset,
+          shareEnabled: !this.playlist.specialType,
+          showSearch: true,
+          searchMode: this.searchVisible,
+          searchText: this.keyword,
+          searchPlaceholder: '搜索歌单内歌曲',
+          onSearchToggle: () => {
+            this.searchVisible = !this.searchVisible
+            if (!this.searchVisible) {
+              this.keyword = ''
+            }
+          },
+          onSearchTextChange: (value: string) => this.keyword = value,
+          onShare: () => this.sharePlaylist()
+        }) {
+          if (!this.playlist.specialType && this.isOwner()) {
+            Row() {
+              SymbolGlyph($r('sys.symbol.ellipsis_circle')).fontSize(18).fontColor([TC.textOnMedia()])
+            }
+            .width(36).height(36).borderRadius(18)
+            .backgroundColor('rgba(0,0,0,0.35)')
+            .justifyContent(FlexAlign.Center)
+            .onClick(() => this.ownerMenuVisible = true)
+          }
+        }
+
+        // 冻结后由浮层接管
+        if (this.frozen) {
+          this.FrozenActionBar()
+        }
 
         if (this.ownerMenuVisible) {
           this.MenuSheetOverlay('owner')
@@ -759,8 +847,8 @@ export struct PlaylistDetail {
         }
       }
       .width('100%').height('100%')
-      .bindSheet(this.commentSheetVisible, this.CommentSheet(), {
-        height: '72%', backgroundColor: '#19191f', showClose: false, dragBar: true,
+      .bindSheet(this.commentSheetVisible, this.skin_CommentSheet(), {
+        height: '72%', backgroundColor: TC.sheetBackground(), showClose: false, dragBar: true,
         onDisappear: () => this.commentSheetVisible = false
       })
     }

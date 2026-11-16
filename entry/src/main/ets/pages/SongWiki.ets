@@ -1,4 +1,7 @@
+import { SheetSkinFrame } from '../components/SheetSkin'
+import { SkinBackdrop } from '../components/SkinBackdrop'
 import { common } from '@kit.AbilityKit'
+import { DecorationMedia } from '../services/DecorationMedia'
 import { fileIo, fileUri } from '@kit.CoreFileKit'
 import { photoAccessHelper } from '@kit.MediaLibraryKit'
 import { http } from '@kit.NetworkKit'
@@ -26,9 +29,11 @@ import { StyleDetailPageParam, StyleListResponse } from '../models/style'
 import { styleTagId, findStyleByName } from '../services/StylePresentation'
 import { playerController } from '../services/PlayerController'
 import { PlayerStore } from '../stores/PlayerStore'
+import { TC } from '../services/ThemeColors'
 
 @Component
 export struct SongWiki {
+  @StorageProp('skinVersion') skinVersionObs: number = 0
   @Consume('pageStack') pageStack: NavPathStack
   @Consume('topAvoidHeight') topAvoidHeight: number
   @Consume('playerStore') playerStore: PlayerStore
@@ -420,14 +425,14 @@ export struct SongWiki {
     Row({ space: 4 }) {
       if (this.song.artists && this.song.artists.length > 0) {
         ForEach(this.song.artists, (artist: SongArtist, index: number) => {
-          Text(artist.name).fontSize(13).fontColor('#b4b4bd').maxLines(1)
+          Text(artist.name).fontSize(13).fontColor(TC.textBody()).maxLines(1)
             .onClick(() => this.openSongArtist(artist))
           if (index < (this.song.artists || []).length - 1) {
-            Text('/').fontSize(13).fontColor('#66666e')
+            Text('/').fontSize(13).fontColor(TC.textQuaternary())
           }
         })
       } else {
-        Text(this.song.author).fontSize(13).fontColor('#92929a')
+        Text(this.song.author).fontSize(13).fontColor(TC.textSecondary())
       }
     }
     .width('100%')
@@ -627,9 +632,9 @@ export struct SongWiki {
         .layoutWeight(1)
         .fontSize(18)
         .fontWeight(FontWeight.Bold)
-        .fontColor('#f4f4f6')
+        .fontColor(TC.textBody())
       if (subtitle) {
-        Text(subtitle).fontSize(11).fontColor('#686870')
+        Text(subtitle).fontSize(11).fontColor(TC.textQuaternary())
       }
     }
     .width('100%')
@@ -651,7 +656,7 @@ export struct SongWiki {
             .width('100%')
             .fontSize(13)
             .fontWeight(FontWeight.Medium)
-            .fontColor('#e8e8eb')
+            .fontColor(TC.textBody())
             .maxLines(2)
             .textOverflow({ overflow: TextOverflow.Ellipsis })
         }
@@ -659,17 +664,17 @@ export struct SongWiki {
           Text(item.subtitle)
             .width('100%')
             .fontSize(11)
-            .fontColor('#8c8c94')
+            .fontColor(TC.textTertiary())
             .maxLines(2)
             .textOverflow({ overflow: TextOverflow.Ellipsis })
         }
         if (item.playCount > 0) {
-          Text(this.formatCount(item.playCount)).fontSize(10).fontColor('#686870')
+          Text(this.formatCount(item.playCount)).fontSize(10).fontColor(TC.textQuaternary())
         }
         if (item.targetUrl.startsWith('orpheus://')) {
           Text('网易云音乐客户端内容')
             .fontSize(9)
-            .fontColor('#7f6a70')
+            .fontColor(TC.textQuaternary())
         }
       }
       .layoutWeight(1)
@@ -686,7 +691,7 @@ export struct SongWiki {
         Text(field.title)
           .width(76)
           .fontSize(13)
-          .fontColor('#85858e')
+          .fontColor(TC.textTertiary())
         if (field.expandable) {
           Column() {
             this.WikiItemRow(field.items[0], true)
@@ -694,13 +699,13 @@ export struct SongWiki {
           .layoutWeight(1)
           SymbolGlyph($r('sys.symbol.chevron_right'))
             .fontSize(16)
-            .fontColor(['#77777f'])
+            .fontColor([TC.textTertiary()])
         } else {
           Text(field.items.map((item: WikiValueItem) => item.title || item.subtitle).join(' / '))
             .layoutWeight(1)
             .fontSize(13)
             .lineHeight(20)
-            .fontColor('#eeeeF1')
+            .fontColor(TC.textBody())
             .textAlign(TextAlign.End)
         }
       }
@@ -716,7 +721,7 @@ export struct SongWiki {
     }
     .width('100%')
     .padding({ left: 16, right: 14, top: 13, bottom: 13 })
-    .backgroundColor('#1b1b20')
+    .backgroundColor(TC.surfaceCard())
     .borderRadius(14)
   }
 
@@ -728,7 +733,7 @@ export struct SongWiki {
         .height(100)
         .borderRadius(10)
         .objectFit(ImageFit.Cover)
-        .backgroundColor('#292930')
+        .backgroundColor(TC.chipBackground())
       Column({ space: 7 }) {
         Row({ space: 7 }) {
           if (sheet.type.length > 0 && sheet.type[0].icon) {
@@ -737,17 +742,17 @@ export struct SongWiki {
           Text(sheet.name)
             .fontSize(15)
             .fontWeight(FontWeight.Bold)
-            .fontColor('#f3f3f5')
+            .fontColor(TC.textBody())
         }
         Text(this.sheetMeta(sheet))
           .width('100%')
           .fontSize(11)
           .lineHeight(18)
-          .fontColor('#92929a')
+          .fontColor(TC.textSecondary())
           .maxLines(3)
         Row({ space: 5 }) {
-          Text('查看完整乐谱').fontSize(11).fontColor('#ff7587')
-          SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(11).fontColor(['#ff7587'])
+          Text('查看完整乐谱').fontSize(11).fontColor(TC.accentSoft())
+          SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(11).fontColor([TC.accentSoft()])
         }
       }
       .layoutWeight(1)
@@ -755,9 +760,21 @@ export struct SongWiki {
     }
     .width('100%')
     .padding(13)
-    .backgroundColor('#1b1b20')
+    .backgroundColor(TC.surfaceCard())
     .borderRadius(16)
     .onClick(() => this.openSheetPreview(sheet))
+  }
+
+  /**
+   * 回忆坐标顶部是压在背景图 + 底部黑色渐变上的文字，必须保持浅色；
+   * 只有接口没给背景图（纯浅色卡片底）时才回落到主题文字色，避免白字看不见。
+   */
+  private memoryTitleColor(): ResourceColor {
+    return this.memoryBgImage ? TC.textOnMediaSecondary() : TC.textBody()
+  }
+
+  private memoryNameColor(): ResourceColor {
+    return this.memoryBgImage ? TC.textOnMedia() : TC.textPrimary()
   }
 
   @Builder
@@ -766,7 +783,7 @@ export struct SongWiki {
       // 顶部背景图 + 歌曲名
       Stack({ alignContent: Alignment.BottomStart }) {
         if (this.memoryBgImage) {
-          Image(this.memoryBgImage)
+          Image(DecorationMedia.displayUri(this.memoryBgImage))
             .width('100%')
             .height(180)
             .objectFit(ImageFit.Cover)
@@ -784,17 +801,17 @@ export struct SongWiki {
           Column()
             .width('100%')
             .height(120)
-            .backgroundColor('#1f1f26')
+            .backgroundColor(TC.surfaceCardAlt())
             .borderRadius({ topLeft: 16, topRight: 16 })
         }
         Column({ space: 4 }) {
           Text(this.memoryTitle)
             .fontSize(12)
-            .fontColor('#b8b8c0')
+            .fontColor(this.memoryTitleColor())
           Text(this.song.name)
             .fontSize(22)
             .fontWeight(FontWeight.Bold)
-            .fontColor('#ffffff')
+            .fontColor(this.memoryNameColor())
             .maxLines(1)
             .textOverflow({ overflow: TextOverflow.Ellipsis })
         }
@@ -809,16 +826,16 @@ export struct SongWiki {
           Column({ space: 6 }) {
             Text(this.memoryFirstListen.title)
               .fontSize(12)
-              .fontColor('#8c8c94')
+              .fontColor(TC.textTertiary())
             Row({ space: 6 }) {
               Text(this.memoryFirstListen.date)
                 .fontSize(15)
                 .fontWeight(FontWeight.Medium)
-                .fontColor('#e8e8eb')
+                .fontColor(TC.textBody())
               if (this.memoryFirstListen.season && this.memoryFirstListen.period) {
                 Text(`${this.memoryFirstListen.season} ${this.memoryFirstListen.period}`)
                   .fontSize(12)
-                  .fontColor('#6d6d75')
+                  .fontColor(TC.textTertiary())
               }
             }
             .width('100%')
@@ -829,24 +846,24 @@ export struct SongWiki {
         }
 
         if (this.memoryFirstListen && this.memoryTotalPlay) {
-          Divider().color('#2a2a32')
+          Divider().color(TC.textQuaternary())
         }
 
         if (this.memoryTotalPlay) {
           Column({ space: 6 }) {
             Text(this.memoryTotalPlay.title)
               .fontSize(12)
-              .fontColor('#8c8c94')
+              .fontColor(TC.textTertiary())
             if (this.memoryTotalPlay.playCount > 0) {
               Text(`${this.memoryTotalPlay.playCount}`)
                 .fontSize(28)
                 .fontWeight(FontWeight.Bold)
-                .fontColor('#ffffff')
+                .fontColor(TC.textPrimary())
             }
             if (this.memoryTotalPlay.text) {
               Text(this.memoryTotalPlay.text)
                 .fontSize(13)
-                .fontColor('#aaaab2')
+                .fontColor(TC.textBody())
                 .maxLines(2)
                 .textOverflow({ overflow: TextOverflow.Ellipsis })
             }
@@ -859,7 +876,7 @@ export struct SongWiki {
       .padding({ left: 18, right: 18, top: 16, bottom: 20 })
     }
     .width('100%')
-    .backgroundColor('#1b1b20')
+    .backgroundColor(TC.surfaceCard())
     .borderRadius(16)
     .clip(true)
   }
@@ -873,12 +890,12 @@ export struct SongWiki {
         }
         .padding({ left: 13, right: 13, top: 10, bottom: 10 })
         if (index < section.items.length - 1) {
-          Divider().color('#292930').margin({ left: 83 })
+          Divider().color(TC.chipBackground()).margin({ left: 83 })
         }
       })
     }
     .width('100%')
-    .backgroundColor('#1b1b20')
+    .backgroundColor(TC.surfaceCard())
     .borderRadius(16)
   }
 
@@ -893,15 +910,15 @@ export struct SongWiki {
               .height(132)
               .borderRadius(15)
               .objectFit(ImageFit.Cover)
-              .backgroundColor('#25252b')
+              .backgroundColor(TC.surfaceRaised())
             Text(item.title)
               .width(132)
               .fontSize(12)
-              .fontColor('#dedee2')
+              .fontColor(TC.textBody())
               .maxLines(2)
               .textOverflow({ overflow: TextOverflow.Ellipsis })
             if (item.playCount > 0) {
-              Text(this.formatCount(item.playCount)).width(132).fontSize(9).fontColor('#686870')
+              Text(this.formatCount(item.playCount)).width(132).fontSize(9).fontColor(TC.textQuaternary())
             }
           }
           .alignItems(HorizontalAlign.Start)
@@ -922,11 +939,18 @@ export struct SongWiki {
           this.WikiItemRow(item, true)
         }
         .padding(13)
-        .backgroundColor('#1b1b20')
+        .backgroundColor(TC.surfaceCard())
         .borderRadius(14)
       })
     }
     .width('100%')
+  }
+
+  @Builder
+  private skin_DetailSheetContent() {
+    SheetSkinFrame() {
+      this.DetailSheetContent()
+    }
   }
 
   @Builder
@@ -937,8 +961,8 @@ export struct SongWiki {
           .layoutWeight(1)
           .fontSize(18)
           .fontWeight(FontWeight.Bold)
-          .fontColor('#ffffff')
-        Text(`${this.detailSheetItems.length} 项`).fontSize(11).fontColor('#77777f')
+          .fontColor(TC.textPrimary())
+        Text(`${this.detailSheetItems.length} 项`).fontSize(11).fontColor(TC.textTertiary())
       }
       .width('100%')
       Scroll() {
@@ -948,7 +972,7 @@ export struct SongWiki {
               this.WikiItemRow(item, true)
             }
             .padding(13)
-            .backgroundColor('#222228')
+            .backgroundColor(TC.surfaceInset())
             .borderRadius(14)
           })
         }
@@ -962,6 +986,13 @@ export struct SongWiki {
   }
 
   @Builder
+  private skin_ScorePreviewContent() {
+    SheetSkinFrame() {
+      this.ScorePreviewContent()
+    }
+  }
+
+  @Builder
   private ScorePreviewContent() {
     Column({ space: 12 }) {
       Row() {
@@ -969,16 +1000,16 @@ export struct SongWiki {
           Text(this.selectedSheet ? this.selectedSheet.name : '乐谱预览')
             .fontSize(18)
             .fontWeight(FontWeight.Bold)
-            .fontColor('#ffffff')
+            .fontColor(TC.textPrimary())
           if (this.selectedSheet) {
-            Text(this.sheetMeta(this.selectedSheet)).fontSize(10).fontColor('#7f7f87').maxLines(1)
+            Text(this.sheetMeta(this.selectedSheet)).fontSize(10).fontColor(TC.textSecondary()).maxLines(1)
           }
         }
         .layoutWeight(1)
         .alignItems(HorizontalAlign.Start)
         SymbolGlyph($r('sys.symbol.xmark_circle_fill'))
           .fontSize(25)
-          .fontColor(['#6d6d75'])
+          .fontColor([TC.textTertiary()])
           .onClick(() => this.scoreSheetVisible = false)
       }
       .width('100%')
@@ -986,25 +1017,25 @@ export struct SongWiki {
       Row({ space: 10 }) {
         Button() {
           Row({ space: 6 }) {
-            SymbolGlyph($r('sys.symbol.share')).fontSize(16).fontColor(['#ffffff'])
-            Text('分享').fontSize(13).fontColor('#ffffff')
+            SymbolGlyph($r('sys.symbol.share')).fontSize(16).fontColor([TC.textPrimary()])
+            Text('分享').fontSize(13).fontColor(TC.textPrimary())
           }
         }
         .layoutWeight(1)
         .height(42)
-        .backgroundColor('#303037')
+        .backgroundColor(TC.surfaceRaised())
         .enabled(!this.previewActionRunning && this.previewPages.length > 0)
         .onClick(() => this.shareScore())
 
         Button() {
           Row({ space: 6 }) {
-            SymbolGlyph($r('sys.symbol.arrow_down_circle')).fontSize(16).fontColor(['#ffffff'])
-            Text('保存到图库').fontSize(13).fontColor('#ffffff')
+            SymbolGlyph($r('sys.symbol.arrow_down_circle')).fontSize(16).fontColor([TC.textOnAccent()])
+            Text('保存到图库').fontSize(13).fontColor(TC.textOnAccent())
           }
         }
         .layoutWeight(1)
         .height(42)
-        .backgroundColor('#ef233c')
+        .backgroundColor(TC.accent())
         .enabled(!this.previewActionRunning && this.previewPages.length > 0)
         .onClick(() => this.saveScoreToGallery())
       }
@@ -1020,8 +1051,8 @@ export struct SongWiki {
 
       if (this.previewLoading) {
         Column({ space: 12 }) {
-          LoadingProgress().width(42).color('#ef233c')
-          Text('正在加载完整乐谱…').fontSize(12).fontColor('#77777f')
+          LoadingProgress().width(42).color(TC.accent())
+          Text('正在加载完整乐谱…').fontSize(12).fontColor(TC.textTertiary())
         }
         .layoutWeight(1)
         .justifyContent(FlexAlign.Center)
@@ -1033,13 +1064,13 @@ export struct SongWiki {
                 Text(`第 ${page.pageNumber} 页`)
                   .width('100%')
                   .fontSize(10)
-                  .fontColor('#77777f')
+                  .fontColor(TC.textTertiary())
                   .textAlign(TextAlign.Center)
                 Image(page.url)
                   .width('100%')
                   .aspectRatio(0.72)
                   .objectFit(ImageFit.Cover)
-                  .backgroundColor('#ffffff')
+                  .backgroundColor(TC.textPrimary())
                   .borderRadius(10)
               }
             })
@@ -1087,18 +1118,19 @@ export struct SongWiki {
 
   build() {
     NavDestination() {
+      SkinBackdrop()
       Column() {
         Column().width('100%').height(this.topAvoidHeight)
         Row() {
           SymbolGlyph($r('sys.symbol.chevron_left'))
             .fontSize(24)
-            .fontColor(['#ffffff'])
+            .fontColor([TC.textPrimary()])
             .onClick(() => this.pageStack.pop())
           Text('歌曲百科')
             .layoutWeight(1)
             .fontSize(18)
             .fontWeight(FontWeight.Bold)
-            .fontColor('#ffffff')
+            .fontColor(TC.textPrimary())
             .textAlign(TextAlign.Center)
           Column().width(24)
         }
@@ -1107,13 +1139,13 @@ export struct SongWiki {
         .padding({ left: 16, right: 16 })
 
         if (this.loading) {
-          LoadingProgress().layoutWeight(1).width(46).color('#ef233c')
+          LoadingProgress().layoutWeight(1).width(46).color(TC.accent())
         } else if (this.message) {
           Column({ space: 12 }) {
             SymbolGlyph($r('sys.symbol.music'))
               .fontSize(46)
-              .fontColor(['#55555d'])
-            Text(this.message).fontSize(13).fontColor('#77777f')
+              .fontColor([TC.textQuaternary()])
+            Text(this.message).fontSize(13).fontColor(TC.textTertiary())
           }
           .layoutWeight(1)
           .justifyContent(FlexAlign.Center)
@@ -1130,11 +1162,11 @@ export struct SongWiki {
                   Text(this.song.name)
                     .fontSize(20)
                     .fontWeight(FontWeight.Bold)
-                    .fontColor('#ffffff')
+                    .fontColor(TC.textPrimary())
                     .maxLines(2)
                   this.SongArtistLinks()
                   if (this.song.album) {
-                    Text(this.song.album).fontSize(11).fontColor('#ff7d8e')
+                    Text(this.song.album).fontSize(11).fontColor(TC.accentSoft())
                       .onClick(() => this.openSongAlbum())
                   }
                 }
@@ -1150,9 +1182,9 @@ export struct SongWiki {
                     ForEach(this.wikiMetaItems, (item: WikiValueItem) => {
                       Text(item.title)
                         .fontSize(11)
-                        .fontColor(item.targetUrl ? '#ff7d8e' : '#aaaab2')
+                        .fontColor(item.targetUrl ? TC.accentSoft() : TC.textTertiary())
                         .padding({ left: 11, right: 11, top: 7, bottom: 7 })
-                        .backgroundColor('#202026')
+                        .backgroundColor(TC.surfaceCardAlt())
                         .borderRadius(14)
                         .onClick(() => this.openWikiItem(item))
                     })
@@ -1190,9 +1222,9 @@ export struct SongWiki {
                     Row({ space: 8 }) {
                       Text('全部')
                         .fontSize(11)
-                        .fontColor(this.selectedInstrumentCode === 0 ? '#ffffff' : '#9a9aa2')
+                        .fontColor(this.selectedInstrumentCode === 0 ? TC.textOnAccent() : TC.textTertiary())
                         .padding({ left: 13, right: 13, top: 8, bottom: 8 })
-                        .backgroundColor(this.selectedInstrumentCode === 0 ? '#ef233c' : '#24242a')
+                        .backgroundColor(this.selectedInstrumentCode === 0 ? TC.accent() : TC.surfaceInset())
                         .borderRadius(16)
                         .onClick(() => this.selectedInstrumentCode = 0)
                       ForEach(this.instrumentTypes, (item: SheetInstrumentType) => {
@@ -1200,10 +1232,10 @@ export struct SongWiki {
                           Image(item.icon).width(16).height(16).objectFit(ImageFit.Cover)
                           Text(item.name)
                             .fontSize(11)
-                            .fontColor(this.selectedInstrumentCode === item.code ? '#ffffff' : '#9a9aa2')
+                            .fontColor(this.selectedInstrumentCode === item.code ? TC.textOnAccent() : TC.textTertiary())
                         }
                         .padding({ left: 11, right: 12, top: 7, bottom: 7 })
-                        .backgroundColor(this.selectedInstrumentCode === item.code ? '#ef233c' : '#24242a')
+                        .backgroundColor(this.selectedInstrumentCode === item.code ? TC.accent() : TC.surfaceInset())
                         .borderRadius(16)
                         .onClick(() => this.selectedInstrumentCode = item.code)
                       })
@@ -1239,10 +1271,10 @@ export struct SongWiki {
                   .width('100%')
                   .fontSize(11)
                   .lineHeight(18)
-                  .fontColor('#a97d84')
+                  .fontColor(TC.textTertiary())
                   .textAlign(TextAlign.Center)
                   .padding(12)
-                  .backgroundColor('#201a1e')
+                  .backgroundColor(TC.surfaceInset())
                   .borderRadius(12)
               }
             }
@@ -1255,17 +1287,17 @@ export struct SongWiki {
       }
       .width('100%')
       .height('100%')
-      .backgroundColor('#121215')
-      .bindSheet(this.detailSheetVisible, this.DetailSheetContent(), {
+      .backgroundColor(TC.pageBackground())
+      .bindSheet(this.detailSheetVisible, this.skin_DetailSheetContent(), {
         height: '50%',
-        backgroundColor: '#19191f',
+        backgroundColor: TC.sheetBackground(),
         showClose: false,
         dragBar: true,
         onDisappear: () => this.detailSheetVisible = false
       })
-      .bindSheet(this.scoreSheetVisible, this.ScorePreviewContent(), {
+      .bindSheet(this.scoreSheetVisible, this.skin_ScorePreviewContent(), {
         height: '94%',
-        backgroundColor: '#151519',
+        backgroundColor: TC.sheetBackground(),
         showClose: false,
         dragBar: false,
         onDisappear: () => this.scoreSheetVisible = false

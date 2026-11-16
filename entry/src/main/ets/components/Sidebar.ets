@@ -1,9 +1,13 @@
+import { SheetSkinFrame } from './SheetSkin'
 import { common, OpenLinkOptions } from '@kit.AbilityKit'
 import { VipGrowthClaimResponse, VipGrowthResponse, VipInfoResponse } from '../models/api'
 import { ApiClient } from '../services/ApiClient'
 import { SleepTimerService } from '../services/SleepTimerService'
 import { parseVipInfo, VipDisplayInfo } from '../services/VipService'
 import { AuthStore } from '../stores/AuthStore'
+import { TC } from '../services/ThemeColors'
+import { DecoKeys } from '../services/DecorationRuntime'
+import { DecorationMedia } from '../services/DecorationMedia'
 
 interface SidebarMenuItem {
   icon: Resource
@@ -16,6 +20,17 @@ interface SidebarMenuItem {
 
 @Component
 export struct Sidebar {
+  @StorageProp('skinVersion') skinVersionObs: number = 0
+  @StorageProp(DecoKeys.SIDEBAR_BG) sidebarBg: string = ''
+  @StorageProp(DecoKeys.SIDEBAR_BG_OPACITY) sidebarBgOpacity: number = 100
+  @StorageProp(DecoKeys.SIDEBAR_BG_BLUR) sidebarBgBlur: number = 0
+  @StorageProp(DecoKeys.SIDEBAR_BG_COLOR) sidebarBgColor: string = ''
+  @StorageProp(DecoKeys.SIDEBAR_TEXT_COLOR) sidebarTextColor: string = ''
+  @StorageProp(DecoKeys.SIDEBAR_TEXT_SIZE) sidebarTextSize: number = 16
+  @StorageProp(DecoKeys.SIDEBAR_ICON_COLOR) sidebarIconColor: string = ''
+  @StorageProp(DecoKeys.VIP_CARD) vipCardImage: string = ''
+  @StorageProp(DecoKeys.VIP_BADGES) vipBadges: string = ''
+  @StorageProp(DecoKeys.SVIP_BADGES) svipBadges: string = ''
   @Consume('pageStack') pageStack: NavPathStack
   @Consume('authStore') authStore: AuthStore
   @Prop visible: boolean = false
@@ -45,11 +60,42 @@ export struct Sidebar {
     { icon: $r('sys.symbol.clock'), title: '最近播放', subtitle: '歌曲、声音及更多播放记录', available: true, route: 'RecentPlaybackPage' },
     { icon: $r('sys.symbol.cloud'), title: '我的云盘', subtitle: '上传、管理与播放云盘音乐', available: true, route: 'CloudDrivePage' },
     { icon: $r('sys.symbol.arrow_down_circle'), title: '本地与下载', subtitle: '下载管理、导入音乐与离线播放', available: true, route: 'LocalMusicPage' },
+    { icon: $r('sys.symbol.square_and_pencil'), title: '装扮中心', subtitle: '皮肤、播放器与图标自定义', available: true, route: 'DecorationCenterPage' },
     { icon: $r('sys.symbol.wand_and_stars'), title: 'AI 写歌', subtitle: '风格改编、AI 作词与灵感创作', available: true, route: 'AiSongStudioPage' },
     { icon: $r('sys.symbol.cart'), title: '云贝中心', subtitle: '签到、任务与收支记录', available: true, route: 'YunbeiPage' },
     { icon: $r('sys.symbol.clock'), title: '定时关闭', subtitle: '倒计时结束自动暂停播放', available: true, action: 'sleep' },
     { icon: $r('sys.symbol.gearshape'), title: '设置', subtitle: '播放与网络设置', available: true, route: 'SettingsPage' }
   ]
+
+  /** 侧边栏文字色 / 图标色：装扮优先，未指定跟随主题。 */
+  private sbText(): ResourceColor {
+    return this.sidebarTextColor ? this.sidebarTextColor : TC.textPrimary()
+  }
+
+  private sbTextDim(): ResourceColor {
+    return this.sidebarTextColor ? this.sidebarTextColor : TC.textSecondary()
+  }
+
+  private sbIcon(): ResourceColor {
+    // 只设了「文字颜色」装扮时，图标也跟着走（编辑器会同步写两项，这里再兜底旧存档）
+    if (this.sidebarIconColor) { return this.sidebarIconColor }
+    if (this.sidebarTextColor) { return this.sidebarTextColor }
+    return TC.textPrimary()
+  }
+
+  /** 当前等级对应的自定义贴图；SVIP 未配置时回退同等级的 VIP 贴图。 */
+  private vipBadgeSrc(): string {
+    if (this.vipLevel <= 0) { return '' }
+    const index = this.vipLevel - 1
+    if (index < 0) { return '' }
+    if (this.vipSvip) {
+      const svip = this.svipBadges ? this.svipBadges.split('\n') : []
+      if (index < svip.length && svip[index]) { return svip[index] }
+    }
+    if (!this.vipBadges) { return '' }
+    const parts = this.vipBadges.split('\n')
+    return index < parts.length ? parts[index] : ''
+  }
 
   private openLogin(): void {
     this.onClose()
@@ -121,7 +167,7 @@ export struct Sidebar {
       const dateStr = `${date.getFullYear()}.${(date.getMonth() + 1).toString().padStart(2, '0')}.${date.getDate().toString().padStart(2, '0')}`
       return `有效期至 ${dateStr}`
     }
-    return '音质选项根据歌曲资源和账号权限自动回落'
+    return '会员有效期内可享受对应音质权益'
   }
 
   aboutToAppear(): void {
@@ -192,11 +238,26 @@ export struct Sidebar {
   }
 
   @Builder
+  private VipMark() {
+    if (this.vipBadgeSrc()) {
+      // 自定义贴图自带等级文字，只需渲染图片本身
+      Image(DecorationMedia.displayUri(this.vipBadgeSrc()))
+        .width(54)
+        .height(18)
+        .objectFit(ImageFit.Contain)
+    } else if (this.vipSvip) {
+      Image($r('app.media.ic_svip')).width(40).height(18).objectFit(ImageFit.Contain)
+    } else {
+      Image($r('app.media.ic_vip')).width(34).height(18).objectFit(ImageFit.Contain)
+    }
+  }
+
+  @Builder
   private VipCard() {
     Column({ space: 0 }) {
-      if (this.vipCardBg.length > 0 && this.vipActive) {
+      if (this.vipCardImage.length > 0 || (this.vipCardBg.length > 0 && this.vipActive)) {
         Stack({ alignContent: Alignment.TopStart }) {
-          Image(this.vipCardBg)
+          Image(DecorationMedia.displayUri(this.vipCardImage ? this.vipCardImage : this.vipCardBg))
             .width('100%')
             .height(140)
             .objectFit(ImageFit.Cover)
@@ -206,15 +267,13 @@ export struct Sidebar {
             Row() {
               Column({ space: 3 }) {
                 Row({ space: 4 }) {
-                  if (this.vipSvip) {
-                    Image($r('app.media.ic_svip')).width(40).height(18).objectFit(ImageFit.Contain)
-                  } else {
-                    Image($r('app.media.ic_vip')).width(34).height(18).objectFit(ImageFit.Contain)
+                  this.VipMark()
+                  if (!this.vipBadgeSrc()) {
+                    Text(this.vipLevel > 0 ? this.getVipText(this.vipLevel) : '')
+                      .fontSize(11)
+                      .fontWeight(FontWeight.Regular)
+                      .fontColor(this.vipLabelColor())
                   }
-                  Text(this.vipLevel > 0 ? this.getVipText(this.vipLevel) : '')
-                    .fontSize(11)
-                    .fontWeight(FontWeight.Regular)
-                    .fontColor(this.vipLabelColor())
                 }
                 Text(this.vipSubtext())
                   .fontSize(11)
@@ -247,7 +306,7 @@ export struct Sidebar {
             }
             .width('100%')
             Divider().color('rgba(255,255,255,0.08)')
-            Text('音质选项会根据歌曲实际资源和账号权限自动回落')
+            Text('会员有效期内可享受对应音质权益')
               .fontSize(11)
               .fontColor('#92877d')
           }
@@ -264,20 +323,18 @@ export struct Sidebar {
             Column({ space: 3 }) {
               Row({ space: 4 }) {
                 if (this.vipActive) {
-                  if (this.vipSvip) {
-                    Image($r('app.media.ic_svip')).width(40).height(18).objectFit(ImageFit.Contain)
-                  } else {
-                    Image($r('app.media.ic_vip')).width(34).height(18).objectFit(ImageFit.Contain)
+                  this.VipMark()
+                  if (!this.vipBadgeSrc()) {
+                    Text(this.vipLevel > 0 ? this.getVipText(this.vipLevel) : '')
+                      .fontSize(11)
+                      .fontWeight(FontWeight.Regular)
+                      .fontColor(this.vipLabelColor())
                   }
-                  Text(this.vipLevel > 0 ? this.getVipText(this.vipLevel) : '')
-                    .fontSize(11)
-                    .fontWeight(FontWeight.Regular)
-                    .fontColor(this.vipLabelColor())
                 } else {
                   Text('VIP已过期')
                     .fontSize(15)
                     .fontWeight(FontWeight.Bold)
-                    .fontColor('#888890')
+                    .fontColor(TC.textTertiary())
                 }
               }
               Text(this.vipSubtext())
@@ -311,7 +368,7 @@ export struct Sidebar {
           }
           .width('100%')
           Divider().color('rgba(255,255,255,0.08)')
-          Text('音质选项会根据歌曲实际资源和账号权限自动回落')
+          Text('会员有效期内可享受对应音质权益')
             .fontSize(11)
             .fontColor('#92877d')
         }
@@ -419,16 +476,23 @@ export struct Sidebar {
   }
 
   @Builder
+  private skin_SleepSheetBuilder() {
+    SheetSkinFrame() {
+      this.SleepSheetBuilder()
+    }
+  }
+
+  @Builder
   private SleepSheetBuilder() {
     Column({ space: 16 }) {
       Column({ space: 6 }) {
         Text('定时关闭播放')
           .fontSize(17)
           .fontWeight(FontWeight.Bold)
-          .fontColor('#ffffff')
+          .fontColor(TC.textPrimary())
         Text(this.sleepStatusText())
           .fontSize(12)
-          .fontColor('#9a9aa2')
+          .fontColor(TC.textSecondary())
       }
       .width('100%')
       .alignItems(HorizontalAlign.Center)
@@ -437,7 +501,7 @@ export struct Sidebar {
         Text(SleepTimerService.format(this.sleepRemainingMs))
           .fontSize(46)
           .fontWeight(FontWeight.Bold)
-          .fontColor('#ffffff')
+          .fontColor(TC.textPrimary())
           .margin({ top: 2, bottom: 2 })
       }
 
@@ -447,15 +511,15 @@ export struct Sidebar {
             Text(`${minutes}`)
               .fontSize(20)
               .fontWeight(FontWeight.Bold)
-              .fontColor(this.selectedMinutes === minutes && SleepTimerService.enabled ? '#ffffff' : '#e7e7eb')
+              .fontColor(this.selectedMinutes === minutes && SleepTimerService.enabled ? TC.textOnAccent() : TC.textPrimary())
             Text('分钟')
               .fontSize(10)
-              .fontColor('#8a8a92')
+              .fontColor(TC.textSecondary())
           }
           .width(96)
           .height(96)
           .borderRadius(48)
-          .backgroundColor(this.selectedMinutes === minutes && SleepTimerService.enabled ? '#ef233c' : '#232329')
+          .backgroundColor(this.selectedMinutes === minutes && SleepTimerService.enabled ? TC.accent() : TC.surfaceInset())
           .justifyContent(FlexAlign.Center)
           .alignItems(HorizontalAlign.Center)
           .onClick(() => this.selectSleepMinutes(minutes))
@@ -466,21 +530,21 @@ export struct Sidebar {
       Row({ space: 10 }) {
         SymbolGlyph($r('sys.symbol.clock'))
           .fontSize(18)
-          .fontColor(['#e7e7eb'])
+          .fontColor([TC.textBody()])
         Text('自定义时长')
           .fontSize(14)
-          .fontColor('#ededf0')
+          .fontColor(TC.textBody())
         Blank()
         Text(this.customLabel())
           .fontSize(12)
-          .fontColor('#8a8a92')
+          .fontColor(TC.textSecondary())
         SymbolGlyph($r('sys.symbol.chevron_right'))
           .fontSize(15)
-          .fontColor(['#5e5e66'])
+          .fontColor([TC.textQuaternary()])
       }
       .width('100%')
       .padding({ left: 14, right: 14, top: 12, bottom: 12 })
-      .backgroundColor('#232329')
+      .backgroundColor(TC.surfaceInset())
       .borderRadius(14)
       .onClick(() => this.openCustomTime())
 
@@ -488,10 +552,10 @@ export struct Sidebar {
         Column({ space: 3 }) {
           Text('开启定时关闭')
             .fontSize(14)
-            .fontColor('#ededf0')
+            .fontColor(TC.textBody())
           Text('倒计时仅在播放时递减')
             .fontSize(10)
-            .fontColor('#66666e')
+            .fontColor(TC.textQuaternary())
         }
         .layoutWeight(1)
         .alignItems(HorizontalAlign.Start)
@@ -500,17 +564,17 @@ export struct Sidebar {
       }
       .width('100%')
       .padding({ left: 14, right: 14, top: 10, bottom: 10 })
-      .backgroundColor('#232329')
+      .backgroundColor(TC.surfaceInset())
       .borderRadius(14)
 
       Row({ space: 12 }) {
         Column({ space: 3 }) {
           Text('播完整首歌后停止')
             .fontSize(14)
-            .fontColor('#ededf0')
+            .fontColor(TC.textBody())
           Text('等待当前歌曲自然结束后暂停')
             .fontSize(10)
-            .fontColor('#66666e')
+            .fontColor(TC.textQuaternary())
         }
         .layoutWeight(1)
         .alignItems(HorizontalAlign.Start)
@@ -522,15 +586,15 @@ export struct Sidebar {
       }
       .width('100%')
       .padding({ left: 14, right: 14, top: 10, bottom: 10 })
-      .backgroundColor('#232329')
+      .backgroundColor(TC.surfaceInset())
       .borderRadius(14)
 
       if (SleepTimerService.enabled) {
         Button('取消定时关闭')
           .width('100%')
           .height(44)
-          .backgroundColor('#2b2024')
-          .fontColor('#ff7785')
+          .backgroundColor(TC.accentContainer())
+          .fontColor(TC.accentSoft())
           .borderRadius(14)
           .onClick(() => {
             SleepTimerService.cancel()
@@ -554,108 +618,102 @@ export struct Sidebar {
         .onClick(() => this.onClose())
         .opacity(this.visible ? 1 : 0)
 
-      Column() {
-        Stack({ alignContent: Alignment.TopStart }) {
-          Column()
+      Stack({ alignContent: Alignment.TopStart }) {
+        Column()
+          .width('100%')
+          .height('100%')
+          .backgroundColor(this.sidebarBgColor ? this.sidebarBgColor : TC.sheetBackground())
+
+        if (this.sidebarBg) {
+          Image(DecorationMedia.displayUri(this.sidebarBg))
             .width('100%')
             .height('100%')
-            .linearGradient({
-              angle: 145,
-              colors: [['#48222a', 0], ['#231a21', 0.48], ['#17171c', 1]]
-            })
+            .objectFit(ImageFit.Cover)
+            .scale({ x: 1.08, y: 1.08 })
+            .blur(this.sidebarBgBlur)
+            .opacity(Math.max(0, Math.min(100, this.sidebarBgOpacity)) / 100)
+        }
 
-          Column({ space: 16 }) {
-            Row({ space: 12 }) {
-              if (this.authStore.avatarUrl) {
-                Image(this.authStore.avatarUrl)
-                  .width(52)
-                  .height(52)
-                  .borderRadius(26)
-                  .objectFit(ImageFit.Cover)
-              } else {
-                Stack() {
-                  SymbolGlyph($r('sys.symbol.person_fill'))
-                    .fontSize(25)
-                    .fontColor(['#f0f0f2'])
-                }
+        Column() {
+        Column({ space: 16 }) {
+          Row({ space: 12 }) {
+            if (this.authStore.avatarUrl) {
+              Image(this.authStore.avatarUrl)
                 .width(52)
                 .height(52)
                 .borderRadius(26)
-                .backgroundColor('rgba(255,255,255,0.12)')
+                .objectFit(ImageFit.Cover)
+            } else {
+              Stack() {
+                SymbolGlyph($r('sys.symbol.person_fill'))
+                  .fontSize(25)
+                  .fontColor([this.sbIcon()])
               }
-
-              Column({ space: 5 }) {
-                Text(this.authStore.nickname)
-                  .fontSize(18)
-                  .fontWeight(FontWeight.Bold)
-                  .fontColor('#ffffff')
-                Text(this.authStore.loggedIn ? '查看个人主页' : '登录后同步收藏与歌单')
-                  .fontSize(11)
-                  .fontColor('#aaaab2')
-              }
-              .layoutWeight(1)
-              .alignItems(HorizontalAlign.Start)
-
-              SymbolGlyph($r('sys.symbol.chevron_right'))
-                .fontSize(18)
-                .fontColor(['#b3b3ba'])
+              .width(52)
+              .height(52)
+              .borderRadius(26)
+              .backgroundColor(TC.surfaceInset())
             }
-            .width('100%')
-            .onClick(() => {
-              if (!this.authStore.loggedIn) {
-                this.openLogin()
-              } else {
-                this.onClose()
-                this.onOpenMine()
-              }
-            })
 
-            this.VipCard()
+            Column({ space: 5 }) {
+              Text(this.authStore.nickname)
+                .fontSize(18)
+                .fontWeight(FontWeight.Bold)
+                .fontColor(this.sbText())
+              Text(this.authStore.loggedIn ? '查看个人主页' : '登录后同步收藏与歌单')
+                .fontSize(11)
+                .fontColor(this.sbTextDim())
+            }
+            .layoutWeight(1)
+            .alignItems(HorizontalAlign.Start)
+
+            SymbolGlyph($r('sys.symbol.chevron_right'))
+              .fontSize(18)
+              .fontColor([this.sbIcon()])
           }
-          .padding({ left: 20, right: 20, top: this.topAvoidHeight + 18 })
+          .width('100%')
+          .onClick(() => {
+            if (!this.authStore.loggedIn) {
+              this.openLogin()
+            } else {
+              this.onClose()
+              this.onOpenMine()
+            }
+          })
+
+          this.VipCard()
         }
-        .height(238 + this.topAvoidHeight)
+        .padding({ left: 20, right: 20, top: this.topAvoidHeight + 18 })
 
         List({ space: 8 }) {
           ForEach(this.menuItems, (item: SidebarMenuItem) => {
             ListItem() {
               Row({ space: 14 }) {
-                Stack() {
-                  SymbolGlyph(item.icon)
-                    .fontSize(20)
-                    .fontColor([item.available ? '#e7e7eb' : '#66666e'])
-                }
-                .width(40)
-                .height(40)
-                .borderRadius(13)
-                .backgroundColor(item.available ? '#25252c' : '#1c1c21')
+                SymbolGlyph(item.icon)
+                  .fontSize(22)
+                  .fontColor([item.available ? this.sbIcon() : TC.textQuaternary()])
 
-                Column({ space: 3 }) {
-                  Text(item.title)
-                    .fontSize(14)
-                    .fontColor(item.available ? '#ededf0' : '#77777f')
-                  Text(item.subtitle)
-                    .fontSize(10)
-                    .fontColor('#66666e')
-                }
-                .layoutWeight(1)
-                .alignItems(HorizontalAlign.Start)
+                Text(item.title)
+                  .fontSize(this.sidebarTextSize)
+                  .fontWeight(FontWeight.Medium)
+                  .fontColor(item.available ? this.sbText() : TC.textQuaternary())
+                  .layoutWeight(1)
 
                 if (!item.available) {
                   Text('暂不可用')
                     .fontSize(9)
-                    .fontColor('#77777f')
+                    .fontColor(TC.textTertiary())
                     .padding({ left: 7, right: 7, top: 3, bottom: 3 })
-                    .backgroundColor('#232329')
+                    .backgroundColor(TC.surfaceInset())
                     .borderRadius(8)
                 } else {
                   SymbolGlyph($r('sys.symbol.chevron_right'))
                     .fontSize(15)
-                    .fontColor(['#5e5e66'])
+                    .fontColor([TC.textQuaternary()])
                 }
               }
               .width('100%')
-              .padding({ left: 14, right: 14, top: 8, bottom: 8 })
+              .padding({ left: 14, right: 14, top: 10, bottom: 10 })
               .borderRadius(16)
               .onClick(() => {
                 if (!item.available) {
@@ -683,7 +741,7 @@ export struct Sidebar {
         if (this.hint) {
           Text(this.hint)
             .fontSize(11)
-            .fontColor('#a9a9b0')
+            .fontColor(TC.textQuaternary())
             .padding({ left: 18, right: 18, bottom: 8 })
         }
 
@@ -691,8 +749,8 @@ export struct Sidebar {
           Button(this.authStore.loggedIn ? '退出登录' : '登录账号')
             .layoutWeight(1)
             .height(44)
-            .fontColor(this.authStore.loggedIn ? '#ff7785' : '#ffffff')
-            .backgroundColor(this.authStore.loggedIn ? '#2b2024' : '#ef233c')
+            .fontColor(this.authStore.loggedIn ? TC.accentSoft() : TC.textOnAccent())
+            .backgroundColor(this.authStore.loggedIn ? TC.accentContainer() : TC.accent())
             .borderRadius(15)
             .onClick(() => {
               if (this.authStore.loggedIn) {
@@ -704,10 +762,12 @@ export struct Sidebar {
         }
         .width('100%')
         .padding({ left: 20, right: 20, top: 8, bottom: 20 })
+        }
+        .width('100%')
+        .height('100%')
       }
       .width('84%')
       .height('100%')
-      .backgroundColor('#151519')
       .borderRadius({ topRight: 28, bottomRight: 28 })
       .clip(true)
       .translate({ x: this.visible ? 0 : -360 })
@@ -717,9 +777,9 @@ export struct Sidebar {
     }
     .width('100%')
     .height('100%')
-    .bindSheet(this.sleepSheetVisible, this.SleepSheetBuilder(), {
+    .bindSheet(this.sleepSheetVisible, this.skin_SleepSheetBuilder(), {
       height: '64%',
-      backgroundColor: '#19191f',
+      backgroundColor: TC.sheetBackground(),
       showClose: false,
       dragBar: true,
       onDisappear: () => {
