@@ -1387,9 +1387,9 @@ export struct Play {
               .fontWeight(this.showTranslation ? FontWeight.Medium : FontWeight.Regular)
               .fontColor(this.showTranslation ? this.psText() : this.psFaint())
           }
-          .width(24)
-          .height(24)
-          .borderRadius(12)
+          .width(20)
+          .height(20)
+          .borderRadius(10)
           .border({ width: 1, color: this.showTranslation ? this.psText() : this.psFaint() })
           .onClick(() => { this.showTranslation = !this.showTranslation })
         }
@@ -1400,9 +1400,9 @@ export struct Play {
               .fontWeight(this.showRoma ? FontWeight.Medium : FontWeight.Regular)
               .fontColor(this.showRoma ? this.psText() : this.psFaint())
           }
-          .width(24)
-          .height(24)
-          .borderRadius(12)
+          .width(20)
+          .height(20)
+          .borderRadius(10)
           .border({ width: 1, color: this.showRoma ? this.psText() : this.psFaint() })
           .onClick(() => { this.showRoma = !this.showRoma })
         }
