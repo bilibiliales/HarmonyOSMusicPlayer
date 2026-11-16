@@ -86,40 +86,34 @@ export struct LyricSettingsSheet {
    */
   @Builder
   private AlignLeftPill() {
-    Row() {
-      Text('居左').fontSize(12)
-        .fontColor(this.alignMode === 0 ? TC.textOnAccent() : TC.textBody())
-    }
-    .width(72)
-    .height(32)
-    .justifyContent(FlexAlign.Center)
-    .backgroundColor(this.alignMode === 0 ? this.color : TC.chipBackground())
-    .borderRadius(16)
-    .hitTestBehavior(HitTestMode.Block)
-    .onClick(() => {
-      if (this.alignMode === 0) { return }
-      this.alignMode = 0
-      this.onPreview(this.current())
-    })
+    Button('居左')
+      .fontSize(12)
+      .fontColor(this.alignMode === 0 ? TC.textOnAccent() : TC.textBody())
+      .backgroundColor(this.alignMode === 0 ? this.color : TC.chipBackground())
+      .width(72)
+      .height(32)
+      .borderRadius(16)
+      .onClick(() => {
+        if (this.alignMode === 0) { return }
+        this.alignMode = 0
+        this.onPreview(this.current())
+      })
   }
 
   @Builder
   private AlignCenterPill() {
-    Row() {
-      Text('居中').fontSize(12)
-        .fontColor(this.alignMode === 1 ? TC.textOnAccent() : TC.textBody())
-    }
-    .width(72)
-    .height(32)
-    .justifyContent(FlexAlign.Center)
-    .backgroundColor(this.alignMode === 1 ? this.color : TC.chipBackground())
-    .borderRadius(16)
-    .hitTestBehavior(HitTestMode.Block)
-    .onClick(() => {
-      if (this.alignMode === 1) { return }
-      this.alignMode = 1
-      this.onPreview(this.current())
-    })
+    Button('居中')
+      .fontSize(12)
+      .fontColor(this.alignMode === 1 ? TC.textOnAccent() : TC.textBody())
+      .backgroundColor(this.alignMode === 1 ? this.color : TC.chipBackground())
+      .width(72)
+      .height(32)
+      .borderRadius(16)
+      .onClick(() => {
+        if (this.alignMode === 1) { return }
+        this.alignMode = 1
+        this.onPreview(this.current())
+      })
   }
 
   build() {
@@ -130,19 +124,19 @@ export struct LyricSettingsSheet {
         SymbolGlyph($r('sys.symbol.arrow_counterclockwise'))
           .fontSize(22)
           .fontColor([TC.textSecondary()])
-          .padding({ left: 14, right: 2, top: 6, bottom: 6 })
+          .padding({ left: 8, right: 0, top: 2, bottom: 2 })
           .onClick(() => this.confirmRestore())
       }.width('100%')
+      Row({ space: 8 }) {
+        Text('对齐方式').fontSize(13).fontColor(TC.textBody()).layoutWeight(1)
+        this.AlignLeftPill()
+        this.AlignCenterPill()
+      }
+      .width('100%')
+      .padding({ top: 2, bottom: 2 })
       Scroll() {
         Column({ space: 8 }) {
           this.Control('字号 · ' + this.lyricSize, this.lyricSize, 14, 32, 1, (v: number) => this.lyricSize = v)
-          Row({ space: 8 }) {
-            Text('对齐方式').fontSize(13).fontColor(TC.textBody()).layoutWeight(1)
-            this.AlignLeftPill()
-            this.AlignCenterPill()
-          }
-          .width('100%')
-          .padding({ top: 2, bottom: 2 })
           this.Control('左右位置 · ' + this.horizontal, this.horizontal, -16, 60, 1, (v: number) => this.horizontal = v)
           this.Control('行间距 · ' + this.spacing, this.spacing, 4, 48, 1, (v: number) => this.spacing = v)
           this.Control('动画幅度 · ' + this.amplitude.toFixed(1), this.amplitude, 0, 2, 0.1, (v: number) => this.amplitude = v)
