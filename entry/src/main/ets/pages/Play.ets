@@ -1,3 +1,4 @@
+import { SheetSkinFrame } from '../components/SheetSkin'
 import { ResourceComments } from '../components/ResourceComments'
 import { CommentResource } from '../models/CommentResource'
 import { CommentService } from '../services/CommentService'
@@ -77,6 +78,12 @@ export struct Play {
   @State lyricUserScrolling: boolean = false
   @State lyricProgressPosition: number = 0
   @State lyricAppearance: LyricPreferences = AppSettings.lyricPreferences
+  /** 当前歌曲是否有译文 / 罗马音（决定歌词区左下角气泡是否出现）。 */
+  @State translationAvailable: boolean = false
+  @State romaAvailable: boolean = false
+  /** 译 / 音 的显示开关（会话内保持，不写盘）。 */
+  @State showTranslation: boolean = true
+  @State showRoma: boolean = false
   @State redCount: number = 0
   @State redCountLoading: boolean = false
   @State vinylOffsetX: number = 0
@@ -310,7 +317,8 @@ export struct Play {
         result.push({
           time: this.parseLyricTime(tag),
           text: lyricText || '♪',
-          translation: ''
+          translation: '',
+          roma: ''
         })
       })
     })
@@ -355,6 +363,7 @@ export struct Play {
           duration: Number.isFinite(lineDuration) ? lineDuration : 0,
           text: lyricText,
           translation: '',
+          roma: '',
           words: words
         })
       }
@@ -363,27 +372,31 @@ export struct Play {
     return result
   }
 
-  private mergeTranslations(lines: LyricLine[], translations: LyricLine[]): LyricLine[] {
-    if (translations.length === 0) {
+  private mergeTranslations(lines: LyricLine[], translations: LyricLine[], romas: LyricLine[]): LyricLine[] {
+    if (translations.length === 0 && romas.length === 0) {
       return lines
     }
     return lines.map((line: LyricLine) => {
-      let translation = ''
-      for (let index = 0; index < translations.length; index++) {
-        if (Math.abs(translations[index].time - line.time) <= 80) {
-          translation = translations[index].text
-          break
-        }
-      }
       const merged: LyricLine = {
         time: line.time,
         duration: line.duration,
         text: line.text,
-        translation: translation,
+        translation: this.matchAuxiliary(translations, line.time),
+        roma: this.matchAuxiliary(romas, line.time),
         words: line.words
       }
       return merged
     })
+  }
+
+  /** 译文 / 罗马音与主歌词按时间对齐（容差 80ms）。 */
+  private matchAuxiliary(list: LyricLine[], time: number): string {
+    for (let index = 0; index < list.length; index++) {
+      if (Math.abs(list[index].time - time) <= 80) {
+        return list[index].text
+      }
+    }
+    return ''
   }
 
   private checkNetwork(): void {
@@ -421,6 +434,8 @@ export struct Play {
     this.lyricCanRetry = false
     this.lyricLines = []
     this.currentLyricIndex = -1
+    this.translationAvailable = false
+    this.romaAvailable = false
     this.lyricProgressPosition = this.playerStore.position
     this.preciseLyricsLoaded = false
     if (this.isNonCatalogAudio() && !this.playerStore.currentSong.localUri) {
@@ -441,9 +456,12 @@ export struct Play {
       const preciseLyrics = response.yrc?.lyric ? this.parseYrcLyrics(response.yrc.lyric) : []
       this.preciseLyricsLoaded = preciseLyrics.length > 0
       const original = preciseLyrics.length > 0 ? preciseLyrics : this.parseTimedLyrics(response.lrc?.lyric || '', true)
-      const translationSource = response.tlyric?.lyric || response.romalrc?.lyric || ''
-      const translations = this.parseTimedLyrics(translationSource, false)
-      this.lyricLines = this.mergeTranslations(original, translations)
+      const translations = this.parseTimedLyrics(response.tlyric?.lyric || '', false)
+      const romas = this.parseTimedLyrics(response.romalrc?.lyric || '', false)
+      this.lyricLines = this.mergeTranslations(original, translations, romas)
+      // 这首歌是否存在译文 / 罗马音，决定左下角「译 / 音」气泡是否出现
+      this.translationAvailable = this.lyricLines.some((line: LyricLine) => !!line.translation)
+      this.romaAvailable = this.lyricLines.some((line: LyricLine) => !!line.roma)
       if (this.lyricLines.length === 0) {
         this.lyricMessage = '歌词格式暂时无法解析'
       } else {
@@ -713,6 +731,15 @@ export struct Play {
     return this.lyricLines.some((line: LyricLine) => !!line.words && line.words.length > 0)
   }
 
+  /** 歌词对齐：0 居左（默认）/ 1 居中。 */
+  private lyricCentered(): boolean {
+    return this.lyricAppearance.align === 1
+  }
+
+  private lyricTextAlign(): TextAlign {
+    return this.lyricCentered() ? TextAlign.Center : TextAlign.Start
+  }
+
   private lyricCharacterProgress(word: LyricWord, characterIndex: number, characterCount: number): number {
     if (characterCount <= 0 || word.duration <= 0) {
       return this.lyricProgressPosition + this.lyricAppearance.offset * 1000 >= word.start ? 1 : 0
@@ -748,9 +775,11 @@ export struct Play {
         }, (word: LyricWord, wordIndex: number) => `${word.start}-${wordIndex}`)
       }
       .width('100%')
+      .justifyContent(this.lyricCentered() ? FlexAlign.Center : FlexAlign.Start)
     } else {
       Text(line.text)
         .width('100%')
+        .textAlign(this.lyricTextAlign())
         .fontSize(this.lyricFontSize(index))
         .fontWeight(index === this.currentLyricIndex ? FontWeight.Bold : FontWeight.Medium)
         .fontColor(this.lyricColor(index))
@@ -969,6 +998,13 @@ export struct Play {
     if (!this.canComment()) { return }
     this.commentTarget = this.currentCommentResource()
     this.commentsVisible = true
+  }
+
+  @Builder
+  private skin_CommentsSheet() {
+    SheetSkinFrame() {
+      this.CommentsSheet()
+    }
   }
 
   @Builder
@@ -1427,26 +1463,43 @@ export struct Play {
             ForEach(this.lyricLines, (line: LyricLine, index: number) => {
               ListItem() {
                 Row({ space: 10 }) {
-                  Column()
-                    .width(index === this.currentLyricIndex ? 3 : 0)
-                    .height(index === this.currentLyricIndex ? 28 : 0)
-                    .borderRadius(2)
-                    .backgroundColor(this.lyricAppearance.highlight)
+                  if (!this.lyricCentered()) {
+                    Column()
+                      .width(index === this.currentLyricIndex ? 3 : 0)
+                      .height(index === this.currentLyricIndex ? 28 : 0)
+                      .borderRadius(2)
+                      .backgroundColor(this.lyricAppearance.highlight)
+                  }
                   Column({ space: 5 }) {
                     this.PrimaryLyricText(line, index)
-                    if (line.translation) {
+                    if (line.translation && this.showTranslation) {
                       Text(line.translation)
                         .width('100%')
+                        .textAlign(this.lyricTextAlign())
                         .fontSize(index === this.currentLyricIndex ? 14 : 12)
                         .fontColor(index === this.currentLyricIndex ? this.lyricAppearance.pendingColor : this.lyricAppearance.otherLineColor)
                         .lineHeight(20)
                     }
+                    if (line.roma && this.showRoma) {
+                      Text(line.roma)
+                        .width('100%')
+                        .textAlign(this.lyricTextAlign())
+                        .fontSize(index === this.currentLyricIndex ? 13 : 11)
+                        .fontColor(index === this.currentLyricIndex ? this.lyricAppearance.pendingColor : this.lyricAppearance.otherLineColor)
+                        .opacity(0.86)
+                        .lineHeight(18)
+                    }
                   }
                   .layoutWeight(1)
-                  .alignItems(HorizontalAlign.Start)
+                  .alignItems(this.lyricCentered() ? HorizontalAlign.Center : HorizontalAlign.Start)
                 }
                 .width('100%')
-                .padding({ left: 22 + this.lyricAppearance.horizontal, right: 22, top: 3, bottom: 3 })
+                .padding({
+                  left: this.lyricCentered() ? 22 : 22 + this.lyricAppearance.horizontal,
+                  right: 22,
+                  top: 3,
+                  bottom: 3
+                })
                 .opacity(this.lyricLineOpacity(index))
                 .scale({
                   x: this.lyricLineScale(index),
@@ -1476,6 +1529,40 @@ export struct Play {
           })
           .onScrollStart(() => this.handleLyricScrollStart())
           .onScrollStop(() => this.handleLyricScrollStop())
+
+          // 左下角「译 / 音」气泡：只在有译文 / 罗马音时出现，圈内文字、无底色
+          if (this.translationAvailable || this.romaAvailable) {
+            Row({ space: 8 }) {
+              if (this.translationAvailable) {
+                Stack({ alignContent: Alignment.Center }) {
+                  Text('译')
+                    .fontSize(10)
+                    .fontWeight(this.showTranslation ? FontWeight.Medium : FontWeight.Regular)
+                    .fontColor(this.showTranslation ? this.psText() : this.psFaint())
+                }
+                .width(24)
+                .height(24)
+                .borderRadius(12)
+                .border({ width: 1, color: this.showTranslation ? this.psText() : this.psFaint() })
+                .onClick(() => { this.showTranslation = !this.showTranslation })
+              }
+              if (this.romaAvailable) {
+                Stack({ alignContent: Alignment.Center }) {
+                  Text('音')
+                    .fontSize(10)
+                    .fontWeight(this.showRoma ? FontWeight.Medium : FontWeight.Regular)
+                    .fontColor(this.showRoma ? this.psText() : this.psFaint())
+                }
+                .width(24)
+                .height(24)
+                .borderRadius(12)
+                .border({ width: 1, color: this.showRoma ? this.psText() : this.psFaint() })
+                .onClick(() => { this.showRoma = !this.showRoma })
+              }
+            }
+            .align(Alignment.BottomStart)
+            .margin({ left: 22, bottom: 12 })
+          }
 
           if (this.lyricUserScrolling) {
             Row({ space: 7 }) {
@@ -1932,11 +2019,12 @@ export struct Play {
                   coverOffsetX: this.playerStyle.coverX,
                   coverOffsetY: this.playerStyle.coverY,
                   coverRadius: this.playerStyle.coverRadius,
+                  vinylRadius: this.playerStyle.vinylRadius,
                   vinylOpacity: this.playerStyle.vinylOpacity
                 })
               }
               .width(this.vinylRenderSize()).height(this.vinylRenderSize())
-              .borderRadius('50%')
+              .borderRadius(`${this.playerStyle.vinylRadius}%`)
               .translate({ x: this.vinylOffsetX + this.playerStyle.vinylX, y: this.playerStyle.vinylY })
               .opacity(this.vinylOpacity)
               .shadow({
@@ -2158,7 +2246,7 @@ export struct Play {
         .width('100%')
         .height('100%')
         .backgroundColor(TC.pageBackground())
-        .bindSheet(this.commentsVisible, this.CommentsSheet(), {
+        .bindSheet(this.commentsVisible, this.skin_CommentsSheet(), {
           height: '72%', backgroundColor: TC.sheetBackground(), showClose: false, dragBar: true,
           onDisappear: () => this.commentsVisible = false
         })
@@ -2172,6 +2260,8 @@ interface LyricLine {
   duration?: number
   text: string
   translation: string
+  /** 罗马音（romalrc），没有则为空串。 */
+  roma: string
   words?: LyricWord[]
 }
 

@@ -1,3 +1,4 @@
+import { SheetSkinFrame } from '../components/SheetSkin'
 import { SkinBackdrop } from '../components/SkinBackdrop'
 import { common } from '@kit.AbilityKit'
 import { DecorationMedia } from '../services/DecorationMedia'
@@ -946,6 +947,13 @@ export struct SongWiki {
   }
 
   @Builder
+  private skin_DetailSheetContent() {
+    SheetSkinFrame() {
+      this.DetailSheetContent()
+    }
+  }
+
+  @Builder
   private DetailSheetContent() {
     Column({ space: 14 }) {
       Row() {
@@ -975,6 +983,13 @@ export struct SongWiki {
     .width('100%')
     .height('100%')
     .padding({ left: 18, right: 18, top: 20, bottom: 16 })
+  }
+
+  @Builder
+  private skin_ScorePreviewContent() {
+    SheetSkinFrame() {
+      this.ScorePreviewContent()
+    }
   }
 
   @Builder
@@ -1273,14 +1288,14 @@ export struct SongWiki {
       .width('100%')
       .height('100%')
       .backgroundColor(TC.pageBackground())
-      .bindSheet(this.detailSheetVisible, this.DetailSheetContent(), {
+      .bindSheet(this.detailSheetVisible, this.skin_DetailSheetContent(), {
         height: '50%',
         backgroundColor: TC.sheetBackground(),
         showClose: false,
         dragBar: true,
         onDisappear: () => this.detailSheetVisible = false
       })
-      .bindSheet(this.scoreSheetVisible, this.ScorePreviewContent(), {
+      .bindSheet(this.scoreSheetVisible, this.skin_ScorePreviewContent(), {
         height: '94%',
         backgroundColor: TC.sheetBackground(),
         showClose: false,

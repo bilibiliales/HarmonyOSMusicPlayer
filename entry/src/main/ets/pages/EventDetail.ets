@@ -1,3 +1,4 @@
+import { SheetSkinFrame } from '../components/SheetSkin'
 import { SkinBackdrop } from '../components/SkinBackdrop'
 import { ShareSheet } from '../components/ShareSheet'
 import { DetailTopBar } from '../components/DetailTopBar'
@@ -399,6 +400,13 @@ export struct EventDetailPage {
   }
 
   @Builder
+  private skin_CommentSheet() {
+    SheetSkinFrame() {
+      this.CommentSheet()
+    }
+  }
+
+  @Builder
   private CommentSheet() {
     ResourceComments({
       resource: this.commentResource(),
@@ -514,7 +522,7 @@ export struct EventDetailPage {
               }
             })
         }.width('100%').height('100%').backgroundColor(TC.pageBackground())
-        .bindSheet(this.commentSheetVisible, this.CommentSheet(), {
+        .bindSheet(this.commentSheetVisible, this.skin_CommentSheet(), {
           height: '68%', backgroundColor: TC.sheetBackground(), showClose: false, dragBar: true,
           onDisappear: () => this.commentSheetVisible = false
         })

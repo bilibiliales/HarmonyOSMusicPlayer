@@ -4,6 +4,8 @@ import { AppSettings } from '../services/AppSettings'
 import { AuthStore } from '../stores/AuthStore'
 import { CellphoneExistenceResponse, LoginResponse, LoginStatusResponse, QrCheckResponse, QrKeyResponse } from '../models/api'
 import { TC } from '../services/ThemeColors'
+import { DecoKeys } from '../services/DecorationRuntime'
+import { DecorationMedia } from '../services/DecorationMedia'
 
 interface LoginMethodItem {
   key: string
@@ -13,6 +15,7 @@ interface LoginMethodItem {
 @Component
 export struct Login {
   @StorageProp('skinVersion') skinVersionObs: number = 0
+  @StorageProp(DecoKeys.APP_ICON) appIcon: string = ''
   @Consume('pageStack') pageStack: NavPathStack
   @Consume('topAvoidHeight') topAvoidHeight: number
   @Consume('authStore') authStore: AuthStore
@@ -370,9 +373,16 @@ export struct Login {
           Column({ space: 20 }) {
             Column({ space: 10 }) {
               Stack() {
-                Image($r('app.media.ic_logo')).width(38).height(38).fillColor('#ffffff')
+                if (this.appIcon) {
+                  Image(DecorationMedia.displayUri(this.appIcon))
+                    .width(72).height(72).objectFit(ImageFit.Cover)
+                } else {
+                  Image($r('app.media.ic_logo')).width(38).height(38).fillColor('#ffffff')
+                }
               }
-              .width(72).height(72).borderRadius(22).backgroundColor(TC.accent())
+              .width(72).height(72).borderRadius(22)
+              .backgroundColor(this.appIcon ? 'rgba(0,0,0,0)' : TC.accent())
+              .clip(true)
               .shadow({ radius: 18, color: 'rgba(239,35,60,0.32)', offsetY: 8 })
               Text(this.registrationMode ? '注册「网易云音乐」账号' : '登录「网易云音乐」账号')
                 .fontSize(22).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary())

@@ -1,3 +1,4 @@
+import { SheetSkinFrame } from '../components/SheetSkin'
 import { SkinBackdrop } from '../components/SkinBackdrop'
 import { DjRadioItem } from '../models/api'
 import { ProgramItem } from '../models/home'
@@ -123,6 +124,13 @@ export struct RadioPage {
   }
 
   @Builder
+  private skin_CategoriesSheet() {
+    SheetSkinFrame() {
+      this.CategoriesSheet()
+    }
+  }
+
+  @Builder
   private CategoriesSheet() {
     Column({ space: 16 }) {
       Row() {
@@ -230,7 +238,7 @@ export struct RadioPage {
       }.width('100%').height('100%').scrollBar(BarState.Off).onReachEnd(() => this.loadList())
     }.width('100%').height('100%').backgroundColor(TC.pageBackground())
       .onRefreshing(async () => { this.refreshing = true; await this.loadHome(); this.refreshing = false })
-      .bindSheet(this.categoryVisible, this.CategoriesSheet(), {
+      .bindSheet(this.categoryVisible, this.skin_CategoriesSheet(), {
         height: '62%', backgroundColor: TC.sheetBackground(), showClose: false, dragBar: true,
         onDisappear: () => this.categoryVisible = false
       })

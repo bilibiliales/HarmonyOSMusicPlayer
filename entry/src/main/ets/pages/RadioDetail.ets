@@ -1,3 +1,4 @@
+import { SheetSkinFrame } from '../components/SheetSkin'
 import { SkinBackdrop } from '../components/SkinBackdrop'
 import { ResourceComments } from '../components/ResourceComments'
 import { CommentResource } from '../models/CommentResource'
@@ -122,6 +123,13 @@ export struct RadioDetailPage {
   }
 
   @Builder
+  private skin_CommentsSheet() {
+    SheetSkinFrame() {
+      this.CommentsSheet()
+    }
+  }
+
+  @Builder
   private CommentsSheet() {
     ResourceComments({
       resource: this.commentResource(),
@@ -168,7 +176,7 @@ export struct RadioDetailPage {
           }
         }.width('100%').layoutWeight(1).scrollBar(BarState.Off).onReachEnd(() => this.loadPrograms())
       }.width('100%').height('100%').backgroundColor(TC.pageBackground())
-        .bindSheet(this.commentsVisible, this.CommentsSheet(), {
+        .bindSheet(this.commentsVisible, this.skin_CommentsSheet(), {
           height: '72%', backgroundColor: TC.sheetBackground(), showClose: false, dragBar: true,
           onDisappear: () => this.commentsVisible = false
         })
@@ -229,6 +237,13 @@ export struct RadioProgramPage {
   }
 
   @Builder
+  private skin_CommentsSheet() {
+    SheetSkinFrame() {
+      this.CommentsSheet()
+    }
+  }
+
+  @Builder
   private CommentsSheet() {
     ResourceComments({
       resource: this.commentResource(),
@@ -277,7 +292,7 @@ export struct RadioProgramPage {
           }.width('100%').padding({ left: 22, right: 22, top: 20, bottom: 40 })
         }.width('100%').layoutWeight(1).scrollBar(BarState.Off)
       }.width('100%').height('100%').backgroundColor(TC.pageBackground())
-        .bindSheet(this.commentsVisible, this.CommentsSheet(), {
+        .bindSheet(this.commentsVisible, this.skin_CommentsSheet(), {
           height: '72%', backgroundColor: TC.sheetBackground(), showClose: false, dragBar: true,
           onDisappear: () => this.commentsVisible = false
         })

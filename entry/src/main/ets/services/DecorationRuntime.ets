@@ -8,7 +8,9 @@ import {
   HeartConfig,
   HomeBgConfig,
   ImageOnlyConfig,
+  MiniPlayerConfig,
   PlayerStyleConfig,
+  SheetConfig,
   SidebarConfig,
   SkinConfig,
   StartupConfig,
@@ -58,7 +60,23 @@ export class DecoKeys {
   static readonly AVATAR_FRAME: string = 'decoAvatarFrame'
   static readonly VIP_CARD: string = 'decoVipCard'
   static readonly VIP_BADGES: string = 'decoVipBadges'
+  static readonly SVIP_BADGES: string = 'decoSvipBadges'
   static readonly APP_ICON: string = 'decoAppIcon'
+  // 迷你播放器
+  static readonly MINI_BG: string = 'decoMiniBg'
+  static readonly MINI_BG_COLOR: string = 'decoMiniBgColor'
+  static readonly MINI_BG_OPACITY: string = 'decoMiniBgOpacity'
+  static readonly MINI_BG_BLUR: string = 'decoMiniBgBlur'
+  static readonly MINI_RADIUS: string = 'decoMiniRadius'
+  static readonly MINI_TITLE_COLOR: string = 'decoMiniTitleColor'
+  static readonly MINI_SUBTITLE_COLOR: string = 'decoMiniSubtitleColor'
+  static readonly MINI_ICON_COLOR: string = 'decoMiniIconColor'
+  // 半模态
+  static readonly SHEET_BG: string = 'decoSheetBg'
+  static readonly SHEET_BG_COLOR: string = 'decoSheetBgColor'
+  static readonly SHEET_BG_OPACITY: string = 'decoSheetBgOpacity'
+  static readonly SHEET_BG_BLUR: string = 'decoSheetBgBlur'
+  static readonly SHEET_SCRIM: string = 'decoSheetScrim'
   // 播放器样式
   static readonly PLAYER_STYLE: string = 'decoPlayerStyle'
   static readonly PLAYER_VERSION: string = 'decoPlayerVersion'
@@ -79,6 +97,8 @@ export class DecorationRuntime {
     DecorationRuntime.applySidebar()
     DecorationRuntime.applyHomeBg()
     DecorationRuntime.applySimple()
+    DecorationRuntime.applyMiniPlayer()
+    DecorationRuntime.applySheet()
     DecorationRuntime.applyPlayerStyle()
     AppStorage.setOrCreate<number>('decorationActiveCount', DecorationStore.activeCount())
   }
@@ -132,6 +152,22 @@ export class DecorationRuntime {
         map.set('text_quaternary', baseDark ? '#66666e' : '#a0a0a8')
       }
 
+      // 容器色：卡片 / 列表 / 输入框 / 胶囊 / 弹层统一指定。
+      // 只给一个颜色，层次靠透明度派生，避免整页所有容器糊成一块死板色。
+      if (cfg.containerColor) {
+        map.set('surface_card', cfg.containerColor)
+        map.set('surface_card_alt', cfg.containerColor)
+        map.set('surface_inset', DecoColor.alpha(cfg.containerColor, 0.72))
+        map.set('surface_raised', DecoColor.alpha(cfg.containerColor, 0.88))
+        map.set('chip_background', DecoColor.alpha(cfg.containerColor, 0.86))
+        // 半模态有独立装扮时以那一类为准，这里只做兜底
+        if (!DecorationStore.payload(DecoKind.SHEET)) {
+          map.set('sheet_background', cfg.containerColor)
+        }
+        map.set('divider', DecoColor.alpha(cfg.textColor ? cfg.textColor : (baseDark ? '#ffffff' : '#000000'), 0.14))
+        map.set('border_subtle', DecoColor.alpha(cfg.textColor ? cfg.textColor : (baseDark ? '#ffffff' : '#000000'), 0.1))
+      }
+
       if (cfg.themeColor) {
         map.set('accent', cfg.themeColor)
         map.set('accent_container', DecoColor.alpha(cfg.themeColor, baseDark ? 0.22 : 0.12))
@@ -147,6 +183,20 @@ export class DecorationRuntime {
         map.set('header_scrim_top', '#00000000')
         map.set('header_scrim_mid', '#00000000')
       }
+    }
+
+    // 半模态底色（独立装扮，与皮肤无关也能单独设置）
+    const sheetRaw = DecorationStore.payload(DecoKind.SHEET)
+    const sheetCfg = sheetRaw ? SheetConfig.from(sheetRaw) : undefined
+    if (sheetCfg && sheetCfg.bgColor) {
+      map.set('sheet_background', sheetCfg.bgColor)
+    }
+    // 弹层贴图模式下，弹层里的卡片要半透明，否则整块不透明卡片会把贴图全部盖住
+    if (sheetCfg && sheetCfg.bgImage) {
+      const dark: boolean = ThemeService.isDark()
+      const cardBase: string = (cfg && cfg.containerColor) ? cfg.containerColor : (dark ? '#26262d' : '#ffffff')
+      map.set('surface_card', DecoColor.alpha(cardBase, 0.82))
+      map.set('surface_card_alt', DecoColor.alpha(cardBase, 0.74))
     }
 
     if (map.size > 0) {
@@ -237,12 +287,44 @@ export class DecorationRuntime {
       vipCardRaw ? ImageOnlyConfig.from(vipCardRaw).image : '')
 
     const badgeRaw = DecorationStore.payload(DecoKind.VIP_BADGE)
-    AppStorage.setOrCreate<string>(DecoKeys.VIP_BADGES,
-      badgeRaw ? VipBadgeConfig.from(badgeRaw).images.join('\n') : '')
+    const badges = badgeRaw ? VipBadgeConfig.from(badgeRaw) : undefined
+    AppStorage.setOrCreate<string>(DecoKeys.VIP_BADGES, badges ? badges.vipImages.join('\n') : '')
+    AppStorage.setOrCreate<string>(DecoKeys.SVIP_BADGES, badges ? badges.svipImages.join('\n') : '')
 
     const iconRaw = DecorationStore.payload(DecoKind.APP_ICON)
     AppStorage.setOrCreate<string>(DecoKeys.APP_ICON,
       iconRaw ? ImageOnlyConfig.from(iconRaw).image : '')
+  }
+
+  // -------------------------------------------------------------------------
+  // 迷你播放器
+  // -------------------------------------------------------------------------
+
+  private static applyMiniPlayer(): void {
+    const raw = DecorationStore.payload(DecoKind.MINI_PLAYER)
+    const cfg = raw ? MiniPlayerConfig.from(raw) : undefined
+    AppStorage.setOrCreate<string>(DecoKeys.MINI_BG, cfg ? cfg.bgImage : '')
+    AppStorage.setOrCreate<string>(DecoKeys.MINI_BG_COLOR, cfg ? cfg.bgColor : '')
+    AppStorage.setOrCreate<number>(DecoKeys.MINI_BG_OPACITY, cfg ? cfg.bgOpacity : 100)
+    AppStorage.setOrCreate<number>(DecoKeys.MINI_BG_BLUR, cfg ? cfg.bgBlur : 0)
+    AppStorage.setOrCreate<number>(DecoKeys.MINI_RADIUS, cfg ? cfg.radius : 29)
+    AppStorage.setOrCreate<string>(DecoKeys.MINI_TITLE_COLOR, cfg ? cfg.titleColor : '')
+    AppStorage.setOrCreate<string>(DecoKeys.MINI_SUBTITLE_COLOR, cfg ? cfg.subtitleColor : '')
+    AppStorage.setOrCreate<string>(DecoKeys.MINI_ICON_COLOR, cfg ? cfg.iconColor : '')
+  }
+
+  // -------------------------------------------------------------------------
+  // 半模态外观
+  // -------------------------------------------------------------------------
+
+  private static applySheet(): void {
+    const raw = DecorationStore.payload(DecoKind.SHEET)
+    const cfg = raw ? SheetConfig.from(raw) : undefined
+    AppStorage.setOrCreate<string>(DecoKeys.SHEET_BG, cfg ? cfg.bgImage : '')
+    AppStorage.setOrCreate<string>(DecoKeys.SHEET_BG_COLOR, cfg ? cfg.bgColor : '')
+    AppStorage.setOrCreate<number>(DecoKeys.SHEET_BG_OPACITY, cfg ? cfg.bgOpacity : 100)
+    AppStorage.setOrCreate<number>(DecoKeys.SHEET_BG_BLUR, cfg ? cfg.bgBlur : 0)
+    AppStorage.setOrCreate<number>(DecoKeys.SHEET_SCRIM, cfg ? cfg.scrim : 0)
   }
 
   // -------------------------------------------------------------------------

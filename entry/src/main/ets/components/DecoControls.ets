@@ -1,3 +1,4 @@
+import { SheetSkinFrame } from './SheetSkin'
 import { common } from '@kit.AbilityKit'
 import { DecorationMedia } from '../services/DecorationMedia'
 import { DecoColor } from '../services/DecorationColor'
@@ -181,6 +182,13 @@ export struct DecoColorPicker {
   }
 
   @Builder
+  private skin_SheetContent() {
+    SheetSkinFrame() {
+      this.SheetContent()
+    }
+  }
+
+  @Builder
   private SheetContent() {
     Column() {
       Scroll() {
@@ -312,7 +320,7 @@ export struct DecoColorPicker {
         })
     }
     .width('100%')
-    .bindSheet(this.sheetOpen, this.SheetContent(), {
+    .bindSheet(this.sheetOpen, this.skin_SheetContent(), {
       height: '78%',
       backgroundColor: TC.sheetBackground(),
       // 展开时暗化背后内容，半模态与页面区分开

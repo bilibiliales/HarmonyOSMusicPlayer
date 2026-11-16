@@ -11,6 +11,10 @@ import { UserSettings, playRecordVisibilityPatch } from '../models/userSettings'
 import { UserSettingsService } from '../services/UserSettingsService'
 import { ThemeMode, ThemeService } from '../services/ThemeService'
 import { TC } from '../services/ThemeColors'
+import { DecoKeys } from '../services/DecorationRuntime'
+import { DecorationMedia } from '../services/DecorationMedia'
+import { DecoKind } from '../models/decoration'
+import { DecorationEditorParam } from './DecorationEditor'
 
 @Component
 struct QualitySelector {
@@ -62,9 +66,16 @@ export struct SettingsPage {
   @State askDownloadSaveMode: boolean = AppSettings.askDownloadSaveMode
   @StorageProp('themeMode') themeMode: string = 'system'
   @StorageProp('systemDarkMode') systemDark: boolean = false
+  @StorageProp(DecoKeys.APP_ICON) appIcon: string = ''
 
   private isFollowSystem(): boolean {
     return this.themeMode === ThemeMode.SYSTEM
+  }
+
+  private decorationParam(kind: string): DecorationEditorParam {
+    const param = new DecorationEditorParam()
+    param.kind = kind
+    return param
   }
 
   private isDarkActive(): boolean {
@@ -397,6 +408,31 @@ export struct SettingsPage {
               QualitySelector({ selected: $defaultDownloadQuality })
               Button('保存默认播放设置').width('100%').height(46).borderRadius(23)
                 .fontColor(TC.textOnAccent()).backgroundColor(TC.accent()).onClick(() => this.savePlaybackDefaults())
+            }.width('100%').padding(18).backgroundColor(TC.surfaceCard()).borderRadius(20)
+
+            Column({ space: 12 }) {
+              Text('应用图标').width('100%').fontSize(16).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary())
+              Row({ space: 14 }) {
+                if (this.appIcon) {
+                  Image(DecorationMedia.displayUri(this.appIcon))
+                    .width(64).height(64).borderRadius(18).objectFit(ImageFit.Cover)
+                } else {
+                  Stack() {
+                    Image($r('app.media.ic_logo')).width(34).height(34).fillColor('#ffffff')
+                  }
+                  .width(64).height(64).borderRadius(18).backgroundColor(TC.accent())
+                }
+                Column({ space: 4 }) {
+                  Text('网易云音乐').fontSize(15).fontWeight(FontWeight.Medium).fontColor(TC.textPrimary())
+                  Text('自定义图标会用在登录页与这里的品牌位；桌面图标由系统在安装时固定，应用无法在运行时替换。')
+                    .fontSize(11).fontColor(TC.textSecondary())
+                }
+                .layoutWeight(1)
+                .alignItems(HorizontalAlign.Start)
+              }
+              .width('100%')
+              .onClick(() => this.pageStack.pushPathByName('DecorationEditorPage',
+                this.decorationParam(DecoKind.APP_ICON)))
             }.width('100%').padding(18).backgroundColor(TC.surfaceCard()).borderRadius(20)
 
             Column({ space: 10 }) {

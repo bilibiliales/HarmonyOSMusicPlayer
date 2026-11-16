@@ -1,3 +1,4 @@
+import { SheetSkinFrame } from '../components/SheetSkin'
 import { SkinBackdrop } from '../components/SkinBackdrop'
 import { EventUpdates } from '../services/EventUpdates'
 import { EventPresentation } from '../services/EventPresentation'
@@ -587,6 +588,13 @@ export struct UserProfilePage {
   }
 
   @Builder
+  private skin_CancelSheet() {
+    SheetSkinFrame() {
+      this.CancelSheet()
+    }
+  }
+
+  @Builder
   private CancelSheet() {
     Column({ space: 18 }) {
       Text(`确定取消关注「${this.detail?.profile.nickname || ''}」吗？`)
@@ -714,7 +722,7 @@ export struct UserProfilePage {
           }
         }
         .width('100%').height('100%')
-        .bindSheet(this.cancelSheetVisible, this.CancelSheet(), {
+        .bindSheet(this.cancelSheetVisible, this.skin_CancelSheet(), {
           height: '30%',
           backgroundColor: TC.sheetBackground(),
           showClose: false,

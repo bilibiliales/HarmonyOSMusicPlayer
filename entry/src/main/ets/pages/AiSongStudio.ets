@@ -1,3 +1,4 @@
+import { SheetSkinFrame } from '../components/SheetSkin'
 import { SkinBackdrop } from '../components/SkinBackdrop'
 import { http } from '@kit.NetworkKit'
 import {
@@ -377,6 +378,13 @@ export struct AiSongStudioPage {
   }
 
   @Builder
+  private skin_SearchSongSheet() {
+    SheetSkinFrame() {
+      this.SearchSongSheet()
+    }
+  }
+
+  @Builder
   private SearchSongSheet() {
     Column({ space: 12 }) {
       Row() {
@@ -507,7 +515,7 @@ export struct AiSongStudioPage {
         .layoutWeight(1).scrollBar(BarState.Off)
       }
       .width('100%').height('100%').backgroundColor(TC.pageBackground())
-      .bindSheet(this.searchSheetVisible, this.SearchSongSheet(), {
+      .bindSheet(this.searchSheetVisible, this.skin_SearchSongSheet(), {
         height: '58%',
         backgroundColor: TC.sheetBackground(),
         showClose: false,

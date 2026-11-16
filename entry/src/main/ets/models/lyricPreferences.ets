@@ -10,6 +10,8 @@ export class LyricPreferences {
   /** 当前行里「还没被逐字高亮」的字色。 */
   pendingColor: string = 'rgba(255,255,255,0.62)'
   offset: number = 0
+  /** 对齐方式：0 = 居左（默认），1 = 居中。 */
+  align: number = 0
 
   static normalize(value: LyricPreferences | undefined): LyricPreferences {
     const defaults = new LyricPreferences()
@@ -22,6 +24,7 @@ export class LyricPreferences {
     defaults.highlight = LyricPreferences.color(value.highlight, defaults.highlight, false)
     defaults.otherLineColor = LyricPreferences.color(value.otherLineColor, defaults.otherLineColor, true)
     defaults.pendingColor = LyricPreferences.color(value.pendingColor, defaults.pendingColor, true)
+    defaults.align = LyricPreferences.clamp(value.align, 0, 1, 0) === 1 ? 1 : 0
     return defaults
   }
 

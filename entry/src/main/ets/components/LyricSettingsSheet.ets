@@ -18,6 +18,7 @@ export struct LyricSettingsSheet {
   @State color: string = '#ef233c'
   @State pendingColor: string = 'rgba(255,255,255,0.62)'
   @State otherLineColor: string = 'rgba(255,255,255,0.46)'
+  @State alignMode: number = 0
   @State saving: boolean = false
 
   aboutToAppear(): void {
@@ -29,12 +30,13 @@ export struct LyricSettingsSheet {
     this.color = this.value.highlight
     this.pendingColor = this.value.pendingColor
     this.otherLineColor = this.value.otherLineColor
+    this.alignMode = this.value.align === 1 ? 1 : 0
   }
 
   private current(): LyricPreferences {
     return { fontSize: this.lyricSize, horizontal: this.horizontal, spacing: this.spacing,
       amplitude: this.amplitude, offset: this.timeOffset, highlight: this.color,
-      pendingColor: this.pendingColor, otherLineColor: this.otherLineColor }
+      pendingColor: this.pendingColor, otherLineColor: this.otherLineColor, align: this.alignMode }
   }
 
   private async save(): Promise<void> {
@@ -63,6 +65,7 @@ export struct LyricSettingsSheet {
     this.color = defaults.highlight
     this.pendingColor = defaults.pendingColor
     this.otherLineColor = defaults.otherLineColor
+    this.alignMode = defaults.align
     this.onPreview(this.current())
     this.save()
   }
@@ -91,6 +94,23 @@ export struct LyricSettingsSheet {
       Scroll() {
         Column({ space: 8 }) {
           this.Control('字号 · ' + this.lyricSize, this.lyricSize, 14, 32, 1, (v: number) => this.lyricSize = v)
+          Row({ space: 8 }) {
+            Text('对齐方式').fontSize(13).fontColor(TC.textBody()).layoutWeight(1)
+            ForEach([0, 1], (mode: number) => {
+              Text(mode === 0 ? '居左' : '居中')
+                .fontSize(12)
+                .fontColor(this.alignMode === mode ? TC.textOnAccent() : TC.textBody())
+                .padding({ left: 16, right: 16, top: 6, bottom: 6 })
+                .backgroundColor(this.alignMode === mode ? this.color : TC.chipBackground())
+                .borderRadius(14)
+                .onClick(() => {
+                  this.alignMode = mode
+                  this.onPreview(this.current())
+                })
+            }, (mode: number) => `lyric_align_${mode}`)
+          }
+          .width('100%')
+          .padding({ top: 2, bottom: 2 })
           this.Control('左右位置 · ' + this.horizontal, this.horizontal, -16, 60, 1, (v: number) => this.horizontal = v)
           this.Control('行间距 · ' + this.spacing, this.spacing, 4, 48, 1, (v: number) => this.spacing = v)
           this.Control('动画幅度 · ' + this.amplitude.toFixed(1), this.amplitude, 0, 2, 0.1, (v: number) => this.amplitude = v)

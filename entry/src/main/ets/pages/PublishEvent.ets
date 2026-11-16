@@ -1,3 +1,4 @@
+import { SheetSkinFrame } from '../components/SheetSkin'
 import { SkinBackdrop } from '../components/SkinBackdrop'
 import { ApiParam, ApiSong, mapApiSong, SearchResponse, ShareResourceResponse } from '../models/api'
 import { songItemType } from '../models/music'
@@ -112,6 +113,13 @@ export struct PublishEventPage {
       this.message = error instanceof Error ? error.message : '笔记发布失败'
     } finally {
       this.publishing = false
+    }
+  }
+
+  @Builder
+  private skin_SearchSongSheet() {
+    SheetSkinFrame() {
+      this.SearchSongSheet()
     }
   }
 
@@ -238,7 +246,7 @@ export struct PublishEventPage {
           }.width('100%').padding({ left: 16, right: 16, top: 12, bottom: 36 })
         }.layoutWeight(1).scrollBar(BarState.Off)
       }.width('100%').height('100%').backgroundColor(TC.pageBackground())
-      .bindSheet(this.searchSheetVisible, this.SearchSongSheet(), {
+      .bindSheet(this.searchSheetVisible, this.skin_SearchSongSheet(), {
         height: '68%', backgroundColor: TC.sheetBackground(), showClose: false, dragBar: true,
         onDisappear: () => this.searchSheetVisible = false
       })

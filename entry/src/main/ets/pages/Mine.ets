@@ -1,4 +1,6 @@
+import { SheetSkinFrame } from '../components/SheetSkin'
 import { EventUpdates } from '../services/EventUpdates'
+import { DecorationMedia } from '../services/DecorationMedia'
 import { EventPresentation } from '../services/EventPresentation'
 import { EventCard } from '../components/EventCard'
 import { ListeningPlaylistService } from '../services/ListeningPlaylistService'
@@ -74,6 +76,7 @@ export struct Mine {
   @StorageProp(DecoKeys.HOME_BG_FADE) homeBgFade: number = 100
   @StorageProp(DecoKeys.AVATAR_FRAME) avatarFrame: string = ''
   @StorageProp(DecoKeys.VIP_BADGES) vipBadges: string = ''
+  @StorageProp(DecoKeys.SVIP_BADGES) svipBadges: string = ''
   @State homeBgVersion: number = 0
   /** 由宿主（Index）注入：点击右上角菜单图标时展开侧边栏。 */
   onMenuClick: () => void = () => {}
@@ -171,10 +174,17 @@ export struct Mine {
   }
 
   private vipBadgeSrc(): string {
-    if (!this.vipBadges || this.vipLevel <= 0) { return '' }
-    const parts = this.vipBadges.split('\n')
+    if (this.vipLevel <= 0) { return '' }
     const index = this.vipLevel - 1
-    return index >= 0 && index < parts.length ? parts[index] : ''
+    if (index < 0) { return '' }
+    // SVIP 优先用 SVIP 贴图，未配置时回退同等级的 VIP 贴图
+    if (this.vipSvip) {
+      const svip = this.svipBadges ? this.svipBadges.split('\n') : []
+      if (index < svip.length && svip[index]) { return svip[index] }
+    }
+    if (!this.vipBadges) { return '' }
+    const parts = this.vipBadges.split('\n')
+    return index < parts.length ? parts[index] : ''
   }
 
   private getVipText(vipLevel: number): string {
@@ -820,7 +830,7 @@ export struct Mine {
         this.loadRecentData()
       }
     })
-    .bindSheet(this.importSheetVisible, this.ImportSheetContent(), {
+    .bindSheet(this.importSheetVisible, this.skin_ImportSheetContent(), {
       height: '70%',
       backgroundColor: TC.sheetBackground(),
       showClose: false,
@@ -903,24 +913,26 @@ export struct Mine {
           if (this.vipActive) {
             Row({ space: 3 }) {
               if (this.vipBadgeSrc()) {
-                Image(this.vipBadgeSrc())
-                  .width(40)
-                  .height(18)
+                // 自定义贴图里自带等级文字，不再渲染「壹贰叁…」，也不套等级胶囊底色
+                Image(DecorationMedia.displayUri(this.vipBadgeSrc()))
+                  .width(60)
+                  .height(20)
                   .objectFit(ImageFit.Contain)
               } else {
                 Image(this.vipSvip ? $r('app.media.ic_svip') : $r('app.media.ic_vip'))
                   .width(this.vipSvip ? 40 : 34)
                   .height(18)
                   .objectFit(ImageFit.Contain)
-              }
 
-              Text(`${this.getVipText(this.vipLevel)}`)
-                .fontSize(10)
-                .fontWeight(FontWeight.Regular)
-                .fontColor(this.vipSvip ? '#fff8e1b9' : '#ffe8d1cc')
+                Text(`${this.getVipText(this.vipLevel)}`)
+                  .fontSize(10)
+                  .fontWeight(FontWeight.Regular)
+                  .fontColor(this.vipSvip ? '#fff8e1b9' : '#ffe8d1cc')
+              }
             }
-            .padding({ left: 0, right: 6, top: 0, bottom: 0 })
-            .backgroundColor(this.vipSvip ? '#ff2d2516' : '#ff372c2c')
+            .padding({ left: 0, right: this.vipBadgeSrc() ? 0 : 6, top: 0, bottom: 0 })
+            .backgroundColor(this.vipBadgeSrc() ? 'rgba(0,0,0,0)' :
+              (this.vipSvip ? '#ff2d2516' : '#ff372c2c'))
             .borderRadius(16)
           }
         }
@@ -1654,6 +1666,13 @@ export struct Mine {
     }
     .width('100%')
     .padding({ top: 12 })
+  }
+
+  @Builder
+  private skin_ImportSheetContent() {
+    SheetSkinFrame() {
+      this.ImportSheetContent()
+    }
   }
 
   @Builder

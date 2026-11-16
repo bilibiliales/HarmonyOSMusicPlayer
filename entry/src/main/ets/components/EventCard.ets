@@ -1,3 +1,4 @@
+import { SheetSkinFrame } from './SheetSkin'
 import { AlbumPageParam, EventDetailPageParam, OperationResponse, UserEventItem, UserProfilePageParam } from '../models/api'
 import { songItemType } from '../models/music'
 import { EventPresentation, EventResourceView } from '../services/EventPresentation'
@@ -133,6 +134,13 @@ export struct EventCard {
   }
 
   @Builder
+  private skin_Comments() {
+    SheetSkinFrame() {
+      this.Comments()
+    }
+  }
+
+  @Builder
   private Comments() {
     ResourceComments({ resource: this.commentResource(), onClose: () => this.commentsVisible = false,
       onCountChange: (total: number) => {
@@ -182,7 +190,7 @@ export struct EventCard {
         }.enabled(!this.liking).onClick(() => this.like())
       }.width('100%')
     }.width('100%').padding(16).backgroundColor(TC.surfaceCard()).borderRadius(16)
-      .bindSheet(this.commentsVisible, this.Comments(), {
+      .bindSheet(this.commentsVisible, this.skin_Comments(), {
         height: '75%', backgroundColor: TC.sheetBackground(), showClose: false, dragBar: false,
         onDisappear: () => this.commentsVisible = false
       })

@@ -1,7 +1,7 @@
-import { ApiParam, SongDownloadUrlResponse, SongMusicDetailResponse, SongMusicQualityInfo,
-  SongUrlResponse } from '../models/api'
+import { ApiParam, SongMusicDetailResponse, SongMusicQualityInfo } from '../models/api'
 import { QUALITY_OPTIONS, QualityOption } from '../models/music'
 import { ApiClient } from './ApiClient'
+import { SongUrlService } from './SongUrlService'
 
 export interface SongAudioResource {
   url: string
@@ -71,6 +71,7 @@ export class SongQualityService {
     const qualities = await SongQualityService.available(id)
     const levels = SongQualityService.candidates(preferred, qualities)
     if (levels.length === 0) { throw new Error('所选音质及以下档位均无可播放资源') }
+    // 逐级降级：某一档没有可用地址就换下一档（下载链接接口会返回空 url）。
     for (let i = 0; i < levels.length; i++) {
       const resource = await SongQualityService.playbackAtLevel(id, levels[i], preferred)
       if (resource) { return resource }
@@ -78,16 +79,20 @@ export class SongQualityService {
     throw new Error('当前歌曲或账号没有可播放资源')
   }
 
-  // Radio programme audio may not have a song/music/detail entry.
+  /**
+   * 播放地址统一走「获取客户端歌曲下载链接 - 新版」/song/download/url/v1。
+   *
+   * /song/url/v1 已 404；/song/url/v1/302 不返回大小/格式/试听信息，代价太大，已回滚。
+   * 这里拿到的是真实 CDN 地址与完整元数据，因此 Range 流式播放（size > 0）可以照常工作。
+   * 电台节目等没有 song/music/detail 条目的场景也用这个方法，只要 id 有效即可。
+   */
   static async playbackAtLevel(id: string, level: string, preferred: string = level): Promise<SongAudioResource | undefined> {
-    const response = await ApiClient.get<SongUrlResponse>('/song/url/v1', SongQualityService.params(id, level))
-    if (response.code !== 200) { throw new Error(`获取播放地址失败 (${response.code})`) }
-    const item = response.data?.find((entry) => String(entry.id) === id)
-    if (!item) { throw new Error('播放地址的歌曲信息不匹配') }
-    if (!item.url) { return undefined }
+    const item = await SongUrlService.resolve(id, level)
+    if (!item) { return undefined }
+    console.info(`[SongUrl] playback id=${id} level=${level} delivered=${item.level} size=${item.size}`)
     return { url: item.url, requestedLevel: preferred, selectedLevel: level,
-      actualLevel: item.level || '', size: item.size || 0, type: item.type || '',
-      encodeType: '', trial: !!item.freeTrialInfo }
+      actualLevel: item.level || level, size: item.size || 0, type: item.type || '',
+      encodeType: item.encodeType || '', trial: !!item.freeTrialInfo }
   }
 
   static async download(id: string, preferred: string): Promise<SongAudioResource> {
@@ -96,13 +101,10 @@ export class SongQualityService {
     if (levels.length === 0) { throw new Error('所选音质及以下档位均无可下载资源') }
     for (let i = 0; i < levels.length; i++) {
       const level = levels[i]
-      const response = await ApiClient.get<SongDownloadUrlResponse>('/song/download/url/v1', SongQualityService.params(id, level))
-      if (response.code !== 200) { throw new Error(`获取下载地址失败 (${response.code})`) }
-      const item = response.data
-      if (!item || String(item.id) !== id) { throw new Error('下载地址的歌曲信息不匹配') }
-      if (!item.url || item.freeTrialInfo) { continue }
+      const item = await SongUrlService.resolve(id, level)
+      if (!item || item.freeTrialInfo) { continue }
       return { url: item.url, requestedLevel: preferred, selectedLevel: level,
-        actualLevel: item.level || '', size: item.size || 0, type: item.type || '',
+        actualLevel: item.level || level, size: item.size || 0, type: item.type || '',
         encodeType: item.encodeType || '', trial: false }
     }
     throw new Error('当前歌曲或账号没有完整的可下载资源')

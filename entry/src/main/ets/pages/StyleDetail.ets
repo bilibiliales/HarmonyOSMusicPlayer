@@ -1,3 +1,4 @@
+import { SheetSkinFrame } from '../components/SheetSkin'
 import { SkinBackdrop } from '../components/SkinBackdrop'
 import {
   AlbumPageParam,
@@ -479,6 +480,13 @@ export struct StyleDetailPage {
   }
 
   @Builder
+  private skin_StylePicker() {
+    SheetSkinFrame() {
+      this.StylePicker()
+    }
+  }
+
+  @Builder
   private StylePicker() {
     Column({ space: 10 }) {
       Row() {
@@ -555,6 +563,13 @@ export struct StyleDetailPage {
   }
 
   @Builder
+  private skin_ReviewDetails() {
+    SheetSkinFrame() {
+      this.ReviewDetails()
+    }
+  }
+
+  @Builder
   private ReviewDetails() {
     Column({ space: 16 }) {
       Row() {
@@ -586,7 +601,7 @@ export struct StyleDetailPage {
         .onAreaChange((_old: Area, area: Area) => {
           this.reviewCardWidth = Math.max(220, Math.min(420, Number(area.width) - 48))
         })
-        .bindSheet(this.reviewVisible, this.ReviewDetails(), {
+        .bindSheet(this.reviewVisible, this.skin_ReviewDetails(), {
           height: '70%', backgroundColor: TC.sheetBackground(), showClose: false, dragBar: true,
           onDisappear: () => this.reviewVisible = false
         })
@@ -824,7 +839,7 @@ export struct StyleDetailPage {
         }
       }.width('100%').height('100%').backgroundColor(TC.pageBackground())
         .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP])
-        .bindSheet(this.pickerVisible, this.StylePicker(), {
+        .bindSheet(this.pickerVisible, this.skin_StylePicker(), {
           height: '78%', backgroundColor: TC.sheetBackground(), showClose: false, dragBar: true,
           onDisappear: () => this.pickerVisible = false
         })

@@ -1,3 +1,4 @@
+import { SheetSkinFrame } from './SheetSkin'
 import { common, OpenLinkOptions } from '@kit.AbilityKit'
 import { VipGrowthClaimResponse, VipGrowthResponse, VipInfoResponse } from '../models/api'
 import { ApiClient } from '../services/ApiClient'
@@ -29,6 +30,7 @@ export struct Sidebar {
   @StorageProp(DecoKeys.SIDEBAR_ICON_COLOR) sidebarIconColor: string = ''
   @StorageProp(DecoKeys.VIP_CARD) vipCardImage: string = ''
   @StorageProp(DecoKeys.VIP_BADGES) vipBadges: string = ''
+  @StorageProp(DecoKeys.SVIP_BADGES) svipBadges: string = ''
   @Consume('pageStack') pageStack: NavPathStack
   @Consume('authStore') authStore: AuthStore
   @Prop visible: boolean = false
@@ -81,12 +83,18 @@ export struct Sidebar {
     return TC.textPrimary()
   }
 
-  /** 当前等级对应的自定义贴图；没有则返回空串。 */
+  /** 当前等级对应的自定义贴图；SVIP 未配置时回退同等级的 VIP 贴图。 */
   private vipBadgeSrc(): string {
-    if (!this.vipBadges || this.vipLevel <= 0) { return '' }
-    const parts = this.vipBadges.split('\n')
+    if (this.vipLevel <= 0) { return '' }
     const index = this.vipLevel - 1
-    return index >= 0 && index < parts.length ? parts[index] : ''
+    if (index < 0) { return '' }
+    if (this.vipSvip) {
+      const svip = this.svipBadges ? this.svipBadges.split('\n') : []
+      if (index < svip.length && svip[index]) { return svip[index] }
+    }
+    if (!this.vipBadges) { return '' }
+    const parts = this.vipBadges.split('\n')
+    return index < parts.length ? parts[index] : ''
   }
 
   private openLogin(): void {
@@ -232,7 +240,11 @@ export struct Sidebar {
   @Builder
   private VipMark() {
     if (this.vipBadgeSrc()) {
-      Image(DecorationMedia.displayUri(this.vipBadgeSrc())).width(40).height(18).objectFit(ImageFit.Contain)
+      // 自定义贴图自带等级文字，只需渲染图片本身
+      Image(DecorationMedia.displayUri(this.vipBadgeSrc()))
+        .width(54)
+        .height(18)
+        .objectFit(ImageFit.Contain)
     } else if (this.vipSvip) {
       Image($r('app.media.ic_svip')).width(40).height(18).objectFit(ImageFit.Contain)
     } else {
@@ -256,10 +268,12 @@ export struct Sidebar {
               Column({ space: 3 }) {
                 Row({ space: 4 }) {
                   this.VipMark()
-                  Text(this.vipLevel > 0 ? this.getVipText(this.vipLevel) : '')
-                    .fontSize(11)
-                    .fontWeight(FontWeight.Regular)
-                    .fontColor(this.vipLabelColor())
+                  if (!this.vipBadgeSrc()) {
+                    Text(this.vipLevel > 0 ? this.getVipText(this.vipLevel) : '')
+                      .fontSize(11)
+                      .fontWeight(FontWeight.Regular)
+                      .fontColor(this.vipLabelColor())
+                  }
                 }
                 Text(this.vipSubtext())
                   .fontSize(11)
@@ -310,10 +324,12 @@ export struct Sidebar {
               Row({ space: 4 }) {
                 if (this.vipActive) {
                   this.VipMark()
-                  Text(this.vipLevel > 0 ? this.getVipText(this.vipLevel) : '')
-                    .fontSize(11)
-                    .fontWeight(FontWeight.Regular)
-                    .fontColor(this.vipLabelColor())
+                  if (!this.vipBadgeSrc()) {
+                    Text(this.vipLevel > 0 ? this.getVipText(this.vipLevel) : '')
+                      .fontSize(11)
+                      .fontWeight(FontWeight.Regular)
+                      .fontColor(this.vipLabelColor())
+                  }
                 } else {
                   Text('VIP已过期')
                     .fontSize(15)
@@ -457,6 +473,13 @@ export struct Sidebar {
       onCancel: () => {},
       onChange: () => {}
     })
+  }
+
+  @Builder
+  private skin_SleepSheetBuilder() {
+    SheetSkinFrame() {
+      this.SleepSheetBuilder()
+    }
   }
 
   @Builder
@@ -754,7 +777,7 @@ export struct Sidebar {
     }
     .width('100%')
     .height('100%')
-    .bindSheet(this.sleepSheetVisible, this.SleepSheetBuilder(), {
+    .bindSheet(this.sleepSheetVisible, this.skin_SleepSheetBuilder(), {
       height: '64%',
       backgroundColor: TC.sheetBackground(),
       showClose: false,

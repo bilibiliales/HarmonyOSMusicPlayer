@@ -7,6 +7,7 @@ import { ApiParam, OperationResponse, mapApiSong, SongUrlResponse } from '../mod
 import { songItemType } from '../models/music'
 import { ApiClient } from './ApiClient'
 import { SongAudioResource } from './SongQualityService'
+import { SongUrlService } from './SongUrlService'
 
 interface UploadTokenResponse { code: number; msg?: string; message?: string; data?: CloudUploadToken }
 
@@ -130,7 +131,20 @@ export class CloudService {
 
   static async playback(id: string): Promise<SongAudioResource> {
     if (!ApiClient.cookie) { throw new Error('登录后才能播放云盘歌曲') }
-    // Unmatched uploads have no song/music/detail entry; use the cloud-supported URL endpoint.
+    // 优先走新的下载链接接口（与普通歌曲同一条链路），云盘曲目通常能拿到原文件档位。
+    const levels: string[] = ['lossless', 'exhigh', 'standard']
+    try {
+      for (let i = 0; i < levels.length; i++) {
+        const resolved = await SongUrlService.resolve(id, levels[i])
+        if (!resolved || resolved.freeTrialInfo) { continue }
+        return { url: resolved.url, requestedLevel: '', selectedLevel: levels[i],
+          actualLevel: resolved.level || levels[i], size: resolved.size || 0, type: resolved.type || '',
+          encodeType: resolved.encodeType || '', trial: false }
+      }
+    } catch (error) {
+      console.info(`[Cloud] download url failed, fallback to /song/url: ${error instanceof Error ? error.message : ''}`)
+    }
+    // 兜底：部分上传曲目没有 song/music/detail 条目，仍用云盘支持的旧接口取地址。
     const response = await ApiClient.get<SongUrlResponse>('/song/url', [
       { key: 'id', value: id }, { key: 'br', value: '999000' }, { key: 'timestamp', value: Date.now().toString() }])
     const item = response.data?.find((song) => String(song.id) === id)

@@ -1,3 +1,4 @@
+import { SheetSkinFrame } from '../components/SheetSkin'
 import { ResourceComments } from '../components/ResourceComments'
 import { CommentResource } from '../models/CommentResource'
 import { CommentService } from '../services/CommentService'
@@ -382,6 +383,13 @@ export struct MvPlayerPage {
   }
 
   @Builder
+  private skin_CommentSheet() {
+    SheetSkinFrame() {
+      this.CommentSheet()
+    }
+  }
+
+  @Builder
   private CommentSheet() {
     ResourceComments({
       resource: this.commentResource(),
@@ -745,7 +753,7 @@ export struct MvPlayerPage {
         }.layoutWeight(1).scrollBar(BarState.Off)
       }
       .width('100%').height('100%').backgroundColor(TC.pageBackground())
-      .bindSheet(this.commentSheetVisible, this.CommentSheet(), {
+      .bindSheet(this.commentSheetVisible, this.skin_CommentSheet(), {
         height: '72%', backgroundColor: TC.sheetBackground(), showClose: false, dragBar: true,
         onDisappear: () => this.commentSheetVisible = false
       })

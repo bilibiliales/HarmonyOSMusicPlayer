@@ -1,3 +1,4 @@
+import { SheetSkinFrame } from '../components/SheetSkin'
 import { SkinBackdrop } from '../components/SkinBackdrop'
 import { ResourceComments } from '../components/ResourceComments'
 import { CommentResource } from '../models/CommentResource'
@@ -68,6 +69,13 @@ export struct AlbumDetail {
 
   private commentResource(): CommentResource {
     return { id: this.pageParam.id, type: 3, title: this.albumName }
+  }
+
+  @Builder
+  private skin_CommentsSheetBuilder() {
+    SheetSkinFrame() {
+      this.CommentsSheetBuilder()
+    }
   }
 
   @Builder
@@ -517,7 +525,7 @@ export struct AlbumDetail {
         }
         .width('100%')
         .height('100%')
-        .bindSheet(this.commentSheetVisible, this.CommentsSheetBuilder(), {
+        .bindSheet(this.commentSheetVisible, this.skin_CommentsSheetBuilder(), {
           height: '68%',
           backgroundColor: TC.sheetBackground(),
           showClose: false,

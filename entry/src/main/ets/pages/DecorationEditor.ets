@@ -12,8 +12,10 @@ import {
   HeartConfig,
   HomeBgConfig,
   ImageOnlyConfig,
+  MiniPlayerConfig,
   PlayerLayer,
   PlayerStyleConfig,
+  SheetConfig,
   SidebarConfig,
   SkinConfig,
   StartupConfig,
@@ -33,7 +35,7 @@ export class DecorationEditorParam {
 /**
  * 装扮编辑器。
  *
- * 一个页面覆盖 12 类装扮：顶部是「该类已保存的装扮」横向列表（可切换/新建/删除），
+ * 一个页面覆盖 14 类装扮：顶部是「该类已保存的装扮」横向列表（可切换/新建/删除），
  * 下面是按类型渲染的表单。所有改动先落在 @State 草稿上，点保存才写库并发布到运行时，
  * 避免拖动滑杆时反复写盘。
  *
@@ -63,6 +65,7 @@ export struct DecorationEditorPage {
   @State private skinThemeColor: string = ''
   @State private skinAccentColor: string = ''
   @State private skinTextColor: string = ''
+  @State private skinContainerColor: string = ''
 
   // ---- 播放器样式 ----
   @State private playerBgImage: string = ''
@@ -78,6 +81,7 @@ export struct DecorationEditorPage {
   @State private vinylX: number = 0
   @State private vinylY: number = 0
   @State private vinylOpacity: number = 100
+  @State private vinylRadius: number = 50
   @State private coverRatio: number = 63
   @State private coverX: number = 0
   @State private coverY: number = 0
@@ -131,11 +135,29 @@ export struct DecorationEditorPage {
   // ---- 单图类 ----
   @State private singleImage: string = ''
 
-  // ---- VIP 等级贴图 ----
-  @State private badgeImages: string[] = ['', '', '', '', '', '', '']
+  // ---- VIP / SVIP 等级贴图（各 7 级） ----
+  @State private badgeVipImages: string[] = ['', '', '', '', '', '', '']
+  @State private badgeSvipImages: string[] = ['', '', '', '', '', '', '']
+
+  // ---- 迷你播放器 ----
+  @State private miniBgImage: string = ''
+  @State private miniBgColor: string = ''
+  @State private miniBgOpacity: number = 100
+  @State private miniBgBlur: number = 0
+  @State private miniRadius: number = 29
+  @State private miniTitleColor: string = ''
+  @State private miniSubtitleColor: string = ''
+  @State private miniIconColor: string = ''
+
+  // ---- 半模态外观 ----
+  @State private sheetBgImage: string = ''
+  @State private sheetBgColor: string = ''
+  @State private sheetBgOpacity: number = 100
+  @State private sheetBgBlur: number = 0
+  @State private sheetScrim: number = 0
 
   // ---- 套装 ----
-  @State private suitPick: string[] = ['', '', '', '', '', '', '', '', '', '', '']
+  @State private suitPick: string[] = DecoKind.emptyPicks()
 
   // =========================================================================
   // 生命周期与数据
@@ -179,6 +201,7 @@ export struct DecorationEditorPage {
     this.skinThemeColor = ''
     this.skinAccentColor = ''
     this.skinTextColor = ''
+    this.skinContainerColor = ''
 
     this.playerBgImage = ''
     this.playerBgVideo = ''
@@ -193,6 +216,7 @@ export struct DecorationEditorPage {
     this.vinylX = 0
     this.vinylY = 0
     this.vinylOpacity = 100
+    this.vinylRadius = 50
     this.coverRatio = 63
     this.coverX = 0
     this.coverY = 0
@@ -235,8 +259,22 @@ export struct DecorationEditorPage {
     this.startupSkip = true
 
     this.singleImage = ''
-    this.badgeImages = ['', '', '', '', '', '', '']
-    this.suitPick = ['', '', '', '', '', '', '', '', '', '', '']
+    this.badgeVipImages = ['', '', '', '', '', '', '']
+    this.badgeSvipImages = ['', '', '', '', '', '', '']
+    this.miniBgImage = ''
+    this.miniBgColor = ''
+    this.miniBgOpacity = 100
+    this.miniBgBlur = 0
+    this.miniRadius = 29
+    this.miniTitleColor = ''
+    this.miniSubtitleColor = ''
+    this.miniIconColor = ''
+    this.sheetBgImage = ''
+    this.sheetBgColor = ''
+    this.sheetBgOpacity = 100
+    this.sheetBgBlur = 0
+    this.sheetScrim = 0
+    this.suitPick = DecoKind.emptyPicks()
   }
 
   /** 把一条已保存的装扮载入草稿。 */
@@ -256,6 +294,7 @@ export struct DecorationEditorPage {
       this.skinThemeColor = cfg.themeColor
       this.skinAccentColor = cfg.accentColor
       this.skinTextColor = cfg.textColor
+      this.skinContainerColor = cfg.containerColor
       return
     }
     if (this.kind === DecoKind.PLAYER) {
@@ -273,6 +312,7 @@ export struct DecorationEditorPage {
       this.vinylX = cfg.vinylX
       this.vinylY = cfg.vinylY
       this.vinylOpacity = cfg.vinylOpacity
+      this.vinylRadius = cfg.vinylRadius
       this.coverRatio = cfg.coverRatio
       this.coverX = cfg.coverX
       this.coverY = cfg.coverY
@@ -331,7 +371,30 @@ export struct DecorationEditorPage {
       return
     }
     if (this.kind === DecoKind.VIP_BADGE) {
-      this.badgeImages = VipBadgeConfig.from(raw).images
+      const cfg = VipBadgeConfig.from(raw)
+      this.badgeVipImages = cfg.vipImages
+      this.badgeSvipImages = cfg.svipImages
+      return
+    }
+    if (this.kind === DecoKind.MINI_PLAYER) {
+      const cfg = MiniPlayerConfig.from(raw)
+      this.miniBgImage = cfg.bgImage
+      this.miniBgColor = cfg.bgColor
+      this.miniBgOpacity = cfg.bgOpacity
+      this.miniBgBlur = cfg.bgBlur
+      this.miniRadius = cfg.radius
+      this.miniTitleColor = cfg.titleColor
+      this.miniSubtitleColor = cfg.subtitleColor
+      this.miniIconColor = cfg.iconColor
+      return
+    }
+    if (this.kind === DecoKind.SHEET) {
+      const cfg = SheetConfig.from(raw)
+      this.sheetBgImage = cfg.bgImage
+      this.sheetBgColor = cfg.bgColor
+      this.sheetBgOpacity = cfg.bgOpacity
+      this.sheetBgBlur = cfg.bgBlur
+      this.sheetScrim = cfg.scrim
       return
     }
     if (this.kind === DecoKind.SUIT) {
@@ -363,6 +426,7 @@ export struct DecorationEditorPage {
       cfg.themeColor = this.skinThemeColor
       cfg.accentColor = this.skinAccentColor
       cfg.textColor = this.skinTextColor
+      cfg.containerColor = this.skinContainerColor
       return JSON.stringify(cfg)
     }
     if (this.kind === DecoKind.PLAYER) {
@@ -379,6 +443,7 @@ export struct DecorationEditorPage {
       cfg.vinylX = this.vinylX
       cfg.vinylY = this.vinylY
       cfg.vinylOpacity = this.vinylOpacity
+      cfg.vinylRadius = this.vinylRadius
       cfg.coverRatio = this.coverRatio
       cfg.coverX = this.coverX
       cfg.coverY = this.coverY
@@ -438,7 +503,29 @@ export struct DecorationEditorPage {
     }
     if (this.kind === DecoKind.VIP_BADGE) {
       const cfg = new VipBadgeConfig()
-      cfg.images = this.badgeImages
+      cfg.vipImages = this.badgeVipImages
+      cfg.svipImages = this.badgeSvipImages
+      return JSON.stringify(cfg)
+    }
+    if (this.kind === DecoKind.MINI_PLAYER) {
+      const cfg = new MiniPlayerConfig()
+      cfg.bgImage = this.miniBgImage
+      cfg.bgColor = this.miniBgColor
+      cfg.bgOpacity = this.miniBgOpacity
+      cfg.bgBlur = this.miniBgBlur
+      cfg.radius = this.miniRadius
+      cfg.titleColor = this.miniTitleColor
+      cfg.subtitleColor = this.miniSubtitleColor
+      cfg.iconColor = this.miniIconColor
+      return JSON.stringify(cfg)
+    }
+    if (this.kind === DecoKind.SHEET) {
+      const cfg = new SheetConfig()
+      cfg.bgImage = this.sheetBgImage
+      cfg.bgColor = this.sheetBgColor
+      cfg.bgOpacity = this.sheetBgOpacity
+      cfg.bgBlur = this.sheetBgBlur
+      cfg.scrim = this.sheetScrim
       return JSON.stringify(cfg)
     }
     if (this.kind === DecoKind.SUIT) {
@@ -800,7 +887,8 @@ export struct DecorationEditorPage {
         }
         Row({ space: 6 }) {
           Column().width(34).height(34).borderRadius(8)
-            .backgroundColor(this.skinBgImage ? 'rgba(255,255,255,0.24)' : '#2B2B33')
+            .backgroundColor(this.skinContainerColor ? this.skinContainerColor :
+              (this.skinBgImage ? 'rgba(255,255,255,0.24)' : '#2B2B33'))
           Column({ space: 4 }) {
             Column().width(56).height(6).borderRadius(3)
               .backgroundColor(this.skinTextColor ? this.skinTextColor : '#FFFFFF')
@@ -859,6 +947,10 @@ export struct DecorationEditorPage {
         DecoColorPicker({
           label: '页面背景色', value: this.skinPageColor,
           onChange: (v: string) => this.skinPageColor = v
+        })
+        DecoColorPicker({
+          label: '容器色（卡片 / 列表 / 输入框）', value: this.skinContainerColor,
+          onChange: (v: string) => this.skinContainerColor = v
         })
         DecoColorPicker({
           label: '主题色（按钮 / 选中 / 进度）', value: this.skinThemeColor,
@@ -961,11 +1053,13 @@ export struct DecorationEditorPage {
             .width(this.stageVinylSize())
             .height(this.stageVinylSize())
             .objectFit(ImageFit.Contain)
+            .borderRadius(`${this.vinylRadius}%`)
+            .clip(true)
         } else {
           Column()
             .width(this.stageVinylSize())
             .height(this.stageVinylSize())
-            .borderRadius(this.stageVinylSize() / 2)
+            .borderRadius(this.stageVinylSize() * this.vinylRadius / 100)
             .backgroundColor('#111114')
             .border({ width: 1, color: 'rgba(255,255,255,0.2)' })
         }
@@ -1240,7 +1334,7 @@ export struct DecorationEditorPage {
         }
       }
 
-      DecoCard({ title: '黑胶唱片', hint: '可替换唱片底图，独立调整直径、位置与透明度' }) {
+      DecoCard({ title: '黑胶唱片', hint: '可替换唱片底图，独立调整直径、位置、圆角与透明度' }) {
         DecoMediaPicker({
           label: '唱片底图', value: this.vinylImage, mediaType: 'image',
           cropAspect: DecoRatio.SQUARE,
@@ -1249,6 +1343,10 @@ export struct DecorationEditorPage {
         DecoSlider({
           label: '直径（0 = 自动适配）', value: this.vinylSize, min: 0, max: 400, step: 2, unit: 'vp',
           onChange: (v: number) => this.vinylSize = v
+        })
+        DecoSlider({
+          label: '贴图圆角（50% = 正圆）', value: this.vinylRadius, min: 0, max: 50, step: 1, unit: '%',
+          onChange: (v: number) => this.vinylRadius = v
         })
         DecoSlider({
           label: '左右偏移', value: this.vinylX, min: -200, max: 200, step: 1, unit: 'vp',
@@ -1578,7 +1676,7 @@ export struct DecorationEditorPage {
         ? '建议正方形 PNG，中心镂空处会正对头像'
         : (this.kind === DecoKind.VIP_CARD
           ? '建议 3:1 横图，会铺满侧边栏会员卡区域'
-          : '桌面图标样式需要系统支持，部分设备可能不生效')
+          : '会用在登录页 logo 与设置页「应用图标」处；桌面图标由系统在安装时固定，应用无法在运行时替换')
     }) {
       DecoMediaPicker({
         label: this.kind === DecoKind.AVATAR_FRAME ? '头像框' : (this.kind === DecoKind.VIP_CARD ? '会员卡底图' : '应用图标'),
@@ -1601,25 +1699,236 @@ export struct DecorationEditorPage {
   @Builder
   private BadgeForm() {
     Column({ space: 12 }) {
-      DecoCard({ title: 'VIP 等级贴图', hint: '按等级逐级上传，我的页与侧边栏会显示当前等级对应的贴图' }) {
+      DecoCard({
+        title: '黑胶VIP 贴图',
+        hint: '按等级上传，贴图里自带等级文字，应用不会再额外渲染「壹贰叁…」'
+      }) {
         ForEach([1, 2, 3, 4, 5, 6, 7], (level: number) => {
           DecoMediaPicker({
-            label: `Lv.${level} 贴图`,
-            value: level <= this.badgeImages.length ? this.badgeImages[level - 1] : '',
+            label: `VIP Lv.${level} 贴图`,
+            value: this.badgeVipImages[level - 1],
             mediaType: 'image',
-            cropAspect: DecoRatio.SQUARE,
-            onChange: (path: string) => this.setBadge(level - 1, path)
+            cropAspect: DecoRatio.CARD,
+            onChange: (path: string) => this.setBadge(true, level - 1, path)
           })
-        }, (level: number) => `badge_${level}`)
+        }, (level: number) => `badge_vip_${level}`)
+      }
+
+      DecoCard({
+        title: '黑胶SVIP 贴图',
+        hint: 'SVIP 与 VIP 的贴图分开配置；SVIP 未上传时回退用对应等级的 VIP 贴图'
+      }) {
+        ForEach([1, 2, 3, 4, 5, 6, 7], (level: number) => {
+          DecoMediaPicker({
+            label: `SVIP Lv.${level} 贴图`,
+            value: this.badgeSvipImages[level - 1],
+            mediaType: 'image',
+            cropAspect: DecoRatio.CARD,
+            onChange: (path: string) => this.setBadge(false, level - 1, path)
+          })
+        }, (level: number) => `badge_svip_${level}`)
       }
     }
     .width('100%')
   }
 
-  private setBadge(index: number, path: string): void {
-    const next = this.badgeImages.slice()
-    next[index] = path
-    this.badgeImages = next
+  private setBadge(svip: boolean, index: number, path: string): void {
+    if (svip) {
+      const next = this.badgeSvipImages.slice()
+      next[index] = path
+      this.badgeSvipImages = next
+    } else {
+      const next = this.badgeVipImages.slice()
+      next[index] = path
+      this.badgeVipImages = next
+    }
+  }
+
+  // =========================================================================
+  // 视图：迷你播放器
+  // =========================================================================
+
+  @Builder
+  private MiniPlayerForm() {
+    Column({ space: 12 }) {
+      DecoCard({ title: '效果预览', hint: '按当前配置实时渲染，未设置时与默认胶囊一致' }) {
+        Stack({ alignContent: Alignment.TopStart }) {
+          Column()
+            .width('100%')
+            .height('100%')
+            .backgroundColor(this.miniBgColor ? this.miniBgColor : TC.sheetBackground())
+          if (this.miniBgImage) {
+            Image(DecorationMedia.displayUri(this.miniBgImage))
+              .width('100%')
+              .height('100%')
+              .objectFit(ImageFit.Cover)
+              .blur(this.miniBgBlur)
+              .opacity(Math.max(0, Math.min(100, this.miniBgOpacity)) / 100)
+          }
+          Row({ space: 10 }) {
+            Stack() {
+              SymbolGlyph($r('sys.symbol.play_circle_fill'))
+                .fontSize(22)
+                .fontColor([this.miniIconColor ? this.miniIconColor : TC.textPrimary()])
+            }
+            .width(44).height(44).borderRadius(22).backgroundColor(TC.surfaceInset())
+
+            Column({ space: 3 }) {
+              Text('示例歌曲名')
+                .fontSize(13).fontWeight(FontWeight.Medium)
+                .fontColor(this.miniTitleColor ? this.miniTitleColor : TC.textPrimary())
+                .maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
+              Text('歌手名')
+                .fontSize(10)
+                .fontColor(this.miniSubtitleColor ? this.miniSubtitleColor : TC.textSecondary())
+                .maxLines(1)
+            }
+            .layoutWeight(1)
+            .alignItems(HorizontalAlign.Start)
+
+            SymbolGlyph($r('sys.symbol.backward_end_fill'))
+              .fontSize(18)
+              .fontColor([this.miniIconColor ? this.miniIconColor : TC.textPrimary()])
+            SymbolGlyph($r('sys.symbol.pause_circle_fill'))
+              .fontSize(26)
+              .fontColor([this.miniIconColor ? this.miniIconColor : TC.textPrimary()])
+            SymbolGlyph($r('sys.symbol.forward_end_fill'))
+              .fontSize(18)
+              .fontColor([this.miniIconColor ? this.miniIconColor : TC.textPrimary()])
+          }
+          .width('100%')
+          .padding({ left: 6, right: 10, top: 5, bottom: 5 })
+        }
+        .width('100%')
+        .height(58)
+        .borderRadius(this.miniRadius)
+        .clip(true)
+      }
+
+      DecoCard({ title: '贴图与底色', hint: '贴图铺满整条胶囊，圆角裁切；不设贴图时用底色' }) {
+        DecoMediaPicker({
+          label: '胶囊贴图', value: this.miniBgImage, mediaType: 'image',
+          cropAspect: DecoRatio.WIDE,
+          onChange: (path: string) => this.miniBgImage = path
+        })
+        DecoColorPicker({
+          label: '底色', value: this.miniBgColor,
+          onChange: (v: string) => this.miniBgColor = v
+        })
+        DecoSlider({
+          label: '贴图不透明度', value: this.miniBgOpacity, min: 5, max: 100, step: 1, unit: '%',
+          onChange: (v: number) => this.miniBgOpacity = v
+        })
+        DecoSlider({
+          label: '贴图模糊', value: this.miniBgBlur, min: 0, max: 40, step: 1, unit: 'vp',
+          onChange: (v: number) => this.miniBgBlur = v
+        })
+        DecoSlider({
+          label: '圆角', value: this.miniRadius, min: 0, max: 29, step: 1, unit: 'vp',
+          onChange: (v: number) => this.miniRadius = v
+        })
+      }
+
+      DecoCard({ title: '文字与图标' }) {
+        DecoColorPicker({
+          label: '歌名颜色', value: this.miniTitleColor,
+          onChange: (v: string) => this.miniTitleColor = v
+        })
+        DecoColorPicker({
+          label: '歌手颜色', value: this.miniSubtitleColor,
+          onChange: (v: string) => this.miniSubtitleColor = v
+        })
+        DecoColorPicker({
+          label: '控制图标颜色', value: this.miniIconColor,
+          onChange: (v: string) => this.miniIconColor = v
+        })
+      }
+    }
+    .width('100%')
+  }
+
+  // =========================================================================
+  // 视图：半模态外观
+  // =========================================================================
+
+  @Builder
+  private SheetForm() {
+    Column({ space: 12 }) {
+      DecoCard({ title: '弹层预览', hint: '所有半模态（评论、列表、设置等）都会套用这套外观' }) {
+        Stack({ alignContent: Alignment.TopStart }) {
+          Column()
+            .width('100%')
+            .height('100%')
+            .backgroundColor(this.sheetBgColor ? this.sheetBgColor : TC.sheetBackground())
+          if (this.sheetBgImage) {
+            Image(DecorationMedia.displayUri(this.sheetBgImage))
+              .width('100%')
+              .height('100%')
+              .objectFit(ImageFit.Cover)
+              .blur(this.sheetBgBlur)
+              .opacity(Math.max(0, Math.min(100, this.sheetBgOpacity)) / 100)
+          }
+          if (this.sheetBgImage && this.sheetScrim > 0) {
+            Column()
+              .width('100%')
+              .height('100%')
+              .backgroundColor(`rgba(0,0,0,${Math.min(80, this.sheetScrim) / 100})`)
+          }
+          Column({ space: 10 }) {
+            Column().width(36).height(4).borderRadius(2)
+              .backgroundColor(TC.textQuaternary())
+              .opacity(0.5)
+            Text('弹层标题').fontSize(15).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary())
+            Row({ space: 8 }) {
+              Column().width(40).height(40).borderRadius(10).backgroundColor(TC.surfaceInset())
+              Column({ space: 5 }) {
+                Column().width('60%').height(8).borderRadius(4).backgroundColor(TC.textSecondary())
+                Column().width('36%').height(7).borderRadius(4).backgroundColor(TC.textTertiary())
+                  .opacity(0.6)
+              }
+              .alignItems(HorizontalAlign.Start)
+              .layoutWeight(1)
+            }
+            .width('100%')
+            .padding(10)
+            .backgroundColor(TC.surfaceCard())
+            .borderRadius(12)
+          }
+          .width('100%')
+          .padding({ left: 16, right: 16, top: 10 })
+          .alignItems(HorizontalAlign.Start)
+        }
+        .width('100%')
+        .height(150)
+        .borderRadius(16)
+        .clip(true)
+      }
+
+      DecoCard({ title: '背景', hint: '贴图铺满整块弹层；不设贴图时用底色' }) {
+        DecoMediaPicker({
+          label: '弹层背景贴图', value: this.sheetBgImage, mediaType: 'image',
+          cropAspect: DecoRatio.SCREEN,
+          onChange: (path: string) => this.sheetBgImage = path
+        })
+        DecoColorPicker({
+          label: '弹层底色', value: this.sheetBgColor,
+          onChange: (v: string) => this.sheetBgColor = v
+        })
+        DecoSlider({
+          label: '贴图不透明度', value: this.sheetBgOpacity, min: 5, max: 100, step: 1, unit: '%',
+          onChange: (v: number) => this.sheetBgOpacity = v
+        })
+        DecoSlider({
+          label: '贴图模糊', value: this.sheetBgBlur, min: 0, max: 40, step: 1, unit: 'vp',
+          onChange: (v: number) => this.sheetBgBlur = v
+        })
+        DecoSlider({
+          label: '可读性蒙版', value: this.sheetScrim, min: 0, max: 80, step: 1, unit: '%',
+          onChange: (v: number) => this.sheetScrim = v
+        })
+      }
+    }
+    .width('100%')
   }
 
   @Builder
@@ -1735,6 +2044,10 @@ export struct DecorationEditorPage {
               this.StartupForm()
             } else if (this.kind === DecoKind.VIP_BADGE) {
               this.BadgeForm()
+            } else if (this.kind === DecoKind.MINI_PLAYER) {
+              this.MiniPlayerForm()
+            } else if (this.kind === DecoKind.SHEET) {
+              this.SheetForm()
             } else if (this.kind === DecoKind.SUIT) {
               this.SuitForm()
             } else {

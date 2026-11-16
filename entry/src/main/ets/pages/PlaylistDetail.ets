@@ -1,3 +1,4 @@
+import { SheetSkinFrame } from '../components/SheetSkin'
 import { SkinBackdrop } from '../components/SkinBackdrop'
 import { CommentService } from '../services/CommentService'
 import { ResourceComments } from '../components/ResourceComments'
@@ -409,6 +410,13 @@ export struct PlaylistDetail {
 
   private commentResource(): CommentResource {
     return { id: this.playlist.id, type: 2, title: this.playlist.name }
+  }
+
+  @Builder
+  private skin_CommentSheet() {
+    SheetSkinFrame() {
+      this.CommentSheet()
+    }
   }
 
   @Builder
@@ -839,7 +847,7 @@ export struct PlaylistDetail {
         }
       }
       .width('100%').height('100%')
-      .bindSheet(this.commentSheetVisible, this.CommentSheet(), {
+      .bindSheet(this.commentSheetVisible, this.skin_CommentSheet(), {
         height: '72%', backgroundColor: TC.sheetBackground(), showClose: false, dragBar: true,
         onDisappear: () => this.commentSheetVisible = false
       })

@@ -1,3 +1,4 @@
+import { SheetSkinFrame } from '../components/SheetSkin'
 import { SkinBackdrop } from '../components/SkinBackdrop'
 import { DifmService, DifmSource, DifmStyle, DifmChannel, DifmTrack } from '../services/DifmService'
 import { RadioService } from '../services/RadioService'
@@ -80,6 +81,13 @@ export struct DifmPage {
       this.pageStack.pushPathByName('PlayPage', null)
     } catch (error) { BubbleTip.show(this.getUIContext(), error instanceof Error ? error.message : '播放失败，请刷新频道曲目') }
     finally { this.playing = false }
+  }
+
+  @Builder
+  private skin_ChannelSheet() {
+    SheetSkinFrame() {
+      this.ChannelSheet()
+    }
   }
 
   @Builder
@@ -170,7 +178,7 @@ export struct DifmPage {
           }.width('100%').layoutWeight(1).scrollBar(BarState.Off)
         }
       }.width('100%').height('100%').backgroundColor(TC.pageBackground())
-        .bindSheet(this.sheetVisible, this.ChannelSheet(), {
+        .bindSheet(this.sheetVisible, this.skin_ChannelSheet(), {
           height: '75%', backgroundColor: TC.sheetBackground(), showClose: false, dragBar: true,
           onDisappear: () => { this.sheetVisible = false; this.token++; this.tracksLoading = false }
         })

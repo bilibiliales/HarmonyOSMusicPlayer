@@ -43,7 +43,7 @@ export interface ImageCropPageParam {
   discardSource?: boolean
 }
 
-/** 装扮类型（12 类）。 */
+/** 装扮类型（14 类）。 */
 export class DecoKind {
   static readonly SKIN: string = 'skin'
   static readonly PLAYER: string = 'player'
@@ -56,6 +56,10 @@ export class DecoKind {
   static readonly VIP_CARD: string = 'vip_card'
   static readonly APP_ICON: string = 'app_icon'
   static readonly VIP_BADGE: string = 'vip_badge'
+  /** 迷你悬浮播放器（首页底部那条胶囊）。 */
+  static readonly MINI_PLAYER: string = 'mini_player'
+  /** 半模态（弹层）外观。 */
+  static readonly SHEET: string = 'sheet'
   static readonly SUIT: string = 'suit'
 
   static title(kind: string): string {
@@ -70,6 +74,8 @@ export class DecoKind {
     if (kind === DecoKind.VIP_CARD) { return '会员身份卡' }
     if (kind === DecoKind.APP_ICON) { return '应用图标' }
     if (kind === DecoKind.VIP_BADGE) { return 'VIP 等级贴图' }
+    if (kind === DecoKind.MINI_PLAYER) { return '迷你播放器' }
+    if (kind === DecoKind.SHEET) { return '弹层外观' }
     if (kind === DecoKind.SUIT) { return '套装' }
     return kind
   }
@@ -84,8 +90,10 @@ export class DecoKind {
     if (kind === DecoKind.STARTUP) { return '冷启动图片或视频，可跳过' }
     if (kind === DecoKind.AVATAR_FRAME) { return '个人主页头像外框' }
     if (kind === DecoKind.VIP_CARD) { return '侧边栏会员卡底板' }
-    if (kind === DecoKind.APP_ICON) { return '桌面图标样式（需应用市场支持）' }
-    if (kind === DecoKind.VIP_BADGE) { return '逐级上传的等级贴图' }
+    if (kind === DecoKind.APP_ICON) { return '应用内品牌图标（系统不允许运行时替换桌面图标）' }
+    if (kind === DecoKind.VIP_BADGE) { return 'VIP / SVIP 逐级贴图，自带等级文字' }
+    if (kind === DecoKind.MINI_PLAYER) { return '首页底部迷你播放器的贴图、底色与文字色' }
+    if (kind === DecoKind.SHEET) { return '所有半模态弹层的底色与背景贴图' }
     if (kind === DecoKind.SUIT) { return '一键切换整套装扮' }
     return ''
   }
@@ -102,6 +110,8 @@ export class DecoKind {
     if (kind === DecoKind.VIP_CARD) { return $r('sys.symbol.bookmark_fill') }
     if (kind === DecoKind.APP_ICON) { return $r('sys.symbol.square_grid_2x2') }
     if (kind === DecoKind.VIP_BADGE) { return $r('sys.symbol.checkmark_circle_fill') }
+    if (kind === DecoKind.MINI_PLAYER) { return $r('sys.symbol.play_circle') }
+    if (kind === DecoKind.SHEET) { return $r('sys.symbol.rectangle_topthird_inset_filled') }
     return $r('sys.symbol.wand_and_stars')
   }
 
@@ -110,8 +120,18 @@ export class DecoKind {
     return [
       DecoKind.SKIN, DecoKind.PLAYER, DecoKind.DOCK, DecoKind.SIDEBAR, DecoKind.HOME_BG,
       DecoKind.HEART, DecoKind.STARTUP, DecoKind.AVATAR_FRAME, DecoKind.VIP_CARD,
-      DecoKind.APP_ICON, DecoKind.VIP_BADGE
+      DecoKind.APP_ICON, DecoKind.VIP_BADGE, DecoKind.MINI_PLAYER, DecoKind.SHEET
     ]
+  }
+
+  /** 套装选择区每个类型占一位，长度必须与 pickable() 一致。 */
+  static emptyPicks(): string[] {
+    const out: string[] = []
+    const kinds = DecoKind.pickable()
+    for (let i = 0; i < kinds.length; i++) {
+      out.push('')
+    }
+    return out
   }
 }
 
@@ -152,6 +172,11 @@ export class SkinConfig {
   accentColor: string = ''
   /** 字体色（主/正文）；为空按背景亮度自动推导。 */
   textColor: string = ''
+  /**
+   * 容器色：卡片 / 列表 / 输入框 / 胶囊等「深灰色块」的统一底色。
+   * 为空时按深浅色表 + 背景自动推导；填了就固定该颜色（透明度自动派生层次）。
+   */
+  containerColor: string = ''
   /** 背景图上的暗化/亮化蒙版强度 0-100，保证文字可读。 */
   scrim: number = 38
 
@@ -167,6 +192,7 @@ export class SkinConfig {
       out.themeColor = src.themeColor ?? ''
       out.accentColor = src.accentColor ?? ''
       out.textColor = src.textColor ?? ''
+      out.containerColor = src.containerColor ?? ''
       out.scrim = src.scrim ?? 38
     } catch (_error) {
       return new SkinConfig()
@@ -222,6 +248,8 @@ export class PlayerStyleConfig {
   vinylY: number = 0
   /** 黑胶不透明度 0-100。 */
   vinylOpacity: number = 100
+  /** 唱片贴图圆角百分比 0-50（50 = 正圆）。 */
+  vinylRadius: number = 50
   /** 唱片封面相对黑胶的比例 0-100（默认 63）。 */
   coverRatio: number = 63
   /** 封面中心相对黑胶中心的偏移（vp）。 */
@@ -255,6 +283,7 @@ export class PlayerStyleConfig {
       out.vinylX = src.vinylX ?? 0
       out.vinylY = src.vinylY ?? 0
       out.vinylOpacity = src.vinylOpacity ?? 100
+      out.vinylRadius = src.vinylRadius ?? 50
       out.coverRatio = src.coverRatio ?? 63
       out.coverX = src.coverX ?? 0
       out.coverY = src.coverY ?? 0
@@ -455,32 +484,117 @@ export class ImageOnlyConfig {
 }
 
 // ---------------------------------------------------------------------------
-// 11. VIP 等级贴图（1-7 级逐级上传）
+// 11. VIP / SVIP 等级贴图（各 1-7 级，共 14 张）
 // ---------------------------------------------------------------------------
 
 export class VipBadgeConfig {
-  /** 下标 0 对应 1 级，依此类推。 */
-  images: string[] = ['', '', '', '', '', '', '']
+  /** 黑胶VIP：下标 0 对应 1 级，依此类推。 */
+  vipImages: string[] = ['', '', '', '', '', '', '']
+  /** 黑胶SVIP：下标 0 对应 1 级，依此类推。 */
+  svipImages: string[] = ['', '', '', '', '', '', '']
+  /** 旧存档字段（当年不分 VIP/SVIP），只读兼容，不再写入。 */
+  images?: string[]
 
   static from(raw: string): VipBadgeConfig {
     const out = new VipBadgeConfig()
     if (!raw) { return out }
     try {
       const src = JSON.parse(raw) as VipBadgeConfig
-      const images: string[] = src.images ?? []
-      out.images = ['', '', '', '', '', '', '']
-      for (let i = 0; i < 7; i++) {
-        out.images[i] = i < images.length ? (images[i] ?? '') : ''
-      }
+      out.vipImages = VipBadgeConfig.normalize(src.vipImages ?? src.images)
+      out.svipImages = VipBadgeConfig.normalize(src.svipImages)
     } catch (_error) {
       return new VipBadgeConfig()
+    }
+    return out
+  }
+
+  private static normalize(source: string[] | undefined): string[] {
+    const out: string[] = ['', '', '', '', '', '', '']
+    const list: string[] = source ?? []
+    for (let i = 0; i < 7; i++) {
+      out[i] = i < list.length ? (list[i] ?? '') : ''
     }
     return out
   }
 }
 
 // ---------------------------------------------------------------------------
-// 12. 套装
+// 12. 迷你悬浮播放器
+// ---------------------------------------------------------------------------
+
+export class MiniPlayerConfig {
+  /** 贴图（铺满胶囊，圆角裁切）。 */
+  bgImage: string = ''
+  /** 底色；空=跟随主题。 */
+  bgColor: string = ''
+  /** 贴图不透明度 0-100。 */
+  bgOpacity: number = 100
+  /** 贴图模糊半径（vp）。 */
+  bgBlur: number = 0
+  /** 胶囊圆角：0（直角）～ 29（完全胶囊）。 */
+  radius: number = 29
+  /** 歌名颜色；空=跟随主题。 */
+  titleColor: string = ''
+  /** 歌手颜色；空=跟随主题。 */
+  subtitleColor: string = ''
+  /** 播放控制图标颜色；空=跟随主题。 */
+  iconColor: string = ''
+
+  static from(raw: string): MiniPlayerConfig {
+    const out = new MiniPlayerConfig()
+    if (!raw) { return out }
+    try {
+      const src = JSON.parse(raw) as MiniPlayerConfig
+      out.bgImage = src.bgImage ?? ''
+      out.bgColor = src.bgColor ?? ''
+      out.bgOpacity = src.bgOpacity ?? 100
+      out.bgBlur = src.bgBlur ?? 0
+      out.radius = src.radius ?? 29
+      out.titleColor = src.titleColor ?? ''
+      out.subtitleColor = src.subtitleColor ?? ''
+      out.iconColor = src.iconColor ?? ''
+    } catch (_error) {
+      return new MiniPlayerConfig()
+    }
+    return out
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 13. 半模态（弹层）外观
+// ---------------------------------------------------------------------------
+
+export class SheetConfig {
+  /** 背景贴图（铺满整块弹层）。 */
+  bgImage: string = ''
+  /** 底色；空=跟随主题。 */
+  bgColor: string = ''
+  /** 贴图不透明度 0-100。 */
+  bgOpacity: number = 100
+  /** 贴图模糊半径（vp）。 */
+  bgBlur: number = 0
+  /** 贴图之上的暗化蒙版 0-80，保证弹层里的文字可读。 */
+  scrim: number = 0
+
+  static from(raw: string): SheetConfig {
+    const out = new SheetConfig()
+    if (!raw) { return out }
+    try {
+      const src = JSON.parse(raw) as SheetConfig
+      out.bgImage = src.bgImage ?? ''
+      out.bgColor = src.bgColor ?? ''
+      out.bgOpacity = src.bgOpacity ?? 100
+      out.bgBlur = src.bgBlur ?? 0
+      out.scrim = src.scrim ?? 0
+    } catch (_error) {
+      return new SheetConfig()
+    }
+    return out
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 14. 套装
 // ---------------------------------------------------------------------------
 
 export class SuitConfig {
@@ -552,6 +666,8 @@ export class DecorationCodec {
     if (kind === DecoKind.VIP_CARD) { return DecorationCodec.encode(new ImageOnlyConfig()) }
     if (kind === DecoKind.APP_ICON) { return DecorationCodec.encode(new ImageOnlyConfig()) }
     if (kind === DecoKind.VIP_BADGE) { return DecorationCodec.encode(new VipBadgeConfig()) }
+    if (kind === DecoKind.MINI_PLAYER) { return DecorationCodec.encode(new MiniPlayerConfig()) }
+    if (kind === DecoKind.SHEET) { return DecorationCodec.encode(new SheetConfig()) }
     if (kind === DecoKind.SUIT) { return DecorationCodec.encode(new SuitConfig()) }
     return '{}'
   }
@@ -581,11 +697,16 @@ export class DecorationCodec {
       return cfg.bgImage
     }
     if (item.kind === DecoKind.VIP_BADGE) {
-      const images = VipBadgeConfig.from(item.payload).images
-      for (const image of images) {
+      const cfg = VipBadgeConfig.from(item.payload)
+      for (const image of cfg.vipImages) {
+        if (image) { return image }
+      }
+      for (const image of cfg.svipImages) {
         if (image) { return image }
       }
     }
+    if (item.kind === DecoKind.MINI_PLAYER) { return MiniPlayerConfig.from(item.payload).bgImage }
+    if (item.kind === DecoKind.SHEET) { return SheetConfig.from(item.payload).bgImage }
     // 套装 / 未来新增类型：从 payload 里找第一个正在启用的图片资源，
     // 找不到（纯颜色类）就返回空，由列表保留默认图标。
     return DecorationCodec.firstImageInPayload(item.payload)
@@ -618,7 +739,7 @@ export class DecorationCodec {
     if (typeof value === 'object') {
       const obj = value as Record<string, Object>
       const preferred: string[] = ['cover', 'image', 'bgImage', 'media', 'src', 'vinylImage',
-        'bgVideo', 'icons', 'layers']
+        'bgVideo', 'icons', 'vipImages', 'svipImages', 'layers']
       for (const key of preferred) {
         const hit = DecorationCodec.findImage(obj[key], depth + 1)
         if (hit) { return hit }

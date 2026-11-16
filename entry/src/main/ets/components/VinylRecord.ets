@@ -1,4 +1,5 @@
 import { TC } from '../services/ThemeColors'
+import { DecorationMedia } from '../services/DecorationMedia'
 
 /**
  * 黑胶唱片。
@@ -21,6 +22,8 @@ export struct VinylRecord {
   @Prop coverOffsetY: number = 0
   /** 封面圆角百分比 0-50。 */
   @Prop coverRadius: number = 50
+  /** 唱片贴图圆角百分比 0-50（50 = 正圆，0 = 方形贴纸）。 */
+  @Prop vinylRadius: number = 50
   @Prop vinylOpacity: number = 100
   @State private angle: number = 0
   private rotationTimer: number = -1
@@ -69,7 +72,7 @@ export struct VinylRecord {
     Stack() {
       Stack() {
         if (this.backImage) {
-          Image(this.backImage)
+          Image(DecorationMedia.displayUri(this.backImage))
             .width(this.diameter).height(this.diameter).objectFit(ImageFit.Contain)
         } else {
           Image($r('app.media.ic_cd'))
@@ -89,7 +92,7 @@ export struct VinylRecord {
         }
       }
       .width(this.diameter).height(this.diameter)
-      .borderRadius('50%').clip(true)
+      .borderRadius(`${Math.max(0, Math.min(50, this.vinylRadius))}%`).clip(true)
       .rotate({ angle: this.angle })
     }
     .width(this.diameter).height(this.diameter)

@@ -1,3 +1,4 @@
+import { SheetSkinFrame } from '../components/SheetSkin'
 import { SkinBackdrop } from '../components/SkinBackdrop'
 import { common } from '@kit.AbilityKit'
 import { LocalLibrary, LocalTrack } from '../services/LocalLibrary'
@@ -170,6 +171,13 @@ export struct LocalMusicPage {
   }
 
   @Builder
+  private skin_MatchSheet() {
+    SheetSkinFrame() {
+      this.MatchSheet()
+    }
+  }
+
+  @Builder
   private MatchSheet() {
     Column({ space: 14 }) {
       Row() {
@@ -289,7 +297,7 @@ export struct LocalMusicPage {
         })
       }.width('100%').height('100%').padding({ top: this.topAvoidHeight + 12, left: 20, right: 20, bottom: 24 })
         .backgroundColor(TC.pageBackground())
-        .bindSheet(this.matchVisible, this.MatchSheet(), {
+        .bindSheet(this.matchVisible, this.skin_MatchSheet(), {
           height: '74%', backgroundColor: TC.sheetBackground(), showClose: false, dragBar: true,
           onDisappear: () => this.closeMatch()
         })

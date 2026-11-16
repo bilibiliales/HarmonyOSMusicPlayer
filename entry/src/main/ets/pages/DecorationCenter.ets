@@ -1,3 +1,4 @@
+import { SheetSkinFrame } from '../components/SheetSkin'
 import { SkinBackdrop } from '../components/SkinBackdrop'
 import { BubbleTip } from '../services/BubbleTip'
 import { DecorationMedia } from '../services/DecorationMedia'
@@ -10,7 +11,7 @@ import { DecorationEditorParam } from './DecorationEditor'
  * 装扮中心。
  *
  * 入口：侧边栏「AI 写歌」上方。
- * 结构：顶部概览（当前生效项数 + 我的装扮/全部取消）→ 12 类装扮入口 →
+ * 结构：顶部概览（当前生效项数 + 我的装扮/全部取消）→ 14 类装扮入口 →
  *       每类点进去是「列表 + 编辑」的装扮编辑器；套装在编辑器里一次性打包多类。
  * 全部数据本地存储（DecorationStore），颜色类装扮会覆盖到 SkinService（装扮优先于深浅色）。
  */
@@ -25,7 +26,8 @@ export struct DecorationCenterPage {
   private kinds: string[] = [
     DecoKind.SKIN, DecoKind.PLAYER, DecoKind.DOCK, DecoKind.SIDEBAR, DecoKind.HOME_BG,
     DecoKind.HEART, DecoKind.STARTUP, DecoKind.AVATAR_FRAME, DecoKind.VIP_CARD,
-    DecoKind.APP_ICON, DecoKind.VIP_BADGE, DecoKind.SUIT
+    DecoKind.APP_ICON, DecoKind.VIP_BADGE, DecoKind.MINI_PLAYER, DecoKind.SHEET,
+    DecoKind.SUIT
   ]
 
   // ---- 数据查询（tick / activeCount 变化时重新取值，驱动界面刷新） ----
@@ -135,6 +137,13 @@ export struct DecorationCenterPage {
     .borderRadius(18)
     .clip(true)
     .onClick(() => this.open(kind))
+  }
+
+  @Builder
+  private skin_MineSheet() {
+    SheetSkinFrame() {
+      this.MineSheet()
+    }
   }
 
   @Builder
@@ -344,7 +353,7 @@ export struct DecorationCenterPage {
       .width('100%')
       .height('100%')
       .backgroundColor(TC.pageBackground())
-      .bindSheet(this.mineVisible, this.MineSheet(), {
+      .bindSheet(this.mineVisible, this.skin_MineSheet(), {
         height: '68%',
         backgroundColor: TC.sheetBackground(),
         showClose: false,
