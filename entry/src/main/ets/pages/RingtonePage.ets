@@ -56,8 +56,7 @@ export struct RingtonePage {
   private clipPath: string = ''
   private clipKey: string = ''
   private lyricScroller: Scroller = new Scroller()
-  /** 双向滑块当前在拖哪一头：0=无，1=开始，2=结束。 */
-  private dragThumb: number = 0
+  private dragBaseSec: number = 0
   private limitNotified: boolean = false
 
   aboutToAppear(): void {
@@ -601,27 +600,22 @@ export struct RingtonePage {
     })
   }
 
-  /** 把滑块上的横坐标换成秒。 */
-  private secAt(x: number): number {
-    if (this.waveWidth <= 0 || this.durationSec <= 0) { return 0 }
-    return Math.max(0, Math.min(this.durationSec, Math.round(x / this.waveWidth * this.durationSec)))
+  /** 两个手柄的中点：轨道左半边抓开始，右半边抓结束。 */
+  private thumbMidX(): number {
+    if (this.waveWidth <= 0) { return 0 }
+    return Math.max(0, Math.min(this.waveWidth,
+      (this.startX(this.startSec) + this.endX(this.endSec)) / 2))
   }
 
-  private nearestThumb(x: number): number {
-    const sec = this.secAt(x)
-    return Math.abs(sec - this.startSec) <= Math.abs(sec - this.endSec) ? 1 : 2
-  }
-
-  /** 拖动当前选中的那一头，两个手柄都能滑。 */
-  private applyThumbX(x: number): void {
-    const sec = this.secAt(x)
-    if (this.dragThumb === 1) { this.setStart(sec, true) }
-    else if (this.dragThumb === 2) { this.setEnd(sec, true) }
+  /** SDK 的 GestureEvent 没有 localX，偏移用项目里通用的 offsetX。 */
+  private dragDelta(offsetX: number): number {
+    if (this.waveWidth <= 0) { return 0 }
+    return offsetX / this.waveWidth * this.durationSec
   }
 
   /**
-   * 双向范围滑块：整条轨道都是触摸区，按下时自动抓离手指更近的那一头，
-   * 之后拖动只更新那一头；里面的波形、选区和手柄都只是画出来，不参与命中测试。
+   * 双向范围滑块：按两个手柄的中点把轨道分成左右两个触摸区，
+   * 左边拖开始、右边拖结束，两头都能滑；波形、选区、手柄只画不参与命中测试。
    */
   @Builder
   private RangeSlider() {
@@ -666,22 +660,45 @@ export struct RingtonePage {
           .backgroundColor(TC.accent())
           .position({ x: Math.max(0, this.endX(this.endSec) - 3), y: 0 })
           .hitTestBehavior(HitTestMode.None)
+        // 两个透明触摸区：左半边拖开始，右半边拖结束，各自只认自己的 offsetX
+        Column()
+          .width(this.thumbMidX())
+          .height(44)
+          .backgroundColor(Color.Transparent)
+          .position({ x: 0, y: 0 })
+          .hitTestBehavior(HitTestMode.Block)
+          .gesture(
+            PanGesture({ distance: 1 })
+              .onActionStart(() => {
+                this.dragBaseSec = this.startSec
+                this.beginDrag()
+              })
+              .onActionUpdate((event: GestureEvent) => {
+                this.setStart(this.dragBaseSec + this.dragDelta(event.offsetX), true)
+              })
+          )
+        Column()
+          .width(Math.max(0, this.waveWidth - this.thumbMidX()))
+          .height(44)
+          .backgroundColor(Color.Transparent)
+          .position({ x: this.thumbMidX(), y: 0 })
+          .hitTestBehavior(HitTestMode.Block)
+          .gesture(
+            PanGesture({ distance: 1 })
+              .onActionStart(() => {
+                this.dragBaseSec = this.endSec
+                this.beginDrag()
+              })
+              .onActionUpdate((event: GestureEvent) => {
+                this.setEnd(this.dragBaseSec + this.dragDelta(event.offsetX), true)
+              })
+          )
       }
       .width('100%')
       .height(44)
       .onAreaChange((_old: Area, area: Area) => {
         this.waveWidth = Math.max(0, Number(area.width))
       })
-      .gesture(
-        PanGesture({ distance: 1 })
-          .onActionStart((event: GestureEvent) => {
-            this.beginDrag()
-            this.dragThumb = this.nearestThumb(event.localX)
-            this.applyThumbX(event.localX)
-          })
-          .onActionUpdate((event: GestureEvent) => this.applyThumbX(event.localX))
-          .onActionEnd(() => { this.dragThumb = 0 })
-      )
 
       Row() {
         Text(`开始 ${this.timeText(this.startSec)}`).fontSize(10).fontColor(TC.textSecondary())
