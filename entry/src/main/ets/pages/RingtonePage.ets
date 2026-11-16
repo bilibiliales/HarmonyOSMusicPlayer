@@ -566,26 +566,31 @@ export struct RingtonePage {
   @Builder
   private StartTag(index: number) {
     Row() {
-      Row({ space: 4 }) {
-        Text(this.timeText(this.startSec)).fontSize(10).fontColor(TC.textOnAccent())
-        Text('开始').fontSize(10).fontColor(TC.textOnAccent()).fontWeight(FontWeight.Medium)
+      Row() {
+        // 只有「数值 + 开始/结束」这一小块接收拖动，避免两个标签靠近时抓错
+        Row({ space: 3 }) {
+          Text(this.timeText(this.startSec)).fontSize(9).fontColor(TC.textOnAccent())
+          Text('开始').fontSize(9).fontColor(TC.textOnAccent()).fontWeight(FontWeight.Medium)
+        }
+        .hitTestBehavior(HitTestMode.Block)
+        .gesture(
+          PanGesture({ distance: 1 })
+            .onActionStart(() => this.beginTagDrag(true))
+            .onActionUpdate((event: GestureEvent) => this.updateTagDrag(true, event.offsetY))
+            .onActionEnd(() => this.finishTagDrag(true))
+        )
       }
-      .height(20)
-      .padding({ left: 9, right: 9 })
+      .height(18)
+      .padding({ left: 6, right: 6 })
       .backgroundColor(TC.accent())
-      .borderRadius(10)
-      .hitTestBehavior(HitTestMode.Block)
-      .gesture(
-        PanGesture({ distance: 1 })
-          .onActionStart(() => this.beginTagDrag(true))
-          .onActionUpdate((event: GestureEvent) => this.updateTagDrag(true, event.offsetY))
-          .onActionEnd(() => this.finishTagDrag(true))
-      )
+      .borderRadius(9)
+      .hitTestBehavior(HitTestMode.None)
       Row()
         .layoutWeight(1)
         .height(1)
         .margin({ left: 8, right: 12 })
         .border({ width: { top: 1 }, color: 'rgba(128,128,128,0.45)', style: BorderStyle.Dashed })
+        .hitTestBehavior(HitTestMode.None)
     }
     .width('100%')
     .height(LYRIC_TAG_VP)
@@ -602,26 +607,30 @@ export struct RingtonePage {
   @Builder
   private EndTag(index: number) {
     Row() {
-      Row({ space: 4 }) {
-        Text(this.timeText(this.endSec)).fontSize(10).fontColor(TC.textOnAccent())
-        Text('结束').fontSize(10).fontColor(TC.textOnAccent()).fontWeight(FontWeight.Medium)
+      Row() {
+        Row({ space: 3 }) {
+          Text(this.timeText(this.endSec)).fontSize(9).fontColor(TC.textOnAccent())
+          Text('结束').fontSize(9).fontColor(TC.textOnAccent()).fontWeight(FontWeight.Medium)
+        }
+        .hitTestBehavior(HitTestMode.Block)
+        .gesture(
+          PanGesture({ distance: 1 })
+            .onActionStart(() => this.beginTagDrag(false))
+            .onActionUpdate((event: GestureEvent) => this.updateTagDrag(false, event.offsetY))
+            .onActionEnd(() => this.finishTagDrag(false))
+        )
       }
-      .height(20)
-      .padding({ left: 9, right: 9 })
+      .height(18)
+      .padding({ left: 6, right: 6 })
       .backgroundColor(TC.accent())
-      .borderRadius(10)
-      .hitTestBehavior(HitTestMode.Block)
-      .gesture(
-        PanGesture({ distance: 1 })
-          .onActionStart(() => this.beginTagDrag(false))
-          .onActionUpdate((event: GestureEvent) => this.updateTagDrag(false, event.offsetY))
-          .onActionEnd(() => this.finishTagDrag(false))
-      )
+      .borderRadius(9)
+      .hitTestBehavior(HitTestMode.None)
       Row()
         .layoutWeight(1)
         .height(1)
         .margin({ left: 8, right: 12 })
         .border({ width: { top: 1 }, color: 'rgba(128,128,128,0.45)', style: BorderStyle.Dashed })
+        .hitTestBehavior(HitTestMode.None)
     }
     .width('100%')
     .height(LYRIC_TAG_VP)
