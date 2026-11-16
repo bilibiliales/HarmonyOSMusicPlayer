@@ -752,7 +752,10 @@ export struct Play {
   @Builder
   private PrimaryLyricText(line: LyricLine, index: number) {
     if (index === this.currentLyricIndex && line.words && line.words.length > 0) {
-      Flex({ wrap: FlexWrap.Wrap }) {
+      Flex({
+        wrap: FlexWrap.Wrap,
+        justifyContent: this.lyricCentered() ? FlexAlign.Center : FlexAlign.Start
+      }) {
         ForEach(line.words, (word: LyricWord, wordIndex: number) => {
           ForEach(word.text.split(''), (character: string, characterIndex: number) => {
             Stack({ alignContent: Alignment.TopStart }) {
@@ -775,7 +778,6 @@ export struct Play {
         }, (word: LyricWord, wordIndex: number) => `${word.start}-${wordIndex}`)
       }
       .width('100%')
-      .justifyContent(this.lyricCentered() ? FlexAlign.Center : FlexAlign.Start)
     } else {
       Text(line.text)
         .width('100%')

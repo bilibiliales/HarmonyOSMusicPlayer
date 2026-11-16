@@ -111,7 +111,7 @@ export class DecoKind {
     if (kind === DecoKind.APP_ICON) { return $r('sys.symbol.square_grid_2x2') }
     if (kind === DecoKind.VIP_BADGE) { return $r('sys.symbol.checkmark_circle_fill') }
     if (kind === DecoKind.MINI_PLAYER) { return $r('sys.symbol.play_circle') }
-    if (kind === DecoKind.SHEET) { return $r('sys.symbol.rectangle_topthird_inset_filled') }
+    if (kind === DecoKind.SHEET) { return $r('sys.symbol.rectangle_on_rectangle') }
     return $r('sys.symbol.wand_and_stars')
   }
 
