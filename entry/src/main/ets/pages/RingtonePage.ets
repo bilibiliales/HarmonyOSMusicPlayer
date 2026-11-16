@@ -19,8 +19,13 @@ interface RingtoneLyric {
 }
 
 const BAR_COUNT: number = 56
-/** 歌词一行的步长：lineHeight 22 + List.space 8。 */
-const LYRIC_ROW_VP: number = 30
+/** 歌词一行的高度与行距（与 List.space 一致）。 */
+const LYRIC_LINE_VP: number = 22
+const LYRIC_ROW_VP: number = LYRIC_LINE_VP + 8
+/** 标签行高度：虚线 / 胶囊都在这个高度里垂直居中。 */
+const LYRIC_TAG_VP: number = 28
+/** List 的上内边距，第一行歌词从 4vp 开始。 */
+const LYRIC_LIST_TOP_VP: number = 4
 
 @Component
 export struct RingtonePage {
@@ -493,11 +498,14 @@ export struct RingtonePage {
   }
 
   /**
-   * 标签贴在对应歌词行的位置。它只是指示物：选区滚出可视区时允许跟着歌词飞出卡片，
-   * 不再夹在容器边缘，这样滑歌词时总能找到它对应的那一行。
+   * 标签中心正好压在亮 / 暗歌词的分界线上：
+   *   开始标签 → 第一句亮歌词的上边缘；结束标签 → 最后一句亮歌词的下边缘。
+   * 坐标只用歌词列表自身的行高 / 行距 / 滚动偏移算，和页面高度无关；
+   * 选区滚出可视区时允许跟着歌词飞出卡片。
    */
-  private tagY(index: number, bottom: boolean): number {
-    return 4 + index * LYRIC_ROW_VP - this.lyricScrollY + (bottom ? 18 : -4)
+  private tagY(index: number, afterLine: boolean): number {
+    const lineTop = LYRIC_LIST_TOP_VP + index * LYRIC_ROW_VP - this.lyricScrollY
+    return lineTop + (afterLine ? LYRIC_LINE_VP : 0) - LYRIC_TAG_VP / 2
   }
 
   /**
@@ -522,7 +530,9 @@ export struct RingtonePage {
               Text(line.text)
                 .width('100%')
                 .fontSize(15)
-                .lineHeight(22)
+                .lineHeight(LYRIC_LINE_VP)
+                .maxLines(1)
+                .textOverflow({ overflow: TextOverflow.Ellipsis })
                 .fontColor(this.lineSelected(index) ? TC.textBody() : TC.textTertiary())
                 .textAlign(TextAlign.Center)
                 .padding({ left: 18, right: 18 })
