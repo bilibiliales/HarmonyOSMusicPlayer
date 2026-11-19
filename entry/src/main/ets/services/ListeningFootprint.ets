@@ -69,10 +69,9 @@ export function listeningTimeValue(raw: number | string | undefined): number {
 }
 
 /**
- * 以「不带 endTime 请求返回的 endTime」为唯一基准递减（不要再按本地今天推算）。
- * 周：每期 -7 天（周六 0 点）；月：每期 -该月天数（月末 0 点）。
- * offset = 0 返回 0，表示不传 endTime，即接口默认的本周 / 本月。
- * 因为永远是基准减去正数，不可能产生比基准更新的日期。
+ * 以给定基准 endTime 按周期递减（保留给需要相对推算的场景）。
+ * 周：每期 -7 天；月：每期 -该月天数。offset = 0 返回 0。
+ * 当前页面改用 periodEndTimestamp 按本地规则直接计算。
  */
 export function listeningPeriodEnd(period: string, baseEnd: number, offset: number): number {
   if (offset === 0 || baseEnd <= 0) { return 0 }
@@ -88,11 +87,39 @@ export function listeningPeriodEnd(period: string, baseEnd: number, offset: numb
   return end
 }
 
-/** 无数据时导航条显示的周期名，同样从接口基准推导。 */
-export function listeningPeriodTitle(period: string, baseEnd: number, offset: number): string {
-  if (baseEnd <= 0) { return period === 'week' ? '本周' : '本月' }
-  const value = listeningPeriodEnd(period, baseEnd, offset)
-  const end = new Date(value > 0 ? value : baseEnd)
+/**
+ * 按接口约定计算周期结束时间戳（毫秒）：
+ *   周 = 该周周六 0 点；月 = 该月最后一天 0 点；年 = 该年最后一天 0 点。
+ * offset = 0 表示当前周期，负数为往前若干个周期。
+ * 直接用本地日期推算，不依赖接口返回的 endTime，保证请求与顶部选中的周期严格对应。
+ */
+export function periodEndTimestamp(period: string, offset: number, now: Date = new Date()): number {
+  if (period === 'week') {
+    // getDay(): 周日=0…周六=6；换算成周一=0…周日=6 后定位本周一
+    const mondayIndex = (now.getDay() + 6) % 7
+    const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - mondayIndex)
+    // 周六 = 周一 + 5 天，再按整周平移
+    const saturday = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + 5 + offset * 7)
+    return saturday.getTime()
+  }
+  if (period === 'month') {
+    const target = new Date(now.getFullYear(), now.getMonth() + offset, 1)
+    // 下个月第 0 天 = 本月最后一天
+    const last = new Date(target.getFullYear(), target.getMonth() + 1, 0)
+    return last.getTime()
+  }
+  if (period === 'year') {
+    return new Date(now.getFullYear() + offset, 11, 31).getTime()
+  }
+  return 0
+}
+
+/** 无数据时导航条显示的周期名，与 endTime 使用同一套本地规则，保证标题与数据一致。 */
+export function listeningPeriodTitle(period: string, offset: number, now: Date = new Date()): string {
+  const value = periodEndTimestamp(period, offset, now)
+  if (value <= 0) { return period === 'week' ? '本周' : period === 'month' ? '本月' : '今年' }
+  const end = new Date(value)
+  if (period === 'year') { return `${end.getFullYear()}年` }
   if (period === 'month') { return `${end.getFullYear()}年${end.getMonth() + 1}月` }
   const start = new Date(end.getFullYear(), end.getMonth(), end.getDate() - 6)
   return `${start.getFullYear()}.${start.getMonth() + 1}.${start.getDate()} — ${end.getMonth() + 1}.${end.getDate()}`

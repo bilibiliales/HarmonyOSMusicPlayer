@@ -16,7 +16,7 @@ import { ApiClient } from '../services/ApiClient'
 import { AuthStore } from '../stores/AuthStore'
 import {
   buildListeningPeriod, ListeningDay, ListeningPeriod, listeningDayBackground, listeningDayColor,
-  listeningPeriodEnd, listeningPeriodOffsetLabel, listeningPeriodTitle, listeningTimeValue
+  listeningPeriodOffsetLabel, listeningPeriodTitle, periodEndTimestamp
 } from '../services/ListeningFootprint'
 import { TC } from '../services/ThemeColors'
 
@@ -37,13 +37,10 @@ export struct ListeningStatsPage {
   @State selectedDay: string = ''
   @State weekMessage: string = ''
   @State monthMessage: string = ''
-  /** 0 = 本周/本月（不传 endTime）；负数 = 往前翻了几个周期。周、月各自独立。 */
+  /** 0 = 当前周期；负数 = 往前翻了几个周期。周、月各自独立。 */
   @State weekOffset: number = 0
   @State monthOffset: number = 0
   @State switching: boolean = false
-  /** 不带 endTime 请求返回的 endTime，作为所有翻页的唯一基准（毫秒）。 */
-  @State weekBaseEnd: number = 0
-  @State monthBaseEnd: number = 0
 
   /** 已翻过的周期缓存，来回切换不再重复请求。 */
   private reportCache: Map<string, ListenReportData> = new Map<string, ListenReportData>()
@@ -52,28 +49,13 @@ export struct ListeningStatsPage {
   private cacheKey(period: string, offset: number): string { return `${period}:${offset}` }
   private offsetFor(period: string): number { return period === 'week' ? this.weekOffset : this.monthOffset }
   private activeOffset(): number { return this.offsetFor(this.currentPeriod) }
-  private baseEndFor(period: string): number { return period === 'week' ? this.weekBaseEnd : this.monthBaseEnd }
-
-  /** 只用接口基准递减，offset=0 不传 endTime。 */
+  /**
+   * 按接口约定算出所选周期的 endTime（毫秒）：
+   * 周=该周周六 0 点、月=该月最后一天 0 点；offset<0 往前翻。
+   * 严格用顶部选中的周期计算，保证请求与展示一致。
+   */
   private endTimeFor(period: string, offset: number): number {
-    return listeningPeriodEnd(period, this.baseEndFor(period), offset)
-  }
-
-  /** 首次（不传 endTime）成功后记录基准；缺 endTime 时用 startTime 补算。 */
-  private calibrateBase(period: string, data: ListenReportData): void {
-    let end = listeningTimeValue(data.endTime)
-    const start = listeningTimeValue(data.startTime)
-    if (end <= 0 && start > 0) {
-      if (period === 'week') {
-        end = start + 6 * 24 * 60 * 60 * 1000
-      } else {
-        const d = new Date(start)
-        const days = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate()
-        end = start + (days - 1) * 24 * 60 * 60 * 1000
-      }
-    }
-    if (end <= 0) { return }
-    if (period === 'week') { this.weekBaseEnd = end } else { this.monthBaseEnd = end }
+    return periodEndTimestamp(period, offset)
   }
 
   private activeReport(): ListenReportData | null { return this.currentPeriod === 'week' ? this.weekReport : this.monthReport }
@@ -83,7 +65,7 @@ export struct ListeningStatsPage {
   private activeChartTitle(): string {
     const chart = this.activeChart()
     return chart ? chart.title :
-      listeningPeriodTitle(this.currentPeriod, this.baseEndFor(this.currentPeriod), this.activeOffset())
+      listeningPeriodTitle(this.currentPeriod, this.activeOffset())
   }
 
   /** 下一周期：最多回到最新的本周/本月，不能翻到未来。 */
@@ -115,14 +97,11 @@ export struct ListeningStatsPage {
     this.switching = false
   }
 
-  private async fetchReport(period: string, endTime: number, seconds: boolean): Promise<ListenReportResponse> {
+  private async fetchReport(period: string, endTime: number): Promise<ListenReportResponse> {
     const params: ApiParam[] = [{ key: 'type', value: period }]
     if (endTime > 0) {
-      const endParam: ApiParam = {
-        key: 'endTime',
-        value: (seconds ? Math.floor(endTime / 1000) : endTime).toString()
-      }
-      params.push(endParam)
+      // endTime 统一按秒传；接口需要毫秒时由调用方再补一次
+      params.push({ key: 'endTime', value: Math.floor(endTime / 1000).toString() })
     }
     return await ApiClient.get<ListenReportResponse>('/listen/data/report', params)
   }
@@ -157,23 +136,19 @@ export struct ListeningStatsPage {
     }
     const endTime = this.endTimeFor(period, offset)
     try {
-      let response = await this.fetchReport(period, endTime, false)
-      // 时间戳单位自适应：某些部署的 endTime 只认秒级，毫秒无数据时再试一次
+      let response = await this.fetchReport(period, endTime)
+      // 时间戳单位自适应：秒级返回空时再尝试毫秒
       if (endTime > 0 && (response.code !== 200 || !response.data)) {
-        response = await this.fetchReport(period, endTime, true)
+        const params: ApiParam[] = [
+          { key: 'type', value: period },
+          { key: 'endTime', value: endTime.toString() }
+        ]
+        response = await ApiClient.get<ListenReportResponse>('/listen/data/report', params)
       }
       const data = response.data
       if (response.code !== 200 || !data) {
         throw new Error(response.message || '暂无该周期的听歌足迹')
       }
-      // 防止接口忽略 endTime 又返回默认周期：返回的 endTime 必须与请求的周期标识一致
-      if (endTime > 0) {
-        const returnedEnd = listeningTimeValue(data.endTime)
-        if (returnedEnd > 0 && Math.abs(returnedEnd - endTime) > 3 * 24 * 60 * 60 * 1000) {
-          throw new Error('该周期暂无听歌足迹')
-        }
-      }
-      if (offset === 0) { this.calibrateBase(period, data) }
       this.reportCache.set(key, data)
       this.applyReport(period, offset, data, '')
     } catch (error) {

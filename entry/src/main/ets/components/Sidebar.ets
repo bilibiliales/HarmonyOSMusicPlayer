@@ -53,6 +53,12 @@ export struct Sidebar {
   @State customMinutes: number = 0
   @State sleepRefresh: number = 0
   @State sleepRemainingMs: number = 0
+  @State sleepEnabled: boolean = false
+  @State sleepStopAfterSong: boolean = false
+  /** 自定义时长编辑面板（小时 / 分钟），不依赖系统时钟，避免日期错位。 */
+  @State private customEditing: boolean = false
+  @State private customHour: number = 0
+  @State private customMinute: number = 30
   private sleepTicker: number = -1
 
   private menuItems: SidebarMenuItem[] = [
@@ -174,6 +180,12 @@ export struct Sidebar {
     if (this.authStore.loggedIn && !this.loadedVip) {
       this.loadVipInfo()
     }
+    // 常驻刷新：让侧边栏条目与半模态在关闭/重新打开后都能看到最新定时状态
+    this.startSleepTicker()
+  }
+
+  aboutToDisappear(): void {
+    this.stopSleepTicker()
   }
 
   private async loadVipInfo(): Promise<void> {
@@ -400,21 +412,38 @@ export struct Sidebar {
   // 将服务中的剩余毫秒同步到组件 @State，确保倒计时显示随数据变化实时刷新
   private refreshSleepDisplay(): void {
     this.sleepRemainingMs = SleepTimerService.remainingMs
+    this.sleepEnabled = SleepTimerService.enabled
+    this.sleepStopAfterSong = SleepTimerService.stopAfterSong
     this.sleepRefresh++
   }
 
   private sleepStatusText(): string {
-    if (!SleepTimerService.enabled) {
+    if (!this.sleepEnabled) {
       return '选择时长后开始倒计时，仅在播放时递减'
     }
-    if (SleepTimerService.stopAfterSong) {
+    if (this.sleepStopAfterSong) {
       return '倒计时结束后将播完当前歌曲再暂停'
     }
     return '倒计时归零将立即暂停播放'
   }
 
   private customLabel(): string {
-    return this.customMinutes > 0 ? `${this.customMinutes} 分钟` : '点击设置'
+    if (this.customMinutes <= 0 && this.selectedMinutes <= 0) { return '点击设置' }
+    if (this.customEditing || (this.customMinutes === 0 && this.selectedMinutes === -1)) {
+      return `${this.customHour} 小时 ${this.customMinute} 分钟`
+    }
+    if (this.customMinutes > 0) { return `${this.customMinutes} 分钟` }
+    return `${this.selectedMinutes} 分钟`
+  }
+
+  /** 应用内嵌时长编辑面板：把小时/分钟换算成总分钟并立即生效。 */
+  private applyCustomDuration(): void {
+    const mins = Math.max(1, this.customHour * 60 + this.customMinute)
+    this.customMinutes = mins
+    this.selectedMinutes = -1
+    this.customEditing = false
+    SleepTimerService.startMs(mins * 60 * 1000, SleepTimerService.stopAfterSong)
+    this.refreshSleepDisplay()
   }
 
   private selectSleepMinutes(minutes: number): void {
@@ -441,40 +470,6 @@ export struct Sidebar {
     this.refreshSleepDisplay()
   }
 
-  // TimePickerDialog 选中的是"时刻"（类似闹钟），需转换为"距此刻还有多少分钟"
-  private clockToDurationMinutes(hour: number, minute: number): number {
-    const now = new Date()
-    const target = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hour, minute, 0, 0)
-    let diffMs = target.getTime() - now.getTime()
-    if (diffMs <= 0) {
-      // 选中的时刻今天已过，顺延到明天同一时刻
-      diffMs += 24 * 60 * 60 * 1000
-    }
-    return Math.max(1, Math.round(diffMs / 60000))
-  }
-
-  private openCustomTime(): void {
-    const baseMin = this.customMinutes > 0
-      ? this.customMinutes
-      : (this.selectedMinutes > 0 ? this.selectedMinutes : 30)
-    const now = new Date()
-    const target = new Date(now.getTime() + baseMin * 60000)
-    const selected = new Date(2024, 0, 1, target.getHours(), target.getMinutes())
-    TimePickerDialog.show({
-      selected: selected,
-      onAccept: (value) => {
-        const mins = this.clockToDurationMinutes(value.hour, value.minute)
-        this.selectedMinutes = -1
-        this.customMinutes = mins
-        SleepTimerService.startMs(mins * 60 * 1000, SleepTimerService.stopAfterSong)
-        this.refreshSleepDisplay()
-        this.sleepSheetVisible = false
-      },
-      onCancel: () => {},
-      onChange: () => {}
-    })
-  }
-
   @Builder
   private skin_SleepSheetBuilder() {
     SheetSkinFrame() {
@@ -484,129 +479,179 @@ export struct Sidebar {
 
   @Builder
   private SleepSheetBuilder() {
-    Column({ space: 16 }) {
-      Column({ space: 6 }) {
-        Text('定时关闭播放')
-          .fontSize(17)
-          .fontWeight(FontWeight.Bold)
-          .fontColor(TC.textPrimary())
-        Text(this.sleepStatusText())
-          .fontSize(12)
-          .fontColor(TC.textSecondary())
-      }
-      .width('100%')
-      .alignItems(HorizontalAlign.Center)
+    Scroll() {
+      Column({ space: 16 }) {
+        Column({ space: 6 }) {
+          Text('定时关闭播放')
+            .fontSize(17)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(TC.textPrimary())
+          Text(this.sleepStatusText())
+            .fontSize(12)
+            .fontColor(TC.textSecondary())
+        }
+        .width('100%')
+        .alignItems(HorizontalAlign.Center)
 
-      if (SleepTimerService.enabled) {
-        Text(SleepTimerService.format(this.sleepRemainingMs))
-          .fontSize(46)
-          .fontWeight(FontWeight.Bold)
-          .fontColor(TC.textPrimary())
-          .margin({ top: 2, bottom: 2 })
-      }
+        if (this.sleepEnabled) {
+          Text(SleepTimerService.format(this.sleepRemainingMs))
+            .fontSize(46)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(TC.textPrimary())
+            .margin({ top: 2, bottom: 2 })
+        }
 
-      Flex({ wrap: FlexWrap.Wrap, justifyContent: FlexAlign.SpaceBetween, alignContent: FlexAlign.SpaceBetween }) {
-        ForEach([10, 20, 30, 45, 60, 90], (minutes: number) => {
-          Column({ space: 2 }) {
-            Text(`${minutes}`)
-              .fontSize(20)
-              .fontWeight(FontWeight.Bold)
-              .fontColor(this.selectedMinutes === minutes && SleepTimerService.enabled ? TC.textOnAccent() : TC.textPrimary())
-            Text('分钟')
-              .fontSize(10)
+        Flex({ wrap: FlexWrap.Wrap, justifyContent: FlexAlign.SpaceBetween, alignContent: FlexAlign.SpaceBetween }) {
+          ForEach([10, 20, 30, 45, 60, 90], (minutes: number) => {
+            Column({ space: 2 }) {
+              Text(`${minutes}`)
+                .fontSize(20)
+                .fontWeight(FontWeight.Bold)
+                .fontColor(this.selectedMinutes === minutes && this.sleepEnabled ? TC.textOnAccent() : TC.textPrimary())
+              Text('分钟')
+                .fontSize(10)
+                .fontColor(TC.textSecondary())
+            }
+            .width(80)
+            .height(80)
+            .borderRadius(40)
+            .backgroundColor(this.selectedMinutes === minutes && this.sleepEnabled ? TC.accent() : TC.surfaceInset())
+            .justifyContent(FlexAlign.Center)
+            .alignItems(HorizontalAlign.Center)
+            .onClick(() => this.selectSleepMinutes(minutes))
+          }, (minutes: number) => `${minutes}`)
+        }
+        .width('100%')
+
+        Column({ space: 10 }) {
+          Row({ space: 10 }) {
+            SymbolGlyph($r('sys.symbol.clock'))
+              .fontSize(18)
+              .fontColor([TC.textBody()])
+            Text('自定义时长')
+              .fontSize(14)
+              .fontColor(TC.textBody())
+            Blank()
+            Text(this.customLabel())
+              .fontSize(12)
               .fontColor(TC.textSecondary())
+            SymbolGlyph($r('sys.symbol.chevron_right'))
+              .fontSize(15)
+              .fontColor([TC.textQuaternary()])
+              .rotate({ angle: this.customEditing ? 90 : 0 })
+              .animation({ duration: 150 })
           }
-          .width(96)
-          .height(96)
-          .borderRadius(48)
-          .backgroundColor(this.selectedMinutes === minutes && SleepTimerService.enabled ? TC.accent() : TC.surfaceInset())
-          .justifyContent(FlexAlign.Center)
-          .alignItems(HorizontalAlign.Center)
-          .onClick(() => this.selectSleepMinutes(minutes))
-        }, (minutes: number) => `${minutes}`)
-      }
-      .width('100%')
-
-      Row({ space: 10 }) {
-        SymbolGlyph($r('sys.symbol.clock'))
-          .fontSize(18)
-          .fontColor([TC.textBody()])
-        Text('自定义时长')
-          .fontSize(14)
-          .fontColor(TC.textBody())
-        Blank()
-        Text(this.customLabel())
-          .fontSize(12)
-          .fontColor(TC.textSecondary())
-        SymbolGlyph($r('sys.symbol.chevron_right'))
-          .fontSize(15)
-          .fontColor([TC.textQuaternary()])
-      }
-      .width('100%')
-      .padding({ left: 14, right: 14, top: 12, bottom: 12 })
-      .backgroundColor(TC.surfaceInset())
-      .borderRadius(14)
-      .onClick(() => this.openCustomTime())
-
-      Row({ space: 12 }) {
-        Column({ space: 3 }) {
-          Text('开启定时关闭')
-            .fontSize(14)
-            .fontColor(TC.textBody())
-          Text('倒计时仅在播放时递减')
-            .fontSize(10)
-            .fontColor(TC.textQuaternary())
-        }
-        .layoutWeight(1)
-        .alignItems(HorizontalAlign.Start)
-        Toggle({ type: ToggleType.Switch, isOn: SleepTimerService.enabled })
-          .onChange((on: boolean) => this.onSleepToggle(on))
-      }
-      .width('100%')
-      .padding({ left: 14, right: 14, top: 10, bottom: 10 })
-      .backgroundColor(TC.surfaceInset())
-      .borderRadius(14)
-
-      Row({ space: 12 }) {
-        Column({ space: 3 }) {
-          Text('播完整首歌后停止')
-            .fontSize(14)
-            .fontColor(TC.textBody())
-          Text('等待当前歌曲自然结束后暂停')
-            .fontSize(10)
-            .fontColor(TC.textQuaternary())
-        }
-        .layoutWeight(1)
-        .alignItems(HorizontalAlign.Start)
-        Toggle({ type: ToggleType.Switch, isOn: SleepTimerService.stopAfterSong })
-          .onChange((on: boolean) => {
-            SleepTimerService.stopAfterSong = on
-            this.refreshSleepDisplay()
-          })
-      }
-      .width('100%')
-      .padding({ left: 14, right: 14, top: 10, bottom: 10 })
-      .backgroundColor(TC.surfaceInset())
-      .borderRadius(14)
-
-      if (SleepTimerService.enabled) {
-        Button('取消定时关闭')
           .width('100%')
-          .height(44)
-          .backgroundColor(TC.accentContainer())
-          .fontColor(TC.accentSoft())
+          .padding({ left: 14, right: 14, top: 12, bottom: 12 })
+          .backgroundColor(TC.surfaceInset())
           .borderRadius(14)
-          .onClick(() => {
-            SleepTimerService.cancel()
-            this.refreshSleepDisplay()
-          })
+          .onClick(() => this.customEditing = !this.customEditing)
+
+          if (this.customEditing) {
+            Column({ space: 12 }) {
+              Row() {
+                Text('小时').fontSize(12).fontColor(TC.textSecondary()).layoutWeight(1)
+                Row({ space: 14 }) {
+                  SymbolGlyph($r('sys.symbol.minus')).fontSize(16).fontColor([TC.textSecondary()])
+                    .onClick(() => this.customHour = Math.max(0, this.customHour - 1))
+                  Text(`${this.customHour}`).fontSize(16).fontColor(TC.textPrimary())
+                    .width(34).textAlign(TextAlign.Center)
+                  SymbolGlyph($r('sys.symbol.plus')).fontSize(16).fontColor([TC.textSecondary()])
+                    .onClick(() => this.customHour = Math.min(23, this.customHour + 1))
+                }
+              }.width('100%')
+              Row() {
+                Text('分钟').fontSize(12).fontColor(TC.textSecondary()).layoutWeight(1)
+                Row({ space: 14 }) {
+                  SymbolGlyph($r('sys.symbol.minus')).fontSize(16).fontColor([TC.textSecondary()])
+                    .onClick(() => this.customMinute = Math.max(1, this.customMinute - 1))
+                  Text(`${this.customMinute}`).fontSize(16).fontColor(TC.textPrimary())
+                    .width(34).textAlign(TextAlign.Center)
+                  SymbolGlyph($r('sys.symbol.plus')).fontSize(16).fontColor([TC.textSecondary()])
+                    .onClick(() => this.customMinute = Math.min(59, this.customMinute + 1))
+                }
+              }.width('100%')
+              Button('使用此时长')
+                .width('100%').height(38)
+                .fontSize(13)
+                .backgroundColor(TC.accent())
+                .fontColor(TC.textOnAccent())
+                .borderRadius(10)
+                .onClick(() => this.applyCustomDuration())
+            }
+            .width('100%')
+            .padding(14)
+            .backgroundColor(TC.surfaceInset())
+            .borderRadius(14)
+          }
+        }
+        .width('100%')
+
+        Row({ space: 12 }) {
+          Column({ space: 3 }) {
+            Text('开启定时关闭')
+              .fontSize(14)
+              .fontColor(TC.textBody())
+            Text('倒计时仅在播放时递减')
+              .fontSize(10)
+              .fontColor(TC.textQuaternary())
+          }
+          .layoutWeight(1)
+          .alignItems(HorizontalAlign.Start)
+          Toggle({ type: ToggleType.Switch, isOn: this.sleepEnabled })
+            .onChange((on: boolean) => this.onSleepToggle(on))
+        }
+        .width('100%')
+        .padding({ left: 14, right: 14, top: 10, bottom: 10 })
+        .backgroundColor(TC.surfaceInset())
+        .borderRadius(14)
+
+        Row({ space: 12 }) {
+          Column({ space: 3 }) {
+            Text('播完整首歌后停止')
+              .fontSize(14)
+              .fontColor(TC.textBody())
+            Text('等待当前歌曲自然结束后暂停')
+              .fontSize(10)
+              .fontColor(TC.textQuaternary())
+          }
+          .layoutWeight(1)
+          .alignItems(HorizontalAlign.Start)
+          Toggle({ type: ToggleType.Switch, isOn: this.sleepStopAfterSong })
+            .onChange((on: boolean) => {
+              SleepTimerService.stopAfterSong = on
+              this.refreshSleepDisplay()
+            })
+        }
+        .width('100%')
+        .padding({ left: 14, right: 14, top: 10, bottom: 10 })
+        .backgroundColor(TC.surfaceInset())
+        .borderRadius(14)
+
+        if (this.sleepEnabled) {
+          Button('取消定时关闭')
+            .width('100%')
+            .height(44)
+            .backgroundColor(TC.accentContainer())
+            .fontColor(TC.accentSoft())
+            .borderRadius(14)
+            .onClick(() => {
+              SleepTimerService.cancel()
+              this.refreshSleepDisplay()
+            })
+        }
       }
+      .width('100%')
+      .padding({ left: 20, right: 20, top: 20, bottom: 28 })
     }
     .width('100%')
-    .padding({ left: 20, right: 20, top: 20, bottom: 28 })
-    .onAppear(() => this.startSleepTicker())
-    .onDisAppear(() => this.stopSleepTicker())
+    .height('100%')
+    .scrollBar(BarState.Off)
+    .edgeEffect(EdgeEffect.Spring)
   }
+
+
+
 
   build() {
     Stack({ alignContent: Alignment.Start }) {
@@ -706,6 +751,11 @@ export struct Sidebar {
                     .padding({ left: 7, right: 7, top: 3, bottom: 3 })
                     .backgroundColor(TC.surfaceInset())
                     .borderRadius(8)
+                } else if (item.action === 'sleep' && this.sleepEnabled) {
+                  Text(SleepTimerService.format(this.sleepRemainingMs))
+                    .fontSize(12)
+                    .fontWeight(FontWeight.Medium)
+                    .fontColor(TC.accent())
                 } else {
                   SymbolGlyph($r('sys.symbol.chevron_right'))
                     .fontSize(15)
@@ -784,7 +834,8 @@ export struct Sidebar {
       dragBar: true,
       onDisappear: () => {
         this.sleepSheetVisible = false
-        this.stopSleepTicker()
+        // 不停止 ticker：侧边栏关闭后仍要实时显示定时剩余时间
+        this.refreshSleepDisplay()
       }
     })
   }

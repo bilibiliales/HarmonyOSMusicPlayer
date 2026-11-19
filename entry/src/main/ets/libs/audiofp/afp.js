@@ -395,8 +395,9 @@ let AudioFingerprintRuntime = (() => {
     }
 
     function ht(t, e) {
-        return t = dt(t),
-            new Function("body", "return function " + t + '() {\n    "use strict";    return body.apply(this, arguments);\n};\n')(e)
+        // ArkTS 禁止 new Function/eval；这里只需要一个转发闭包，函数名不影响指纹算法。
+        t = dt(t);
+        return function () { return e.apply(this, arguments); };
     }
 
     function yt(t, e) {
