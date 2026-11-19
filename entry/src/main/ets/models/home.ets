@@ -286,10 +286,14 @@ export interface HappySignInfoRaw {
   hotComments?: HappySignHotCommentRaw[]
 }
 
+export interface HappySignData {
+  info?: HappySignInfoRaw
+}
+
 export interface HappySignResponse {
   code: number
   message?: string
-  data?: { info?: HappySignInfoRaw }
+  data?: HappySignData
 }
 
 /** 弹窗直接消费的乐签内容。 */

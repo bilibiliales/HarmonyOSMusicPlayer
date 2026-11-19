@@ -97,7 +97,7 @@ export struct DailyRecommendPage {
       })
       this.historyDate = date
       this.showingHistory = true
-      this.scroller.scrollTo({ yOffset: 0, animation: false })
+      this.scroller.scrollTo({ xOffset: 0, yOffset: 0, animation: false })
     } catch (error) {
       BubbleTip.show(this.getUIContext(), error instanceof Error ? error.message : '历史日推加载失败')
     } finally {
@@ -109,7 +109,7 @@ export struct DailyRecommendPage {
     this.songs = this.todaySongs.slice()
     this.showingHistory = false
     this.historyDate = ''
-    this.scroller.scrollTo({ yOffset: 0, animation: false })
+    this.scroller.scrollTo({ xOffset: 0, yOffset: 0, animation: false })
   }
 
   /** 今日乐签：先取内容，再用自定义弹窗展示。 */

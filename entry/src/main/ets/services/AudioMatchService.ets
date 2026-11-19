@@ -8,10 +8,14 @@ export interface AudioMatchRawRow {
   startTime?: number
 }
 
+interface AudioMatchData {
+  result?: AudioMatchRawRow[]
+}
+
 interface AudioMatchResponse {
   code: number
   message?: string
-  data?: { result?: AudioMatchRawRow[] }
+  data?: AudioMatchData
 }
 
 export class MatchedSong {

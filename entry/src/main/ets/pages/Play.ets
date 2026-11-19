@@ -9,7 +9,7 @@ import { LyricPreferences } from '../models/lyricPreferences'
 import { LyricSettingsSheet } from '../components/LyricSettingsSheet'
 import { RadioPageParam } from '../models/radio'
 import { common } from '@kit.AbilityKit'
-import { AVCastPicker, avSession } from '@kit.AVSessionKit'
+import { AVCastPicker } from '@kit.AVSessionKit'
 import { fileIo, fileUri } from '@kit.CoreFileKit'
 import { photoAccessHelper } from '@kit.MediaLibraryKit'
 import { http } from '@kit.NetworkKit'
@@ -1598,6 +1598,11 @@ export struct Play {
     .padding({ top: 8 })
   }
 
+  private castNormalColor(): string {
+    const color = this.playerStyle.iconColor
+    return color && color.length > 0 ? color : '#999999'
+  }
+
   @Builder
   private SmallAction(icon: Resource, text: string, onClick: () => void) {
     // 只留图标：无底版、无文字。灰色在深浅画布下都可读，
@@ -2208,9 +2213,8 @@ export struct Play {
             // 多端协同：系统投播组件，负责设备发现、连接与认证
             Stack() {
               AVCastPicker({
-                sessionType: avSession.AVSessionType.AUDIO,
-                normalColor: this.playerStyle.iconColor ? this.playerStyle.iconColor : '#999999',
-                activeColor: TC.accent()
+                normalColor: this.castNormalColor(),
+                activeColor: '#ef233c'
               })
                 .width(36)
                 .height(36)
