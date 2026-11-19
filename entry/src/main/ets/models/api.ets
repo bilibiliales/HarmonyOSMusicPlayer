@@ -1311,17 +1311,19 @@ export interface SheetPreviewResponse {
 }
 
 export function mapApiSong(song: ApiSong): songItemType {
-  const artists = song.ar || song.artists || []
+  const rawArtists = song.ar || song.artists || []
+  const artists: ApiArtist[] = rawArtists.filter((item: ApiArtist | null | undefined) =>
+    item !== null && item !== undefined && typeof item.name === 'string') as ApiArtist[]
   const album = song.al || song.album
   return {
-    id: song.id.toString(),
-    name: song.name,
+    id: song.id !== undefined && song.id !== null ? song.id.toString() : '',
+    name: typeof song.name === 'string' ? song.name : '未知歌曲',
     author: artists.map((item: ApiArtist) => item.name).join(' / '),
     img: album?.picUrl || song.picUrl || '',
     url: '',
     duration: song.dt || song.duration || 0,
     album: album?.name || '',
-    albumId: album?.id?.toString() || '',
+    albumId: album?.id !== undefined && album?.id !== null ? album.id.toString() : '',
     fee: song.fee || 0,
     artists: artists.map((item: ApiArtist) => {
       const artist: SongArtist = {

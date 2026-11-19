@@ -2243,6 +2243,7 @@ export struct Play {
             .width(36)
             .height(36)
             .layoutWeight(1)
+            .hitTestBehavior(HitTestMode.Transparent)
             if (this.isNonCatalogAudio()) {
               this.SmallAction($r('sys.symbol.info_circle'), this.playerStore.currentSong.localUri ? '本地音乐' : this.playerStore.currentSong.programId ? '节目详情' : '音乐电台', () => this.openAudioDetails())
             } else {

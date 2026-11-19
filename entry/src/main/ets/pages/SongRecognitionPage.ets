@@ -5,6 +5,7 @@ import { TC } from '../services/ThemeColors'
 import { BubbleTip } from '../services/BubbleTip'
 import { playerController } from '../services/PlayerController'
 import { AudioMatchService, MatchedSong } from '../services/AudioMatchService'
+import { SkinBackdrop } from '../components/SkinBackdrop'
 
 /**
  * 听歌识曲：内录手机正在播放的音频（可选同时改用麦克风），本地生成音频指纹后查询。
@@ -17,7 +18,8 @@ export struct SongRecognitionPage {
   @State private status: string = '点击中间图标开始识别'
   @State private progress: number = 0
   @State private busy: boolean = false
-  @State private useMic: boolean = false
+  /** 0=听歌识曲（麦克风），1=录屏识曲（系统内音）。 */
+  @State private mode: number = 0
   @State private results: MatchedSong[] = []
 
   private capturer?: audio.AudioCapturer
@@ -58,7 +60,12 @@ export struct SongRecognitionPage {
       source: useMic ? audio.SourceType.SOURCE_TYPE_MIC : audio.SourceType.SOURCE_TYPE_PLAYBACK_CAPTURE,
       capturerFlags: 0
     }
-    const capturer = await audio.createAudioCapturer({ streamInfo: streamInfo, capturerInfo: capturerInfo })
+    const options: audio.AudioCapturerOptions = { streamInfo: streamInfo, capturerInfo: capturerInfo }
+    if (!useMic) {
+      // 内录必须指定媒体音用途，否则采到的是静音帧
+      options.playbackCaptureMode = audio.AudioPlaybackCaptureMode.MODE_MEDIA
+    }
+    const capturer = await audio.createAudioCapturer(options)
     this.capturer = capturer
     this.chunks = []
     this.bytes = 0
@@ -104,7 +111,8 @@ export struct SongRecognitionPage {
 
   private async startRecognize(): Promise<void> {
     if (this.busy) { return }
-    if (this.useMic && !(await this.ensureMicPermission())) {
+    const useMic = this.mode === 0
+    if (useMic && !(await this.ensureMicPermission())) {
       BubbleTip.show(this.getUIContext(), '需要麦克风权限才能使用麦克风识别')
       return
     }
@@ -115,7 +123,7 @@ export struct SongRecognitionPage {
     try {
       for (let i = 0; i < 3; i++) {
         this.status = `正在采集第 ${i + 1}/3 次…`
-        const pcm = await this.captureOnce(this.useMic)
+        const pcm = await this.captureOnce(useMic)
         this.status = `正在识别第 ${i + 1}/3 次…`
         const rows = await AudioMatchService.recognize(pcm)
         all.push(...rows)
@@ -147,6 +155,7 @@ export struct SongRecognitionPage {
 
   build() {
     NavDestination() {
+      SkinBackdrop()
       Column() {
         Column().width('100%').height(this.topAvoidHeight)
 
@@ -164,10 +173,14 @@ export struct SongRecognitionPage {
           Column({ space: 18 }) {
             Column({ space: 14 }) {
               Stack() {
-                Circle().width(128).height(128).backgroundColor(TC.accent())
-                SymbolGlyph($r('sys.symbol.mic_fill')).fontSize(52).fontColor(Color.White)
+                SymbolGlyph($r('sys.symbol.mic_fill'))
+                  .fontSize(52)
+                  .fontColor(Color.White)
               }
               .width(128).height(128)
+              .borderRadius(64)
+              .backgroundColor(TC.accent())
+              .justifyContent(FlexAlign.Center)
               .onClick(() => this.startRecognize())
 
               Text(this.status).fontSize(13).fontColor(TC.textBody())
@@ -176,13 +189,22 @@ export struct SongRecognitionPage {
                 Progress({ value: this.progress, total: 100, type: ProgressType.Linear })
                   .width('60%').height(4).color(TC.accent())
               }
-              Row({ space: 10 }) {
-                Text('同时录麦克风').fontSize(12).fontColor(TC.textBody())
-                Toggle({ type: ToggleType.Switch, isOn: this.useMic })
-                  .selectedColor(TC.accent()).enabled(!this.busy)
-                  .onChange((value: boolean) => this.useMic = value)
+              Column({ space: 6 }) {
+                Slider({ value: this.mode, min: 0, max: 1, step: 1 })
+                  .width(220)
+                  .selectedColor(TC.accent())
+                  .enabled(!this.busy)
+                  .onChange((value: number) => this.mode = Math.round(value))
+                Row() {
+                  Text('听歌识曲').fontSize(11)
+                    .fontColor(this.mode === 0 ? TC.accent() : TC.textTertiary())
+                  Text('录屏识曲').fontSize(11)
+                    .fontColor(this.mode === 1 ? TC.accent() : TC.textTertiary())
+                }
+                .width(220)
+                .justifyContent(FlexAlign.SpaceBetween)
               }
-              Text('识别手机正在播放的音乐 · 采集 3 次约 15 秒').fontSize(10).fontColor(TC.textQuaternary())
+              Text('采集 3 次约 15 秒 · 结果自动去重').fontSize(10).fontColor(TC.textQuaternary())
             }
             .width('100%')
             .padding({ top: 24, bottom: 12 })
