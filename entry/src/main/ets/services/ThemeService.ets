@@ -14,7 +14,7 @@ const AS_SYSTEM_DARK: string = 'systemDarkMode'
 const AS_CURRENT: string = 'currentColorMode'
 
 export class ThemeService {
-  private static context: common.Context | undefined = undefined
+  private static context: common.UIAbilityContext | undefined = undefined
   private static mode: string = ThemeMode.SYSTEM
   private static systemDark: boolean = false
   private static listeners: Array<(isDark: boolean) => void> = []

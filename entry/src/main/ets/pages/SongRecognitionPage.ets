@@ -62,8 +62,18 @@ export struct SongRecognitionPage {
     }
     const options: audio.AudioCapturerOptions = { streamInfo: streamInfo, capturerInfo: capturerInfo }
     if (!useMic) {
-      // 内录必须指定媒体音用途，否则采到的是静音帧
-      options.playbackCaptureMode = audio.AudioPlaybackCaptureMode.MODE_MEDIA
+      // 内录必须声明要抓取的音频用途，否则采到的是静音帧。
+      // 这个字段在 SDK 里叫 playbackCaptureConfig（不是 playbackCaptureMode）。
+      options.playbackCaptureConfig = {
+        filterOptions: {
+          usages: [
+            audio.StreamUsage.STREAM_USAGE_MUSIC,
+            audio.StreamUsage.STREAM_USAGE_MOVIE,
+            audio.StreamUsage.STREAM_USAGE_GAME,
+            audio.StreamUsage.STREAM_USAGE_AUDIOBOOK
+          ]
+        }
+      }
     }
     const capturer = await audio.createAudioCapturer(options)
     this.capturer = capturer
@@ -172,15 +182,14 @@ export struct SongRecognitionPage {
         Scroll() {
           Column({ space: 18 }) {
             Column({ space: 14 }) {
-              Stack() {
+              Stack({ alignContent: Alignment.Center }) {
                 SymbolGlyph($r('sys.symbol.mic_fill'))
                   .fontSize(52)
-                  .fontColor(Color.White)
+                  .fontColor([Color.White])
               }
               .width(128).height(128)
               .borderRadius(64)
               .backgroundColor(TC.accent())
-              .justifyContent(FlexAlign.Center)
               .onClick(() => this.startRecognize())
 
               Text(this.status).fontSize(13).fontColor(TC.textBody())
