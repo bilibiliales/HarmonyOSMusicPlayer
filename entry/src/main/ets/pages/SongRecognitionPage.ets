@@ -179,6 +179,32 @@ export struct SongRecognitionPage {
         }
         .width('100%').height(52).padding({ left: 16, right: 16 })
 
+        // 模式切换：与「最近播放」一致的顶部 Tab
+        Row({ space: 28 }) {
+          ForEach(['听歌识曲', '录屏识曲'], (title: string, index: number) => {
+            Column({ space: 7 }) {
+              Text(title)
+                .fontSize(14)
+                .fontColor(this.mode === index ? TC.textPrimary() : TC.textTertiary())
+                .fontWeight(this.mode === index ? FontWeight.Bold : FontWeight.Regular)
+              Column()
+                .width(24).height(3).borderRadius(2)
+                .backgroundColor(this.mode === index ? TC.accent() : Color.Transparent)
+            }
+            .height(46)
+            .justifyContent(FlexAlign.Center)
+            .enabled(!this.busy)
+            .onClick(() => {
+              if (this.mode !== index) {
+                this.mode = index
+                this.results = []
+                this.status = '点击中间图标开始识别'
+              }
+            })
+          }, (title: string, index: number) => `mode_${index}`)
+        }
+        .width('100%').height(46).padding({ left: 18, right: 18 })
+
         Scroll() {
           Column({ space: 18 }) {
             Column({ space: 14 }) {
@@ -198,22 +224,10 @@ export struct SongRecognitionPage {
                 Progress({ value: this.progress, total: 100, type: ProgressType.Linear })
                   .width('60%').height(4).color(TC.accent())
               }
-              Column({ space: 6 }) {
-                Slider({ value: this.mode, min: 0, max: 1, step: 1 })
-                  .width(220)
-                  .selectedColor(TC.accent())
-                  .enabled(!this.busy)
-                  .onChange((value: number) => this.mode = Math.round(value))
-                Row() {
-                  Text('听歌识曲').fontSize(11)
-                    .fontColor(this.mode === 0 ? TC.accent() : TC.textTertiary())
-                  Text('录屏识曲').fontSize(11)
-                    .fontColor(this.mode === 1 ? TC.accent() : TC.textTertiary())
-                }
-                .width(220)
-                .justifyContent(FlexAlign.SpaceBetween)
-              }
-              Text('采集 3 次约 15 秒 · 结果自动去重').fontSize(10).fontColor(TC.textQuaternary())
+              Text(this.mode === 0
+                ? '采集周围播放的音乐 · 3 次约 15 秒 · 结果自动去重'
+                : '采集手机内正在播放的声音 · 3 次约 15 秒 · 结果自动去重')
+                .fontSize(10).fontColor(TC.textQuaternary())
             }
             .width('100%')
             .padding({ top: 24, bottom: 12 })

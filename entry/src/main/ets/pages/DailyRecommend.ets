@@ -9,6 +9,7 @@ import { SheetSkinFrame } from '../components/SheetSkin'
 import { HappySignDialog } from '../components/HappySignDialog'
 import { DailyExtraService } from '../services/DailyExtraService'
 import { BubbleTip } from '../services/BubbleTip'
+import { resizeImageUrl } from '../services/ImageUrl'
 
 @Component
 export struct DailyRecommendPage {
@@ -324,7 +325,7 @@ export struct DailyRecommendPage {
                     Row({ space: 12 }) {
                       Text((index + 1).toString()).width(26).fontSize(12)
                         .fontColor(index < 3 ? TC.accent() : TC.textTertiary()).textAlign(TextAlign.Center)
-                      Image(item.img).width(52).height(52).borderRadius(11).objectFit(ImageFit.Cover)
+                      Image(resizeImageUrl(item.img, 104, 104)).width(52).height(52).borderRadius(11).objectFit(ImageFit.Cover)
                       Column({ space: 5 }) {
                         Text(item.name).width('100%').fontSize(14).fontColor(TC.textBody()).maxLines(1)
                           .textOverflow({ overflow: TextOverflow.Ellipsis })

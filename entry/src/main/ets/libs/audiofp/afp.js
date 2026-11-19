@@ -1,4 +1,4 @@
-import { WASM_BINARY } from './afp.wasm.js'
+import { instantiateAfpWasm } from './afp.wasm2js.js'
 'use strict'
 const WASM_BINARY_PLACEHOLDER = 'WASM_BINARY_PLACEHOLDER';
 // See https://github.com/Distributive-Network/PythonMonkey/issues/266
@@ -68,14 +68,8 @@ let AudioFingerprintRuntime = (() => {
     var read_, readSync, readBinary, c, f, l = [],
     p = "./this.program",    
     readSync = function(t, e, r) {
-        switch (t) {
-            case WASM_BINARY_PLACEHOLDER:                
-                e(globalThis.b64decode(WASM_BINARY));
-                break;
-            default:
-                throw "Reading " + t + " is not supported";
-                break;
-        }
+        // ArkTS 适配：wasm 已转成纯 JS，不再读取二进制文件。
+        throw "Reading " + t + " is not supported";
     }
     var v = o.print || console.log.bind(console),
         g = o.printErr || console.warn.bind(console);
@@ -88,7 +82,7 @@ let AudioFingerprintRuntime = (() => {
     var w;
     o.wasmBinary && (w = o.wasmBinary);
     var b, _ = o.noExitRuntime || !0;
-    "object" != typeof WebAssembly && abort("no native wasm support detected");
+    /* ArkTS 适配：使用纯 JS wasm 实现，不依赖 WebAssembly 全局对象 */
     var C = !1;
 
     function T(t, e) {
@@ -269,7 +263,7 @@ let AudioFingerprintRuntime = (() => {
             C = !0,
             1,
             what += ". Build with -s ASSERTIONS=1 for more info.",
-            new WebAssembly.RuntimeError(what)
+            new Error(what)
     }
     o.preloadedImages = {},
         o.preloadedAudios = {};
@@ -1512,24 +1506,12 @@ let AudioFingerprintRuntime = (() => {
                 }
 
                 function getBinaryPromise(e) {
-                    return function() {
-                        if (!w) {
-                            if (readSync)
-                                return new Promise((function(t, e) {
-                                    readSync(Q, (function(e) {
-                                        t(new Uint8Array(e))
-                                    }), e)
-                                }))
-                        }
-                        return Promise.resolve().then((function() {
-                            return getBinary(Q)
-                        }))
-                    }().then((function(e) {
-                        return WebAssembly.instantiate(e, import_table)
-                    })).then((function(t) {
-                        return t
+                    // ArkTS：直接用 binaryen wasm2js 生成的纯 JS 运行时，
+                    // 不读取/解码 wasm 二进制（readSync/getBinary 在沙箱里不可用）。
+                    return Promise.resolve().then((function() {
+                        return { instance: { exports: instantiateAfpWasm(import_table) } }
                     })).then(e, (function(t) {
-                        g("failed to asynchronously prepare wasm: " + t,Q),
+                        g("failed to prepare wasm runtime: " + t),
                             abort(t)
                     }))
                 }
@@ -1542,7 +1524,7 @@ let AudioFingerprintRuntime = (() => {
                         return g("Module.instantiateWasm callback failed with error: " + t),
                             !1
                     }
-                w || "function" != typeof WebAssembly.instantiate || isDataURI(Q) || isFileURI(Q) || getBinaryPromise(load_wasm)                
+                w || isDataURI(Q) || isFileURI(Q) || getBinaryPromise(load_wasm)                
             }(),
             o.___wasm_call_ctors = function() {
                 return (o.___wasm_call_ctors = o.asm.C).apply(null, arguments)

@@ -9,7 +9,7 @@ import { LyricPreferences } from '../models/lyricPreferences'
 import { LyricSettingsSheet } from '../components/LyricSettingsSheet'
 import { RadioPageParam } from '../models/radio'
 import { common } from '@kit.AbilityKit'
-import { AVCastPicker } from '@kit.AVSessionKit'
+import { avSession } from '@kit.AVSessionKit'
 import { fileIo, fileUri } from '@kit.CoreFileKit'
 import { photoAccessHelper } from '@kit.MediaLibraryKit'
 import { http } from '@kit.NetworkKit'
@@ -1598,9 +1598,20 @@ export struct Play {
     .padding({ top: 8 })
   }
 
-  private castNormalColor(): string {
-    const color = this.playerStyle.iconColor
-    return color && color.length > 0 ? color : '#999999'
+  /** 多端协同：命令式拉起系统设备选择面板，避免 AVCastPicker 组件二次点击失效。 */
+  private async openCastPicker(): Promise<void> {
+    if (this.castBlocked) {
+      BubbleTip.show(this.getUIContext(), '请先开启后台播放以使用多端协同')
+      return
+    }
+    try {
+      const context = this.getUIContext().getHostContext() as common.Context
+      const helper = new avSession.AVCastPickerHelper(context)
+      await helper.select()
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '投播暂不可用'
+      BubbleTip.show(this.getUIContext(), `多端协同：${message}`)
+    }
   }
 
   @Builder
@@ -2210,40 +2221,7 @@ export struct Play {
             .alignItems(VerticalAlign.Center)
 
             Row() {
-            // 多端协同：系统投播组件，负责设备发现、连接与认证
-            Stack() {
-              // 系统投播组件保留为透明命中层，负责设备发现与连接
-              AVCastPicker({
-                normalColor: this.castNormalColor(),
-                activeColor: '#ef233c'
-              })
-                .width(36)
-                .height(36)
-                .opacity(this.castBlocked ? 0 : 0.01)
-              Row() {
-                SymbolGlyph($r('sys.symbol.media_center'))
-                  .fontSize(21)
-                  .fontColor([this.playerStyle.iconColor ? this.playerStyle.iconColor : '#999999'])
-              }
-              .width(36)
-              .height(36)
-              .justifyContent(FlexAlign.Center)
-              .hitTestBehavior(HitTestMode.None)
-              if (this.castBlocked) {
-                Row()
-                  .width(36)
-                  .height(36)
-                  .backgroundColor(Color.Transparent)
-                  .hitTestBehavior(HitTestMode.Block)
-                  .onClick(() => {
-                    BubbleTip.show(this.getUIContext(), '请先开启后台播放以使用多端协同')
-                  })
-              }
-            }
-            .width(36)
-            .height(36)
-            .layoutWeight(1)
-            .hitTestBehavior(HitTestMode.Transparent)
+            this.SmallAction($r('sys.symbol.media_center'), '多端协同', () => this.openCastPicker())
             if (this.isNonCatalogAudio()) {
               this.SmallAction($r('sys.symbol.info_circle'), this.playerStore.currentSong.localUri ? '本地音乐' : this.playerStore.currentSong.programId ? '节目详情' : '音乐电台', () => this.openAudioDetails())
             } else {
