@@ -1,6 +1,7 @@
 import { ApiClient } from './ApiClient'
 import { ApiParam } from '../models/api'
 import { songItemType } from '../models/music'
+import { AppSettings } from './AppSettings'
 
 // Track media time actually traversed; seeks and resumed progress do not count as listening.
 // 听歌打卡（V2 / NCBL 加密版）：
@@ -37,7 +38,8 @@ export class ListeningScrobble {
   }
 
   private canSubmit(song: songItemType): boolean {
-    return !!this.cookie && this.cookie === ApiClient.cookie &&
+    // 用户关闭「记录听歌」后不调用 V2 打卡，网易云侧不会计入听歌记录与听歌排行
+    return AppSettings.scrobbleEnabled && !!this.cookie && this.cookie === ApiClient.cookie &&
       !this.trial && !(song.isVoice || !!song.localUri) && !this.submitted
   }
 

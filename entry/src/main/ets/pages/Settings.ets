@@ -58,6 +58,7 @@ export struct SettingsPage {
   @State defaultDownloadQuality: string = AppSettings.defaultDownloadQuality
   @State backgroundPlaybackEnabled: boolean = AppSettings.backgroundPlaybackEnabled
   @State streamingPlaybackEnabled: boolean = AppSettings.streamingPlaybackEnabled
+  @State scrobbleEnabled: boolean = AppSettings.scrobbleEnabled
   @State effectsEnabled: boolean = AppSettings.effectsEnabled
   @State downloadSaveMode: string = AppSettings.downloadSaveMode
   @State askDownloadSaveMode: boolean = AppSettings.askDownloadSaveMode
@@ -282,6 +283,19 @@ export struct SettingsPage {
     }
   }
 
+  private async changeScrobble(enabled: boolean): Promise<void> {
+    if (enabled === AppSettings.scrobbleEnabled) { return }
+    try {
+      const context = this.getUIContext().getHostContext() as common.UIAbilityContext
+      await AppSettings.saveScrobble(context, enabled)
+      BubbleTip.show(this.getUIContext(), enabled ? '已开启听歌记录上报' : '已关闭听歌记录上报，本机播放不会计入网易云听歌记录与排行')
+    } catch (error) {
+      BubbleTip.show(this.getUIContext(), error instanceof Error ? error.message : '听歌记录设置失败')
+    } finally {
+      this.scrobbleEnabled = AppSettings.scrobbleEnabled
+    }
+  }
+
   private async savePlaybackDefaults(): Promise<void> {
     try {
       const context = this.getUIContext().getHostContext() as common.UIAbilityContext
@@ -368,6 +382,16 @@ export struct SettingsPage {
                 Toggle({ type: ToggleType.Switch, isOn: this.streamingPlaybackEnabled })
                   .selectedColor(TC.accent()).enabled(!this.changingPlayback)
                   .onChange((enabled: boolean) => this.changeStreamingPlayback(enabled))
+              }.width('100%').margin({ top: 6 })
+              Row({ space: 12 }) {
+                Column({ space: 6 }) {
+                  Text('记录听歌').fontSize(14).fontColor(TC.textPrimary())
+                  Text('开启后向网易云上报听歌打卡，计入听歌记录与听歌排行；关闭则不上报。')
+                    .fontSize(11).fontColor(TC.textSecondary()).width('100%')
+                }.layoutWeight(1).alignItems(HorizontalAlign.Start)
+                Toggle({ type: ToggleType.Switch, isOn: this.scrobbleEnabled })
+                  .selectedColor(TC.accent()).enabled(!this.featureBusy)
+                  .onChange((enabled: boolean) => this.changeScrobble(enabled))
               }.width('100%').margin({ top: 6 })
               Text('播放顺序').width('100%').fontSize(12).fontColor(TC.textBody())
               Row({ space: 8 }) {

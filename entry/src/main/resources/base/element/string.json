@@ -23,6 +23,22 @@
     {
       "name": "reason_microphone",
       "value": "用于听歌识曲时采集周围音频"
+    },
+    {
+      "name": "shortcut_song_recognition",
+      "value": "听歌识曲"
+    },
+    {
+      "name": "shortcut_heart_mode",
+      "value": "心动模式"
+    },
+    {
+      "name": "shortcut_search",
+      "value": "搜索"
+    },
+    {
+      "name": "shortcut_local_music",
+      "value": "播放本地音乐"
     }
   ]
 }
