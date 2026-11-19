@@ -50,6 +50,7 @@ import { SatiPage } from './Sati'
 import { PlaylistCoverPreview, PlaylistCoverPreviewPageParam } from './PlaylistCoverPreview'
 import { ImagePreviewPage, ImagePreviewPageParam } from './ImagePreviewPage'
 import { RingtonePage, RingtonePageParam } from './RingtonePage'
+import { SongRecognitionPage } from './SongRecognitionPage'
 import {
   AlbumPageParam,
   ArtistPageParam,
@@ -375,6 +376,8 @@ struct HomeIndex {
       ImagePreviewPage({ pageParam: param as ImagePreviewPageParam })
     } else if (name === 'RingtonePage') {
       RingtonePage({ pageParam: param as RingtonePageParam })
+    } else if (name === 'SongRecognitionPage') {
+      SongRecognitionPage()
     }
   }
 

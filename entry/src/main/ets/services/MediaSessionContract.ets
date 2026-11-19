@@ -92,14 +92,14 @@ export type MediaSessionFactory = (context: common.Context, handlers: SessionHan
   initial: DesktopLyricConfig) => Promise<MediaSessionApi>
 
 /**
- * THE single gate that decides whether AVSession Kit may be loaded at all.
- *
- * `settingsLoaded` matters: AppSettings.backgroundPlaybackEnabled defaults to
- * true, so without it a call arriving before the persisted preference is read
- * would load the Kit even for a user who has the switch turned off.
+ * Gate for the AVSession-backed runtime. The background-playback switch no
+ * longer prevents the Kit from loading: the player page hosts the system cast
+ * picker (AVCastPicker), which needs the media session even when background
+ * playback is off. We only wait for persisted settings to be read and for the
+ * controller to be alive.
  */
 export function shouldLoadMediaSession(settingsLoaded: boolean, enabled: boolean, released: boolean): boolean {
-  return settingsLoaded && enabled && !released
+  return settingsLoaded && !released
 }
 
 /**

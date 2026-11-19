@@ -716,6 +716,12 @@ struct Recommend {
             .layoutWeight(1).height(42).padding({ left: 14, right: 14 })
             .backgroundColor(TC.surfaceCardAlt()).borderRadius(21)
             .onClick(() => this.pageStack.pushPathByName('SearchPage', null))
+
+            Stack() {
+              SymbolGlyph($r('sys.symbol.music')).fontSize(20).fontColor([TC.accent()])
+            }
+            .width(42).height(42).borderRadius(21).backgroundColor(TC.surfaceCardAlt())
+            .onClick(() => this.pageStack.pushPathByName('SongRecognitionPage', null))
           }
           .width('100%').padding({ left: 14, right: 14, top: 12 })
 

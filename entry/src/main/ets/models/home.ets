@@ -214,3 +214,96 @@ export interface HomeBlockView {
   creativeType: string
   creatives: HomeCreativeView[]
 }
+
+// ---- 历史日推 ----
+
+/** /history/recommend/songs 的可选返回字段。 */
+export interface HistoryRecommendData {
+  dates?: string[]
+  purchaseUrl?: string
+  description?: string | null
+  noHistoryMessage?: string
+}
+
+export interface HistoryRecommendResponse {
+  code: number
+  message?: string
+  data?: HistoryRecommendData
+}
+
+/** /history/recommend/songs/detail 的返回体：songs 与每日推荐歌曲同构。 */
+export interface HistoryDetailData {
+  dates?: string[]
+  songs?: DailySong[]
+  description?: string | null
+  noHistoryMessage?: string
+}
+
+export interface HistoryDetailResponse {
+  code: number
+  message?: string
+  data?: HistoryDetailData
+}
+
+/** 历史日推日期与说明，交给页面展示。 */
+export class HistoryRecommendSummary {
+  dates: string[] = []
+  description: string = ''
+  noHistoryMessage: string = ''
+  purchaseUrl: string = ''
+}
+
+// ---- 今日乐签 ----
+
+export interface HappySignHotCommentRaw {
+  content?: string
+  authorName?: string
+}
+
+export class HappySignHotComment {
+  content: string = ''
+  authorName: string = ''
+}
+
+/** /sign/happy/info 的原始 info。 */
+export interface HappySignInfoRaw {
+  id?: number
+  type?: number
+  picUrl?: string
+  newPicUrl?: string
+  backColor?: string
+  mainText?: string
+  author?: string
+  resourceName?: string
+  resourceAuthor?: string
+  resourceCover?: string
+  resourceUrl?: string
+  qrCodeUrl?: string
+  qrCodeWithLogoUrl?: string
+  sharePicUrl?: string
+  currentUserName?: string
+  status?: number
+  hotComments?: HappySignHotCommentRaw[]
+}
+
+export interface HappySignResponse {
+  code: number
+  message?: string
+  data?: { info?: HappySignInfoRaw }
+}
+
+/** 弹窗直接消费的乐签内容。 */
+export class HappySignInfo {
+  mainText: string = ''
+  author: string = ''
+  backColor: string = ''
+  cover: string = ''
+  resourceName: string = ''
+  resourceAuthor: string = ''
+  resourceCover: string = ''
+  resourceUrl: string = ''
+  qrCode: string = ''
+  sharePic: string = ''
+  currentUserName: string = ''
+  hotComments: HappySignHotComment[] = []
+}

@@ -84,10 +84,9 @@ export class PlayerController {
   onAppForeground(): void { this.foreground = true }
 
   /**
-   * The only gate for touching the AVSession-backed runtime. Nothing below may
-   * load MediaSessionBridge or call a media session API without going through
-   * this check. With the switch off (or before preferences are read, or after
-   * release) it is false, so the media session Kit is never resolved.
+   * Gate for the AVSession-backed runtime. The media session is now always
+   * available once preferences are loaded (needed by the system cast picker),
+   * regardless of the background-playback switch.
    */
   private mediaSessionAllowed(): boolean {
     return shouldLoadMediaSession(AppSettings.settingsLoaded, AppSettings.backgroundPlaybackEnabled,
@@ -315,10 +314,8 @@ export class PlayerController {
   }
 
   /**
-   * The ONLY place in the application that resolves AVSession Kit.
-   * Reachable exclusively from ensureSystemSession() after mediaSessionAllowed()
-   * has returned true. When the background playback switch is off this method is
-   * never entered, so the Kit is never loaded, resolved or called.
+   * The place in the application that resolves AVSession Kit.
+   * Reachable from ensureSystemSession() after mediaSessionAllowed() returns true.
    */
   private async createSystemSession(context: common.Context): Promise<MediaSessionApi> {
     const bridge: ESObject = await import('./MediaSessionBridge')
@@ -390,7 +387,9 @@ export class PlayerController {
 
   async setDesktopLyrics(enabled: boolean, locked: boolean): Promise<void> {
     if (this.desktopChanging) { return }
-    if (enabled && !this.mediaSessionAllowed()) { throw new Error('请先开启后台播放以使用系统桌面歌词') }
+    if (enabled && !AppSettings.backgroundPlaybackEnabled) {
+      throw new Error('请先开启后台播放以使用系统桌面歌词')
+    }
     // Switch off: persist the preference only, without touching the media session
     // (not even reading it). This guarantees zero Kit access in this state.
     if (!this.mediaSessionAllowed()) {

@@ -9,6 +9,7 @@ import { LyricPreferences } from '../models/lyricPreferences'
 import { LyricSettingsSheet } from '../components/LyricSettingsSheet'
 import { RadioPageParam } from '../models/radio'
 import { common } from '@kit.AbilityKit'
+import { AVCastPicker, avSession } from '@kit.AVSessionKit'
 import { fileIo, fileUri } from '@kit.CoreFileKit'
 import { photoAccessHelper } from '@kit.MediaLibraryKit'
 import { http } from '@kit.NetworkKit'
@@ -78,6 +79,8 @@ export struct Play {
   @State lyricUserScrolling: boolean = false
   @State lyricProgressPosition: number = 0
   @State lyricAppearance: LyricPreferences = AppSettings.lyricPreferences
+  /** 后台播放关闭时，多端协同改成提示开启，不直接拉起系统设备选择器。 */
+  @State private castBlocked: boolean = !AppSettings.backgroundPlaybackEnabled
   /** 当前歌曲是否有译文 / 罗马音（决定歌词区左下角气泡是否出现）。 */
   @State translationAvailable: boolean = false
   @State romaAvailable: boolean = false
@@ -133,6 +136,7 @@ export struct Play {
       this.pageStack.pop()
       return
     }
+    this.castBlocked = !AppSettings.backgroundPlaybackEnabled
     this.checkNetwork()
     this.liked = this.playerStore.currentSong.liked || false
     this.loadCommentSummary()
@@ -2201,6 +2205,28 @@ export struct Play {
             .alignItems(VerticalAlign.Center)
 
             Row() {
+            // 多端协同：系统投播组件，负责设备发现、连接与认证
+            Stack() {
+              AVCastPicker({
+                sessionType: avSession.AVSessionType.AUDIO,
+                normalColor: this.playerStyle.iconColor ? this.playerStyle.iconColor : '#999999',
+                activeColor: TC.accent()
+              })
+                .width(36)
+                .height(36)
+              if (this.castBlocked) {
+                Row()
+                  .width(36)
+                  .height(36)
+                  .backgroundColor(Color.Transparent)
+                  .hitTestBehavior(HitTestMode.Block)
+                  .onClick(() => {
+                    BubbleTip.show(this.getUIContext(), '请先开启后台播放以使用多端协同')
+                  })
+              }
+            }
+            .width(36)
+            .height(36)
             if (this.isNonCatalogAudio()) {
               this.SmallAction($r('sys.symbol.info_circle'), this.playerStore.currentSong.localUri ? '本地音乐' : this.playerStore.currentSong.programId ? '节目详情' : '音乐电台', () => this.openAudioDetails())
             } else {

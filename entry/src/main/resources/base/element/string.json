@@ -19,6 +19,10 @@
     {
       "name": "EntryAbility_label",
       "value": "网易云音乐"
+    },
+    {
+      "name": "reason_microphone",
+      "value": "用于听歌识曲时采集周围音频"
     }
   ]
 }

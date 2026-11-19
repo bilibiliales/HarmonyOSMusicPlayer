@@ -2,7 +2,7 @@ import { http } from '@kit.NetworkKit'
 import { ApiParam } from '../models/api'
 
 export class ApiClient {
-  static baseUrl: string = 'https://api.enzymeym.top'
+  static baseUrl: string = 'https://neteaseapi.gksm.store'
   static cookie: string = ''
 
   static setBaseUrl(value: string): void {
