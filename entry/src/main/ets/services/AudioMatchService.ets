@@ -1,5 +1,6 @@
 import { ApiSong, mapApiSong, songItemType } from '../models'
 import { ApiClient } from './ApiClient'
+import { http } from '@kit.NetworkKit'
 import { GenerateFP } from '../libs/audiofp/afp'
 
 /** /audio/match 返回的单条命中：歌曲本体 + 在歌中的起始时间。 */
@@ -28,30 +29,67 @@ export class MatchedSong {
  * 再用 AFP 查询匹配结果。指纹算法完全在本地执行，不依赖网页。
  */
 export class AudioMatchService {
-  /** 5 秒 8kHz 单声道，按 40000 个采样点计算。 */
+  /** 官方 demo 使用 3 秒 8kHz 单声道 AFP。 */
   static readonly SAMPLE_RATE: number = 8000
-  static readonly DURATION_SECONDS: number = 5
+  static readonly DURATION_SECONDS: number = 3
   static readonly SAMPLE_COUNT: number = AudioMatchService.SAMPLE_RATE * AudioMatchService.DURATION_SECONDS
 
   static async recognize(pcm: Float32Array): Promise<MatchedSong[]> {
     const pending: ESObject = GenerateFP(pcm)
     const audioFP: string = await (pending as Promise<string>)
-    const response = await ApiClient.get<AudioMatchResponse>('/audio/match', [
-      { key: 'audioFP', value: audioFP },
-      { key: 'duration', value: AudioMatchService.DURATION_SECONDS.toString() }
-    ])
-    if (response.code !== 200) {
-      throw new Error(response.message || '识别失败，请重试')
+    const duration = AudioMatchService.DURATION_SECONDS.toString()
+    const boundary = '----HarmonyAfpBoundary' + Date.now().toString()
+    const body = `--${boundary}\r\n` +
+      `Content-Disposition: form-data; name="duration"\r\n\r\n${duration}\r\n` +
+      `--${boundary}\r\n` +
+      `Content-Disposition: form-data; name="audioFP"\r\n\r\n${audioFP}\r\n` +
+      `--${boundary}--\r\n`
+    const url = `${ApiClient.baseUrl}/audio/match?duration=${duration}&audioFP=${encodeURIComponent(audioFP)}`
+    const request = http.createHttp()
+    try {
+      const response = await request.request(url, {
+        method: http.RequestMethod.POST,
+        header: {
+          'Content-Type': `multipart/form-data; boundary=${boundary}`,
+          'Cookie': ApiClient.cookie
+        },
+        body: body,
+        expectDataType: http.HttpDataType.STRING,
+        connectTimeout: 10000,
+        readTimeout: 20000,
+        usingCache: false
+      })
+      if (response.responseCode < 200 || response.responseCode >= 300) {
+        throw new Error(`识别请求失败 (${response.responseCode})`)
+      }
+      const payload = JSON.parse(response.result as string) as AudioMatchResponse
+      if (payload.code !== 200) {
+        throw new Error(payload.message || '识别失败，请重试')
+      }
+      const rows = payload.data?.result ?? []
+      const result: MatchedSong[] = []
+      for (const row of rows) {
+        if (!row || !row.song || !row.song.id) { continue }
+        const item = new MatchedSong()
+        item.song = mapApiSong(row.song)
+        item.startTimeMs = Math.max(0, row.startTime ?? 0)
+        result.push(item)
+      }
+      return result
+    } finally {
+      request.destroy()
     }
-    const rows = response.data?.result ?? []
-    const result: MatchedSong[] = []
+  }
+
+  /** 多次识别结果按歌曲 id 去重。 */
+  static dedupe(rows: MatchedSong[]): MatchedSong[] {
+    const seen: Set<string> = new Set<string>()
+    const out: MatchedSong[] = []
     for (const row of rows) {
-      if (!row || !row.song || !row.song.id) { continue }
-      const item = new MatchedSong()
-      item.song = mapApiSong(row.song)
-      item.startTimeMs = Math.max(0, row.startTime ?? 0)
-      result.push(item)
+      if (!row.song || !row.song.id || seen.has(row.song.id)) { continue }
+      seen.add(row.song.id)
+      out.push(row)
     }
-    return result
+    return out
   }
 }

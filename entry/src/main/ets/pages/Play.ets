@@ -2212,12 +2212,23 @@ export struct Play {
             Row() {
             // 多端协同：系统投播组件，负责设备发现、连接与认证
             Stack() {
+              // 系统投播组件保留为透明命中层，负责设备发现与连接
               AVCastPicker({
                 normalColor: this.castNormalColor(),
                 activeColor: '#ef233c'
               })
                 .width(36)
                 .height(36)
+                .opacity(this.castBlocked ? 0 : 0.01)
+              Row() {
+                SymbolGlyph($r('sys.symbol.media_center'))
+                  .fontSize(21)
+                  .fontColor([this.playerStyle.iconColor ? this.playerStyle.iconColor : '#999999'])
+              }
+              .width(36)
+              .height(36)
+              .justifyContent(FlexAlign.Center)
+              .hitTestBehavior(HitTestMode.None)
               if (this.castBlocked) {
                 Row()
                   .width(36)
@@ -2231,6 +2242,7 @@ export struct Play {
             }
             .width(36)
             .height(36)
+            .layoutWeight(1)
             if (this.isNonCatalogAudio()) {
               this.SmallAction($r('sys.symbol.info_circle'), this.playerStore.currentSong.localUri ? '本地音乐' : this.playerStore.currentSong.programId ? '节目详情' : '音乐电台', () => this.openAudioDetails())
             } else {

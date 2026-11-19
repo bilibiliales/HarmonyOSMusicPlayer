@@ -11,6 +11,7 @@ import { UserSettings, playRecordVisibilityPatch } from '../models/userSettings'
 import { UserSettingsService } from '../services/UserSettingsService'
 import { ThemeMode, ThemeService } from '../services/ThemeService'
 import { TC } from '../services/ThemeColors'
+import { preferences } from '@kit.ArkData'
 
 @Component
 struct QualitySelector {
@@ -62,6 +63,25 @@ export struct SettingsPage {
   @State askDownloadSaveMode: boolean = AppSettings.askDownloadSaveMode
   @StorageProp('themeMode') themeMode: string = 'system'
   @StorageProp('systemDarkMode') systemDark: boolean = false
+
+  /** 重置本地偏好设置（保留登录态；重启后按默认值生效）。 */
+  private confirmReset(): void {
+    this.getUIContext().showAlertDialog({
+      title: '重置设置',
+      message: '将清除主题、播放与歌词等本地偏好，登录状态不受影响。确定继续？',
+      primaryButton: { value: '取消', action: () => {} },
+      secondaryButton: {
+        value: '重置',
+        fontColor: TC.accent(),
+        action: () => {
+          const context = this.getUIContext().getHostContext() as common.UIAbilityContext
+          preferences.deletePreferences(context, { name: 'music_player_settings' })
+            .then(() => BubbleTip.show(this.getUIContext(), '设置已重置，重启应用后生效'))
+            .catch(() => BubbleTip.show(this.getUIContext(), '重置失败'))
+        }
+      }
+    })
+  }
 
   private isFollowSystem(): boolean {
     return this.themeMode === ThemeMode.SYSTEM
@@ -310,7 +330,10 @@ export struct SettingsPage {
             .onClick(() => this.pageStack.pop())
           Text('设置').layoutWeight(1).fontSize(18).fontWeight(FontWeight.Bold)
             .fontColor(TC.textPrimary()).textAlign(TextAlign.Center)
-          Column().width(24)
+          SymbolGlyph($r('sys.symbol.arrow_counterclockwise'))
+            .fontSize(20).fontColor([TC.textSecondary()])
+            .width(24).height(36)
+            .onClick(() => this.confirmReset())
         }.height(56).constraintSize({ minHeight: 56 }).width('100%').padding({ left: 16, right: 16 })
         Scroll() {
           Column({ space: 16 }) {
@@ -401,7 +424,7 @@ export struct SettingsPage {
 
             Column({ space: 10 }) {
               Text('后端服务').width('100%').fontSize(16).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary())
-              TextInput({ text: this.serverUrl, placeholder: '后端服务 Base URL，例如 https://neteaseapi.gksm.store' })
+              TextInput({ text: this.serverUrl, placeholder: '后端服务 Base URL' })
                 .height(50).fontColor(TC.textPrimary()).placeholderColor(TC.textQuaternary()).backgroundColor(TC.surfaceInset())
                 .borderRadius(14).onChange((value: string) => this.serverUrl = value)
               Button('保存服务地址').width('100%').height(46).borderRadius(23)
@@ -410,7 +433,7 @@ export struct SettingsPage {
 
             Column({ space: 10 }) {
               Text('AI 模型连接').width('100%').fontSize(16).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary())
-              TextInput({ text: this.aiBaseUrl, placeholder: 'AI 服务 Base URL，例如 https://api.openai.com/v1' })
+              TextInput({ text: this.aiBaseUrl, placeholder: 'AI 服务 Base URL' })
                 .height(48).fontColor(TC.textPrimary()).placeholderColor(TC.textQuaternary()).backgroundColor(TC.surfaceInset())
                 .borderRadius(14).onChange((value: string) => this.aiBaseUrl = value)
               TextInput({ text: this.aiApiKey, placeholder: 'API Key' }).type(InputType.Password)

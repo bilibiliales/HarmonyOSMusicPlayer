@@ -718,7 +718,7 @@ struct Recommend {
             .onClick(() => this.pageStack.pushPathByName('SearchPage', null))
 
             Stack() {
-              SymbolGlyph($r('sys.symbol.music')).fontSize(20).fontColor([TC.accent()])
+              SymbolGlyph($r('sys.symbol.identify_song')).fontSize(20).fontColor([TC.accent()])
             }
             .width(42).height(42).borderRadius(21).backgroundColor(TC.surfaceCardAlt())
             .onClick(() => this.pageStack.pushPathByName('SongRecognitionPage', null))

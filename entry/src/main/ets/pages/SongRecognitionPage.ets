@@ -1,5 +1,5 @@
 import { audio } from '@kit.AudioKit'
-import { abilityAccessCtrl } from '@kit.AbilityKit'
+import { abilityAccessCtrl, common } from '@kit.AbilityKit'
 import { BusinessError } from '@kit.BasicServicesKit'
 import { TC } from '../services/ThemeColors'
 import { BubbleTip } from '../services/BubbleTip'
@@ -7,39 +7,27 @@ import { playerController } from '../services/PlayerController'
 import { AudioMatchService, MatchedSong } from '../services/AudioMatchService'
 
 /**
- * 听歌识曲：原生采集 8kHz 单声道 PCM，本地生成音频指纹后查询匹配结果。
- * 不嵌网页，保持与应用其它页面一致的交互和主题。
+ * 听歌识曲：内录手机正在播放的音频（可选同时改用麦克风），本地生成音频指纹后查询。
+ * 三次采样、每次 5 秒，取前 3 秒生成 AFP，结果去重后展示。
  */
 @Component
 export struct SongRecognitionPage {
   @Consume('pageStack') pageStack: NavPathStack
   @Consume('topAvoidHeight') topAvoidHeight: number
-  @State private status: string = '点击下方按钮，开始识别周围的音乐'
+  @State private status: string = '点击中间图标开始识别'
   @State private progress: number = 0
   @State private busy: boolean = false
+  @State private useMic: boolean = false
   @State private results: MatchedSong[] = []
 
   private capturer?: audio.AudioCapturer
   private chunks: ArrayBuffer[] = []
   private bytes: number = 0
-  private recognizing: boolean = false
-  private finishTimer: number = -1
-
-  aboutToAppear(): void {
-    try {
-      const atManager = abilityAccessCtrl.createAtManager()
-      atManager.requestPermissionsFromUser(this.getUIContext().getHostContext(),
-        ['ohos.permission.MICROPHONE'])
-        .catch((error: BusinessError) => {
-          BubbleTip.show(this.getUIContext(), `麦克风权限申请失败：${error.message}`)
-        })
-    } catch (_error) {
-    }
-  }
+  private captureDone?: () => void
+  private captureTimer: number = -1
 
   aboutToDisappear(): void {
-    this.recognizing = false
-    if (this.finishTimer >= 0) { clearTimeout(this.finishTimer) }
+    if (this.captureTimer >= 0) { clearTimeout(this.captureTimer) }
     const capturer = this.capturer
     this.capturer = undefined
     if (capturer) {
@@ -47,79 +35,95 @@ export struct SongRecognitionPage {
     }
   }
 
-  private async startRecognize(): Promise<void> {
-    if (this.busy) { return }
-    this.busy = true
-    this.results = []
-    this.chunks = []
-    this.bytes = 0
-    this.progress = 0
-    this.status = '正在采集音频…'
+  private async ensureMicPermission(): Promise<boolean> {
     try {
-      const streamInfo: audio.AudioStreamInfo = {
-        samplingRate: audio.AudioSamplingRate.SAMPLE_RATE_8000,
-        channels: audio.AudioChannel.CHANNEL_1,
-        sampleFormat: audio.AudioSampleFormat.SAMPLE_FORMAT_F32LE,
-        encodingType: audio.AudioEncodingType.ENCODING_TYPE_RAW
-      }
-      const capturerInfo: audio.AudioCapturerInfo = {
-        source: audio.SourceType.SOURCE_TYPE_MIC,
-        capturerFlags: 0
-      }
-      const options: audio.AudioCapturerOptions = { streamInfo: streamInfo, capturerInfo: capturerInfo }
-      const capturer = await audio.createAudioCapturer(options)
-      this.capturer = capturer
-      this.recognizing = true
-      const targetBytes = AudioMatchService.SAMPLE_COUNT * 4
-      capturer.on('readData', (buffer: ArrayBuffer) => {
-        if (!this.recognizing) { return }
-        // 底层缓冲区会复用，跨回调前必须复制一份
-        const copy = buffer.slice(0)
-        this.chunks.push(copy)
-        this.bytes += copy.byteLength
-        this.progress = Math.min(100, Math.floor(this.bytes / targetBytes * 100))
-        if (this.bytes >= targetBytes) { this.finish() }
-      })
-      await capturer.start()
-      // 麦克风采样不足 5 秒时也要收尾，避免一直停在采集中
-      this.finishTimer = setTimeout(() => this.finish(), 8000)
-    } catch (error) {
-      this.recognizing = false
-      this.busy = false
-      this.status = error instanceof Error ? error.message : '录音启动失败'
+      const atManager = abilityAccessCtrl.createAtManager()
+      const context = this.getUIContext().getHostContext() as common.Context
+      const result = await atManager.requestPermissionsFromUser(context, ['ohos.permission.MICROPHONE'])
+      return result.authResults.length > 0 && result.authResults[0] === 0
+    } catch (_error) {
+      return false
     }
   }
 
-  private async finish(): Promise<void> {
-    if (!this.recognizing) { return }
-    this.recognizing = false
-    if (this.finishTimer >= 0) { clearTimeout(this.finishTimer); this.finishTimer = -1 }
-    const capturer = this.capturer
-    this.capturer = undefined
-    if (capturer) {
-      try { await capturer.stop() } catch (_error) {}
-      try { await capturer.release() } catch (_error) {}
+  /** 采集一段音频并返回前 3 秒的 8k 单声道 Float32 PCM。 */
+  private async captureOnce(useMic: boolean): Promise<Float32Array> {
+    const streamInfo: audio.AudioStreamInfo = {
+      samplingRate: audio.AudioSamplingRate.SAMPLE_RATE_8000,
+      channels: audio.AudioChannel.CHANNEL_1,
+      sampleFormat: audio.AudioSampleFormat.SAMPLE_FORMAT_F32LE,
+      encodingType: audio.AudioEncodingType.ENCODING_TYPE_RAW
     }
-    this.status = '正在识别…'
+    const capturerInfo: audio.AudioCapturerInfo = {
+      source: useMic ? audio.SourceType.SOURCE_TYPE_MIC : audio.SourceType.SOURCE_TYPE_PLAYBACK_CAPTURE,
+      capturerFlags: 0
+    }
+    const capturer = await audio.createAudioCapturer({ streamInfo: streamInfo, capturerInfo: capturerInfo })
+    this.capturer = capturer
+    this.chunks = []
+    this.bytes = 0
+    const targetBytes = AudioMatchService.SAMPLE_COUNT * 4
+    const runMs = 5000
+    const runBytes = AudioMatchService.SAMPLE_RATE * (runMs / 1000) * 4
+    await new Promise<void>((resolve) => {
+      this.captureDone = resolve
+      capturer.on('readData', (buffer: ArrayBuffer) => {
+        if (!this.capturer) { return }
+        const copy = buffer.slice(0)
+        this.chunks.push(copy)
+        this.bytes += copy.byteLength
+        this.progress = Math.min(100, Math.floor(this.bytes / runBytes * 100))
+        if (this.bytes >= runBytes) { this.captureDone?.() }
+      })
+      this.captureTimer = setTimeout(() => this.captureDone?.(), runMs + 1500)
+      capturer.start().catch((error: BusinessError) => {
+        BubbleTip.show(this.getUIContext(), `录音启动失败：${error.message}`)
+        this.captureDone?.()
+      })
+    })
+    if (this.captureTimer >= 0) { clearTimeout(this.captureTimer); this.captureTimer = -1 }
+    this.captureDone = undefined
+    try { await capturer.stop() } catch (_error) {}
+    try { await capturer.release() } catch (_error) {}
+    if (this.capturer === capturer) { this.capturer = undefined }
+
+    const pcm = new Float32Array(AudioMatchService.SAMPLE_COUNT)
+    let offset = 0
+    for (const chunk of this.chunks) {
+      const view = new Float32Array(chunk)
+      const count = Math.min(view.length, pcm.length - offset)
+      if (count > 0) { pcm.set(view.subarray(0, count), offset); offset += count }
+      if (offset >= pcm.length) { break }
+    }
+    this.chunks = []
+    if (offset < targetBytes / 4) {
+      throw new Error('采集时间不足，请靠近音源重试')
+    }
+    return pcm
+  }
+
+  private async startRecognize(): Promise<void> {
+    if (this.busy) { return }
+    if (this.useMic && !(await this.ensureMicPermission())) {
+      BubbleTip.show(this.getUIContext(), '需要麦克风权限才能使用麦克风识别')
+      return
+    }
+    this.busy = true
+    this.results = []
+    this.progress = 0
+    const all: MatchedSong[] = []
     try {
-      const pcm = new Float32Array(AudioMatchService.SAMPLE_COUNT)
-      let offset = 0
-      for (const chunk of this.chunks) {
-        const view = new Float32Array(chunk)
-        const count = Math.min(view.length, pcm.length - offset)
-        if (count > 0) {
-          pcm.set(view.subarray(0, count), offset)
-          offset += count
-        }
-        if (offset >= pcm.length) { break }
+      for (let i = 0; i < 3; i++) {
+        this.status = `正在采集第 ${i + 1}/3 次…`
+        const pcm = await this.captureOnce(this.useMic)
+        this.status = `正在识别第 ${i + 1}/3 次…`
+        const rows = await AudioMatchService.recognize(pcm)
+        all.push(...rows)
       }
-      if (offset < AudioMatchService.SAMPLE_COUNT) {
-        throw new Error('采集时间不足，请靠近音源重试')
-      }
-      this.results = await AudioMatchService.recognize(pcm)
+      this.results = AudioMatchService.dedupe(all)
       this.status = this.results.length > 0
-        ? `识别到 ${this.results.length} 个结果`
-        : '没有识别到歌曲，请靠近音源重试'
+        ? `识别到 ${this.results.length} 首歌曲`
+        : '没有识别到歌曲，请换个片段重试'
     } catch (error) {
       this.status = error instanceof Error ? error.message : '识别失败，请重试'
     } finally {
@@ -157,14 +161,14 @@ export struct SongRecognitionPage {
         .width('100%').height(52).padding({ left: 16, right: 16 })
 
         Scroll() {
-          Column({ space: 20 }) {
+          Column({ space: 18 }) {
             Column({ space: 14 }) {
               Stack() {
-                Circle().width(150).height(150)
-                  .backgroundColor(TC.accentSoft()).opacity(0.16)
-                SymbolGlyph($r('sys.symbol.music_note_list')).fontSize(56).fontColor([TC.accent()])
+                Circle().width(128).height(128).backgroundColor(TC.accent())
+                SymbolGlyph($r('sys.symbol.mic_fill')).fontSize(52).fontColor(Color.White)
               }
-              .width(150).height(150)
+              .width(128).height(128)
+              .onClick(() => this.startRecognize())
 
               Text(this.status).fontSize(13).fontColor(TC.textBody())
                 .textAlign(TextAlign.Center).padding({ left: 24, right: 24 })
@@ -172,15 +176,16 @@ export struct SongRecognitionPage {
                 Progress({ value: this.progress, total: 100, type: ProgressType.Linear })
                   .width('60%').height(4).color(TC.accent())
               }
-              Button(this.busy ? '识别中…' : '开始识别')
-                .width(180).height(44).fontSize(15)
-                .fontColor(TC.textOnAccent()).backgroundColor(TC.accent())
-                .borderRadius(22).enabled(!this.busy)
-                .onClick(() => this.startRecognize())
-              Text('需要麦克风权限 · 采集约 5 秒').fontSize(10).fontColor(TC.textQuaternary())
+              Row({ space: 10 }) {
+                Text('同时录麦克风').fontSize(12).fontColor(TC.textBody())
+                Toggle({ type: ToggleType.Switch, isOn: this.useMic })
+                  .selectedColor(TC.accent()).enabled(!this.busy)
+                  .onChange((value: boolean) => this.useMic = value)
+              }
+              Text('识别手机正在播放的音乐 · 采集 3 次约 15 秒').fontSize(10).fontColor(TC.textQuaternary())
             }
             .width('100%')
-            .padding({ top: 30, bottom: 24 })
+            .padding({ top: 24, bottom: 12 })
 
             if (this.results.length > 0) {
               Column({ space: 10 }) {
