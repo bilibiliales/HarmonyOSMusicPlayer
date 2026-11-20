@@ -112,7 +112,7 @@ export class AppSettings {
    */
   static settingsLoaded: boolean = false
 
-  static aiBaseUrl: string = 'https://neteaseapi.gksm.store'
+  static aiBaseUrl: string = 'https://ncme.scfd.top'
   static aiApiKey: string = ''
   static aiModel: string = 'gpt-3.5-turbo'
   static defaultPlayMode: PlayMode = PlayMode.LOOP

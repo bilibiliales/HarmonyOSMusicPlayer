@@ -31,7 +31,7 @@ const bridge = `
 (function () {
   var chunks = [];
   var busy = false;
-  var NEED = 24000;   // 3 秒 @ 8kHz，与官方 demo 一致
+  var NEED = 24000;   // 3 秒 @ 8kHz
   var RATE = 8000;
 
   function b64ToBytes(b64) {

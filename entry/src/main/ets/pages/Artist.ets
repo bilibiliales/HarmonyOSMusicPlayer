@@ -14,6 +14,7 @@ import {
   ArtistSongsPageParam,
   ArtistTopSongsResponse,
   MvPlayerPageParam,
+  OperationResponse,
   SharePageParam,
   SimilarArtistResponse,
   UserEventItem,
@@ -33,12 +34,15 @@ import { EventCard } from '../components/EventCard'
 import { NoMoreFooter } from '../components/NoMoreFooter'
 import { RelationshipPageParam } from './RelationshipList'
 import { ImagePreviewPageParam } from './ImagePreviewPage'
+import { AuthStore } from '../stores/AuthStore'
+import { BubbleTip } from '../services/BubbleTip'
 
 @Component
 export struct ArtistPage {
   @StorageProp('skinVersion') skinVersionObs: number = 0
   @Consume('pageStack') pageStack: NavPathStack
   @Consume('topAvoidHeight') topAvoidHeight: number
+  @Consume('authStore') authStore: AuthStore
   pageParam: ArtistPageParam = { id: '' }
 
   @State artist: ApiArtist = { name: '' }
@@ -62,6 +66,9 @@ export struct ArtistPage {
   @State verifyIcon: string = ''
   @State artistUid: string = ''
   @State fansCount: number = 0
+  /** 是否已收藏该歌手：/artist/follow/count 的 isFollow，操作走 /artist/sub。 */
+  @State followed: boolean = false
+  @State followBusy: boolean = false
   @State events: UserEventItem[] = []
   @State eventsMore: boolean = true
   @State eventsLoading: boolean = false
@@ -237,9 +244,60 @@ export struct ArtistPage {
       ])
       if (response.code === 200 && response.data) {
         this.fansCount = response.data.fansCnt || 0
+        this.followed = response.data.isFollow === true || response.data.follow === true
       }
     } catch (error) {
       console.error(`[ArtistPage] load fans count failed: ${error instanceof Error ? error.message : 'unknown error'}`)
+    }
+  }
+
+  /** 收藏 / 取消收藏歌手：/artist/sub（t=1 收藏，t=0 取消）。 */
+  private toggleArtistFollow(): void {
+    if (this.followBusy) {
+      return
+    }
+    if (!this.authStore.loggedIn) {
+      this.pageStack.pushPathByName('LoginPage', null)
+      return
+    }
+    if (this.followed) {
+      this.getUIContext().showAlertDialog({
+        title: '取消收藏歌手',
+        message: `确定不再关注「${this.displayName()}」吗？`,
+        primaryButton: { value: '再想想', action: () => {} },
+        secondaryButton: {
+          value: '取消收藏',
+          fontColor: TC.accent(),
+          action: () => { this.submitArtistFollow(0) }
+        }
+      })
+      return
+    }
+    this.submitArtistFollow(1)
+  }
+
+  private async submitArtistFollow(t: number): Promise<void> {
+    this.followBusy = true
+    try {
+      const response = await ApiClient.get<OperationResponse>('/artist/sub', [
+        { key: 'id', value: this.pageParam.id },
+        { key: 't', value: t.toString() }
+      ])
+      if (response.code === 200) {
+        this.followed = t === 1
+        if (t === 1) {
+          this.fansCount += 1
+        } else if (this.fansCount > 0) {
+          this.fansCount -= 1
+        }
+        BubbleTip.show(this.getUIContext(), t === 1 ? '已收藏歌手' : '已取消收藏')
+      } else {
+        BubbleTip.show(this.getUIContext(), response.message || '操作失败')
+      }
+    } catch (error) {
+      BubbleTip.show(this.getUIContext(), error instanceof Error ? error.message : '操作失败')
+    } finally {
+      this.followBusy = false
     }
   }
 
@@ -483,16 +541,28 @@ export struct ArtistPage {
         }
         Text(`${this.artistDetail.musicSize || this.artist.musicSize || this.topSongs.length} 首单曲 · ${this.artistDetail.albumSize || this.artist.albumSize || this.albums.length} 张专辑 · ${this.artistDetail.mvSize || this.mvs.length} 个 MV`)
           .fontSize(11).fontColor(TC.textBody())
-        // 粉丝数：点击进粉丝列表
-        Row({ space: 4 }) {
-          Text(this.formatCount(this.fansCount)).fontSize(13).fontWeight(FontWeight.Bold)
-            .fontColor(TC.textPrimary())
-          Text('粉丝').fontSize(11).fontColor(TC.textBody())
-          SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(12).fontColor([TC.textBody()])
+        Row({ space: 8 }) {
+          // 粉丝数：点击进粉丝列表
+          Row({ space: 4 }) {
+            Text(this.formatCount(this.fansCount)).fontSize(13).fontWeight(FontWeight.Bold)
+              .fontColor(TC.textPrimary())
+            Text('粉丝').fontSize(11).fontColor(TC.textBody())
+            SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(12).fontColor([TC.textBody()])
+          }
+          .padding({ left: 12, right: 10, top: 5, bottom: 5 })
+          .borderRadius(14).backgroundColor('rgba(255,255,255,0.18)')
+          .onClick(() => this.openFans())
+
+          // 收藏歌手：已收藏时显示「已关注」，再点可取消（不涉及互相关注）
+          Text(this.followed ? '已关注' : '关注')
+            .fontSize(12)
+            .fontWeight(FontWeight.Medium)
+            .fontColor(this.followed ? TC.textPrimary() : TC.textOnAccent())
+            .padding({ left: 18, right: 18, top: 6, bottom: 6 })
+            .backgroundColor(this.followed ? 'rgba(255,255,255,0.18)' : TC.accent())
+            .borderRadius(15)
+            .onClick(() => this.toggleArtistFollow())
         }
-        .padding({ left: 12, right: 10, top: 5, bottom: 5 })
-        .borderRadius(14).backgroundColor('rgba(255,255,255,0.18)')
-        .onClick(() => this.openFans())
         if ((this.artistDetail.alias || []).length > 0) {
           Text((this.artistDetail.alias || []).join(' / ')).width('82%').fontSize(11).fontColor(TC.textSecondary())
             .maxLines(1).textAlign(TextAlign.Center)

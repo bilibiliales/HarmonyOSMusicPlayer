@@ -357,8 +357,8 @@ export struct SongRecognitionPage {
                 LoadingProgress().width(26).height(26).color(TC.accent())
               }
               Text(this.mode === 1
-                ? '选择手机里的音频文件 · 自动挑最响的 3 秒 · 与在线 demo 一致'
-                : '采集周围播放的音乐 · 3 次约 15 秒 · 结果自动去重')
+                ? '选择手机里的音频文件'
+                : '采集周围播放的音乐')
                 .fontSize(10).fontColor(TC.textQuaternary())
                 .textAlign(TextAlign.Center).padding({ left: 20, right: 20 })
             }

@@ -234,6 +234,7 @@ export interface ArtistFanProfile {
   authStatus?: number
   follows?: number
   followeds?: number
+  avatarDetail?: ArtistAvatarDetail
 }
 
 export interface ArtistFanItem {
@@ -513,6 +514,7 @@ export interface ApiUser {
   signature?: string
   userType?: number
   authStatus?: number
+  avatarDetail?: ArtistAvatarDetail
   followed?: boolean
   mutual?: boolean
   backgroundUrl?: string
@@ -567,16 +569,83 @@ export interface SocialUser {
   followeds?: number
   userType?: number
   authStatus?: number
+  /** 头像右下角的认证角标（音乐人 / 官方号等）。 */
+  avatarDetail?: ArtistAvatarDetail
+}
+
+/** /user/follow/mixed：我关注的用户/歌手混合列表。 */
+export interface FollowBoxResource {
+  resourceType?: number
+  subType?: number
+  resourceId?: string
+  coverUrl?: string
+  orpheusUrl?: string
+  picCount?: number
+}
+
+export interface FollowBoxContent {
+  title?: string
+  resource?: FollowBoxResource
+}
+
+export interface FollowShowContent {
+  message?: string
+  time?: number
+  active?: boolean
+  boxContent?: FollowBoxContent
+  consumeParam?: string
+}
+
+export interface FollowFansGroupInfo {
+  level?: string
+  segment?: string
+  fansGroupIdStr?: string
+  fansGroupInnerPageUrl?: string
+  showUpgrade?: boolean
+}
+
+export interface MixedFollowRecord {
+  type?: number
+  followId?: number
+  userProfile?: ApiUser | null
+  artistInfo?: ApiArtist | null
+  showContent?: FollowShowContent | null
+  followTime?: number
+  mutualFollowTime?: number | null
+  followDay?: string
+  mutualFollowDay?: string | null
+  fansGroupInfo?: FollowFansGroupInfo | null
+}
+
+export interface MixedFollowPage {
+  size?: number
+  cursor?: string
+  more?: boolean
+}
+
+export interface MixedFollowData {
+  records?: MixedFollowRecord[]
+  page?: MixedFollowPage
+}
+
+export interface MixedFollowResponse {
+  code: number
+  message?: string
+  data?: MixedFollowData
 }
 
 export interface UserFollowsResponse {
   code: number
+  /** 隐私设置等拒绝原因，例如「用户隐私无权限查看」。 */
+  message?: string
   follow: SocialUser[]
   more: boolean
 }
 
 export interface UserFollowedsResponse {
   code: number
+  /** 隐私设置等拒绝原因，例如「用户隐私无权限查看」。 */
+  message?: string
   followeds: SocialUser[]
   more: boolean
   size?: number
