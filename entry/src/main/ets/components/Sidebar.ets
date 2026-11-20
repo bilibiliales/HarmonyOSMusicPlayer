@@ -38,6 +38,8 @@ export struct Sidebar {
   onClose: () => void = () => {}
   onOpenMine: () => void = () => {}
   @State hint: string = ''
+  /** 容器宽度：大屏上侧边栏保持手机版的窄栏，不再拉成半屏。 */
+  @State private hostWidth: number = 0
   @State vipActive: boolean = false
   @State vipSvip: boolean = false
   @State vipLevel: number = 0
@@ -72,6 +74,15 @@ export struct Sidebar {
     { icon: $r('sys.symbol.clock'), title: '定时关闭', subtitle: '倒计时结束自动暂停播放', available: true, action: 'sleep' },
     { icon: $r('sys.symbol.gearshape'), title: '设置', subtitle: '播放与网络设置', available: true, route: 'SettingsPage' }
   ]
+
+  /** 侧边栏宽度：手机按 84% 铺开，平板/横屏封顶 360vp，保持手机版的窄栏观感。 */
+  private panelWidth(): number {
+    if (this.hostWidth <= 0) {
+      return 320
+    }
+    const ratioWidth = Math.round(this.hostWidth * 0.84)
+    return Math.min(360, ratioWidth)
+  }
 
   /** 侧边栏文字色 / 图标色：装扮优先，未指定跟随主题。 */
   private sbText(): ResourceColor {
@@ -816,17 +827,23 @@ export struct Sidebar {
         .width('100%')
         .height('100%')
       }
-      .width('84%')
+      .width(this.panelWidth())
       .height('100%')
       .borderRadius({ topRight: 28, bottomRight: 28 })
       .clip(true)
-      .translate({ x: this.visible ? 0 : -360 })
+      .translate({ x: this.visible ? 0 : -this.panelWidth() })
       .opacity(this.visible ? 1 : 0.92)
       .shadow({ radius: 30, color: 'rgba(0,0,0,0.4)', offsetX: 10 })
       .animation({ duration: 280, curve: this.visible ? Curve.EaseOut : Curve.EaseIn })
     }
     .width('100%')
     .height('100%')
+    .onAreaChange((_old: Area, area: Area) => {
+      const width = Number(area.width)
+      if (width > 0 && width !== this.hostWidth) {
+        this.hostWidth = width
+      }
+    })
     .bindSheet(this.sleepSheetVisible, this.skin_SleepSheetBuilder(), {
       height: '64%',
       backgroundColor: TC.sheetBackground(),

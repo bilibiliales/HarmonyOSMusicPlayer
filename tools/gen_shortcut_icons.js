@@ -11,7 +11,6 @@ const SIZE = 216;
 const RED = [0xef, 0x23, 0x3c];
 const SS = 4;                       // 每像素 4x4 超采样
 const GLYPH_BOX = SIZE * 0.56;      // 图形占画布比例
-const UNIT = GLYPH_BOX / 24;        // 24x24 图形坐标系 -> 像素
 const OFFSET = (SIZE - GLYPH_BOX) / 2;
 
 /* ---------------- 路径解析 ---------------- */
@@ -69,8 +68,26 @@ function parsePath(d) {
   return subpaths;
 }
 
-function toPixel(subpaths) {
-  return subpaths.map(sp => sp.map(([px, py]) => [OFFSET + px * UNIT, OFFSET + py * UNIT]));
+/* 从外部 SVG 取填充路径（原始素材是 48x48 坐标，需按自身网格换算）。 */
+function loadSvg(rel) {
+  const text = fs.readFileSync(path.resolve(__dirname, rel), 'utf8');
+  const ds = [...text.matchAll(/<path[^>]*\sd="([^"]+)"/g)].map(m => m[1]);
+  let grid = 24;
+  const vb = text.match(/viewBox="([^"]+)"/);
+  if (vb) {
+    const nums = vb[1].trim().split(/[\s,]+/).map(Number);
+    grid = nums[2] || 24;
+  } else {
+    const w = text.match(/\swidth="([\d.]+)"/);
+    if (w) grid = parseFloat(w[1]);
+  }
+  return { ds, grid };
+}
+
+function toPixel(subpaths, grid = 24, box = GLYPH_BOX) {
+  const unit = box / grid;
+  const offset = (SIZE - box) / 2;
+  return subpaths.map(sp => sp.map(([px, py]) => [offset + px * unit, offset + py * unit]));
 }
 
 function inFill(px, py, polys) {
@@ -177,19 +194,27 @@ const ICONS = [
   },
   {
     name: 'ic_shortcut_local',
-    // 向下箭头：播放本地音乐
-    fills: [
-      'M10.9 3.9 L13.1 3.9 L13.1 14.1 L17.6 14.1 L12 20.4 L6.4 14.1 L10.9 14.1 Z',
-    ],
+    // 下载/落本地：直接用素材原始 SVG（48x48 网格）
+    svg: 'svg-source/download.svg',
+    box: SIZE * 0.52,
+    fills: [],
     strokes: [],
   },
 ];
 
 /* ---------------- 渲染 ---------------- */
 function render(icon, file) {
+  const box = icon.box || GLYPH_BOX;
+  let fillDefs = icon.fills;
+  let grid = 24;
+  if (icon.svg) {
+    const src = loadSvg(icon.svg);
+    fillDefs = src.ds;
+    grid = src.grid;
+  }
   const polys = [];
-  for (const d of icon.fills) polys.push(...toPixel(parsePath(d)));
-  const strokes = icon.strokes.map(s => ({ polys: toPixel(parsePath(s.d)), w: s.w * UNIT }));
+  for (const d of fillDefs) polys.push(...toPixel(parsePath(d), grid, box));
+  const strokes = icon.strokes.map(s => ({ polys: toPixel(parsePath(s.d), grid, box), w: s.w * (box / 24) }));
 
   const buf = Buffer.alloc(SIZE * SIZE * 4);
   const CX = SIZE / 2;

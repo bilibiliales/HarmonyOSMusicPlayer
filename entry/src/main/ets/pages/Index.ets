@@ -272,7 +272,8 @@ struct HomeIndex {
       const context = this.getUIContext().getHostContext() as common.UIAbilityContext
       const mainWindow = await window.getLastWindow(context)
       const avoidArea = mainWindow.getWindowAvoidArea(window.AvoidAreaType.TYPE_SYSTEM)
-      this.topAvoidHeight = px2vp(avoidArea.topRect.height)
+      // 某些平板横屏会给出异常的顶部避让高度，钳一下，避免整页被顶下去、底部 Tab 划出屏幕
+      this.topAvoidHeight = Math.min(px2vp(avoidArea.topRect.height), 60)
     } catch (error) {
       console.error(`[HomeIndex] Failed to obtain the top avoid area: ${JSON.stringify(error)}`)
       this.topAvoidHeight = 0
@@ -497,6 +498,10 @@ struct HomeIndex {
         }
         .barHeight(60)
         .barMode(BarMode.Fixed)
+        // 必须显式撑满：Tabs 会按内容撑高，平板横屏内容比窗口高时
+        // 底部的 5 个 Tab 会被顶到屏幕外，甚至要滑动页面才能点到。
+        .width('100%')
+        .height('100%')
         .barBackgroundColor(this.dockBgImage ? 'rgba(0,0,0,0)' :
           (this.dockBgColor ? this.dockBgColor : TC.navBackground()))
         .onChange((index: number) => {

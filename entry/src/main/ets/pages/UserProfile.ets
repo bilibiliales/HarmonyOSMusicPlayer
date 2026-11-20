@@ -41,6 +41,7 @@ import { DetailTopBar } from '../components/DetailTopBar'
 import { ShareSheet } from '../components/ShareSheet'
 import { NoMoreFooter } from '../components/NoMoreFooter'
 import { ImagePreviewPageParam } from './ImagePreviewPage'
+import { Responsive } from '../services/Responsive'
 
 @Component
 export struct UserProfilePage {
@@ -68,7 +69,14 @@ export struct UserProfilePage {
   @State followedByTarget: boolean = false
   @State shareSheetVisible: boolean = false
   @State scrollOffset: number = 0
+  /** 页面宽度：大屏上歌单改成多列卡片，而不是一条超长行。 */
+  @State private viewWidth: number = 0
   private scroller: Scroller = new Scroller()
+
+  /** 歌单卡片列数：手机单列（保持原样），平板 2 列，全屏 3 列。 */
+  private playlistColumns(): number {
+    return Responsive.columns(this.viewWidth, 1, 2, 3)
+  }
 
   private getVipText(vipLevel: number): string {
     return vipLevel == 1 ? '壹'
@@ -560,6 +568,20 @@ export struct UserProfilePage {
     .width('100%').height(280 + this.topAvoidHeight + 54)
   }
 
+  /** 大屏用的歌单卡片：封面在上、信息在下，一栏可以并排放多个。 */
+  @Builder
+  private PlaylistTile(item: playlistType) {
+    Column({ space: 8 }) {
+      Image(item.cover).width('100%').aspectRatio(1).borderRadius(14).objectFit(ImageFit.Cover)
+      Text(item.name).width('100%').fontSize(13).fontColor(TC.textBody()).maxLines(2)
+        .textOverflow({ overflow: TextOverflow.Ellipsis })
+      Text(`${item.count} 首`).width('100%').fontSize(11).fontColor(TC.textTertiary())
+    }
+    .width('100%')
+    .alignItems(HorizontalAlign.Start)
+    .onClick(() => this.pageStack.pushPathByName('PlaylistDetailPage', item))
+  }
+
   @Builder
   private HomeTab() {
     Column({ space: 14 }) {
@@ -571,18 +593,31 @@ export struct UserProfilePage {
       }
       Text(`共公开 ${this.playlists.length} 个歌单`)
         .width('100%').fontSize(13).fontColor(TC.textSecondary())
-      ForEach(this.playlists.slice(0, 3), (item: playlistType) => {
-        Row({ space: 12 }) {
-          Image(item.cover).width(54).height(54).borderRadius(12).objectFit(ImageFit.Cover)
-          Column({ space: 4 }) {
-            Text(item.name).fontSize(14).fontColor(TC.textBody()).maxLines(1)
-            Text(`${item.count} 首 · ${item.creator}`).fontSize(11).fontColor(TC.textTertiary())
-          }
-          .layoutWeight(1).alignItems(HorizontalAlign.Start)
-          SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(15).fontColor([TC.textQuaternary()])
+      if (this.playlistColumns() > 1) {
+        Flex({ wrap: FlexWrap.Wrap, justifyContent: FlexAlign.SpaceBetween }) {
+          ForEach(this.playlists.slice(0, 6), (item: playlistType) => {
+            Column() {
+              this.PlaylistTile(item)
+            }
+            .width(Responsive.itemPercent(this.playlistColumns()))
+            .margin({ bottom: 14 })
+          })
         }
-        .height(68).onClick(() => this.pageStack.pushPathByName('PlaylistDetailPage', item))
-      })
+        .width('100%')
+      } else {
+        ForEach(this.playlists.slice(0, 3), (item: playlistType) => {
+          Row({ space: 12 }) {
+            Image(item.cover).width(54).height(54).borderRadius(12).objectFit(ImageFit.Cover)
+            Column({ space: 4 }) {
+              Text(item.name).fontSize(14).fontColor(TC.textBody()).maxLines(1)
+              Text(`${item.count} 首 · ${item.creator}`).fontSize(11).fontColor(TC.textTertiary())
+            }
+            .layoutWeight(1).alignItems(HorizontalAlign.Start)
+            SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(15).fontColor([TC.textQuaternary()])
+          }
+          .height(68).onClick(() => this.pageStack.pushPathByName('PlaylistDetailPage', item))
+        })
+      }
     }
     .padding({ left: 16, right: 16, top: 14, bottom: 28 })
   }
@@ -684,18 +719,31 @@ export struct UserProfilePage {
                   this.HomeTab()
                 } else if (this.currentTab === 'playlists') {
                   Column() {
-                    ForEach(this.playlists, (item: playlistType) => {
-                      Row({ space: 12 }) {
-                        Image(item.cover).width(58).height(58).borderRadius(12).objectFit(ImageFit.Cover)
-                        Column({ space: 5 }) {
-                          Text(item.name).fontSize(14).fontColor(TC.textBody()).maxLines(1)
-                          Text(`${item.count} 首`).fontSize(11).fontColor(TC.textTertiary())
-                        }
-                        .layoutWeight(1).alignItems(HorizontalAlign.Start)
+                    if (this.playlistColumns() > 1) {
+                      Flex({ wrap: FlexWrap.Wrap, justifyContent: FlexAlign.SpaceBetween }) {
+                        ForEach(this.playlists, (item: playlistType) => {
+                          Column() {
+                            this.PlaylistTile(item)
+                          }
+                          .width(Responsive.itemPercent(this.playlistColumns()))
+                          .margin({ bottom: 14 })
+                        })
                       }
-                      .height(72).padding({ left: 16, right: 16 })
-                      .onClick(() => this.pageStack.pushPathByName('PlaylistDetailPage', item))
-                    })
+                      .width('100%').padding({ left: 16, right: 16, top: 4 })
+                    } else {
+                      ForEach(this.playlists, (item: playlistType) => {
+                        Row({ space: 12 }) {
+                          Image(item.cover).width(58).height(58).borderRadius(12).objectFit(ImageFit.Cover)
+                          Column({ space: 5 }) {
+                            Text(item.name).fontSize(14).fontColor(TC.textBody()).maxLines(1)
+                            Text(`${item.count} 首`).fontSize(11).fontColor(TC.textTertiary())
+                          }
+                          .layoutWeight(1).alignItems(HorizontalAlign.Start)
+                        }
+                        .height(72).padding({ left: 16, right: 16 })
+                        .onClick(() => this.pageStack.pushPathByName('PlaylistDetailPage', item))
+                      })
+                    }
                   }
                 } else {
                   Column({ space: 12 }) {
@@ -744,6 +792,10 @@ export struct UserProfilePage {
       }
       .width('100%').height('100%').backgroundColor(TC.pageBackground())
       .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP])
+      .onAreaChange((_old: Area, area: Area) => {
+        const width = Number(area.width)
+        if (width !== this.viewWidth) { this.viewWidth = width }
+      })
     }
     .hideTitleBar(true)
   }

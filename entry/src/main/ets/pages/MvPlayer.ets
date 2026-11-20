@@ -20,6 +20,7 @@ import { ApiClient } from '../services/ApiClient'
 import { playerController } from '../services/PlayerController'
 import { AuthStore } from '../stores/AuthStore'
 import { TC } from '../services/ThemeColors'
+import { Responsive } from '../services/Responsive'
 
 interface RecentVideoUrl { url: string; r?: number }
 interface RecentVideoUrlResponse { code: number; urls?: RecentVideoUrl[] }
@@ -57,6 +58,11 @@ export struct MvPlayerPage {
   @State pipSupported: boolean = false
   @State pipActive: boolean = false
   @State pipStarting: boolean = false
+  /** 页面自身的宽高：平板横屏时画面与详情左右分栏。 */
+  @State private viewWidth: number = 0
+  @State private viewHeight: number = 0
+  /** 横竖屏切换会重建 Video，切之前把进度存在这里，onPrepared 再续上。 */
+  private resumeSeconds: number = 0
   private controller: VideoController = new VideoController()
   private pipSurfaceController: XComponentController = new XComponentController()
   private pipSurfaceId: string = ''
@@ -548,6 +554,10 @@ export struct MvPlayerPage {
     }
   }
 
+  private wideLandscape(): boolean {
+    return Responsive.isWideLandscape(this.viewWidth, this.viewHeight)
+  }
+
   private resolutionTitle(resolution: number): string {
     return resolution >= 1080 ? '1080P' : `${resolution}P`
   }
@@ -596,6 +606,11 @@ export struct MvPlayerPage {
           .onPrepared(() => {
             this.loading = false
             this.message = ''
+            // 横竖屏切换会重建 Video 组件，这里把进度接回去
+            if (this.resumeSeconds > 1) {
+              try { this.controller.setCurrentTime(this.resumeSeconds) } catch (_error) {}
+              this.resumeSeconds = 0
+            }
           })
           .onStart(() => this.isPlaying = true)
           .onPause(() => this.isPlaying = false)
@@ -643,6 +658,97 @@ export struct MvPlayerPage {
   }
 
 
+  /** 详情区：竖屏时在画面下方，平板横屏时在画面右侧。 */
+  @Builder
+  private DetailsPane() {
+    Scroll() {
+      Column({ space: 18 }) {
+        Column({ space: 8 }) {
+          Text(this.mvName || 'MV').width('100%').fontSize(20).fontWeight(FontWeight.Bold)
+            .fontColor(TC.textBody()).maxLines(2).textOverflow({ overflow: TextOverflow.Ellipsis })
+          if (this.mvArtistName) {
+            Text(this.mvArtistName).width('100%').fontSize(13).fontColor(TC.textQuaternary())
+          }
+          Row({ space: 12 }) {
+            if (this.mvPlayCount > 0) {
+              Text(`${this.compactCount(this.mvPlayCount)} 次播放`).fontSize(11).fontColor(TC.textQuaternary())
+            }
+            if (this.mvDuration > 0) {
+              Text(this.formatDuration(this.mvDuration)).fontSize(11).fontColor(TC.textQuaternary())
+            }
+            if (this.mvPublishTime) {
+              Text(this.mvPublishTime).fontSize(11).fontColor(TC.textQuaternary())
+            }
+          }
+          if (this.mvDescription) {
+            Text(this.mvDescription).width('100%').fontSize(12).lineHeight(19).fontColor(TC.textTertiary())
+              .maxLines(3).textOverflow({ overflow: TextOverflow.Ellipsis })
+          }
+        }.width('100%').alignItems(HorizontalAlign.Start)
+
+        if (!this.pageParam.isVideo) {
+        Row() {
+          this.ActionButton(() => $r('sys.symbol.share'), () => '分享',
+            () => this.compactCount(this.shareCount), () => false,
+            () => this.shareMv())
+          this.ActionButton(() => this.liked ? $r('sys.symbol.heart_fill') : $r('sys.symbol.heart'),
+            () => this.liked ? '已点赞' : '点赞', () => this.compactCount(this.likedCount), () => this.liked,
+            () => this.toggleLike())
+          this.ActionButton(() => $r('sys.symbol.ellipsis_bubble'), () => '评论',
+            () => this.compactCount(this.commentCount), () => false,
+            () => this.openComments())
+          this.ActionButton(() => $r('sys.symbol.arrow_down_circle'), () => '下载',
+            () => this.downloading ? `${this.downloadProgress}%` : '', () => this.downloading,
+            () => this.downloadVideo())
+        }.width('100%').padding({ top: 4, bottom: 4 })
+        } else {
+          Row() {
+            this.ActionButton(() => $r('sys.symbol.ellipsis_bubble'), () => '评论',
+              () => this.compactCount(this.commentCount), () => false,
+              () => this.openComments())
+          }.width('100%').padding({ top: 4, bottom: 4 })
+        }
+
+        Column({ space: 11 }) {
+          Row() {
+            Text('播放清晰度').fontSize(14).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary())
+            Blank()
+            if (this.actualResolution > 0) {
+              Text(`当前 ${this.resolutionTitle(this.actualResolution)}`).fontSize(10).fontColor(TC.textTertiary())
+            }
+          }.width('100%')
+          Row({ space: 9 }) {
+            ForEach(this.resolutions, (resolution: number) => {
+              Text(this.resolutionTitle(resolution)).layoutWeight(1).height(38).fontSize(11)
+                .fontWeight(FontWeight.Medium).textAlign(TextAlign.Center)
+                .fontColor(this.selectedResolution === resolution ? TC.textOnAccent() : TC.textTertiary())
+                .backgroundColor(this.selectedResolution === resolution ? TC.accent() : TC.surfaceInset())
+                .borderRadius(12).onClick(() => {
+                  if (this.selectedResolution !== resolution) {
+                    this.loadVideoUrl(resolution)
+                  }
+                })
+            })
+          }.width('100%')
+        }.width('100%').padding(15).backgroundColor(TC.surfaceCard()).borderRadius(17)
+
+        if (this.actionMessage) {
+          Text(this.actionMessage).width('100%').padding(12).fontSize(11).lineHeight(18)
+            .fontColor(this.actionMessage.includes('已') ? '#65c98c' : '#ff9a78')
+            .textAlign(TextAlign.Center).backgroundColor(TC.surfaceCardAlt()).borderRadius(13)
+        }
+        if (this.message && this.videoUrl) {
+          Row({ space: 8 }) {
+            SymbolGlyph($r('sys.symbol.exclamationmark_triangle_fill')).fontSize(18).fontColor([TC.accentSoft()])
+            Text(this.message).layoutWeight(1).fontSize(11).lineHeight(18).fontColor(TC.accentSoft())
+            Text('重试').fontSize(11).fontColor(TC.accentSoft())
+              .onClick(() => this.loadVideoUrl(this.selectedResolution))
+          }.width('100%').padding(12).backgroundColor(TC.surfaceInset()).borderRadius(13)
+        }
+      }.width('100%').padding({ left: 16, right: 16, top: 18, bottom: 34 })
+    }.layoutWeight(1).scrollBar(BarState.Off)
+  }
+
   build() {
     NavDestination() {
       Column() {
@@ -663,96 +769,48 @@ export struct MvPlayerPage {
             .onClick(() => this.controller.requestFullscreen(true))
         }.width('100%').height(56).padding({ left: 16, right: 16 })
 
-        this.VideoArea()
-
-        Scroll() {
-          Column({ space: 18 }) {
-            Column({ space: 8 }) {
-              Text(this.mvName || 'MV').width('100%').fontSize(20).fontWeight(FontWeight.Bold)
-                .fontColor(TC.textBody()).maxLines(2).textOverflow({ overflow: TextOverflow.Ellipsis })
-              if (this.mvArtistName) {
-                Text(this.mvArtistName).width('100%').fontSize(13).fontColor(TC.textQuaternary())
-              }
-              Row({ space: 12 }) {
-                if (this.mvPlayCount > 0) {
-                  Text(`${this.compactCount(this.mvPlayCount)} 次播放`).fontSize(11).fontColor(TC.textQuaternary())
-                }
-                if (this.mvDuration > 0) {
-                  Text(this.formatDuration(this.mvDuration)).fontSize(11).fontColor(TC.textQuaternary())
-                }
-                if (this.mvPublishTime) {
-                  Text(this.mvPublishTime).fontSize(11).fontColor(TC.textQuaternary())
-                }
-              }
-              if (this.mvDescription) {
-                Text(this.mvDescription).width('100%').fontSize(12).lineHeight(19).fontColor(TC.textTertiary())
-                  .maxLines(3).textOverflow({ overflow: TextOverflow.Ellipsis })
-              }
-            }.width('100%').alignItems(HorizontalAlign.Start)
-
-            if (!this.pageParam.isVideo) {
-            Row() {
-              this.ActionButton(() => $r('sys.symbol.share'), () => '分享',
-                () => this.compactCount(this.shareCount), () => false,
-                () => this.shareMv())
-              this.ActionButton(() => this.liked ? $r('sys.symbol.heart_fill') : $r('sys.symbol.heart'),
-                () => this.liked ? '已点赞' : '点赞', () => this.compactCount(this.likedCount), () => this.liked,
-                () => this.toggleLike())
-              this.ActionButton(() => $r('sys.symbol.ellipsis_bubble'), () => '评论',
-                () => this.compactCount(this.commentCount), () => false,
-                () => this.openComments())
-              this.ActionButton(() => $r('sys.symbol.arrow_down_circle'), () => '下载',
-                () => this.downloading ? `${this.downloadProgress}%` : '', () => this.downloading,
-                () => this.downloadVideo())
-            }.width('100%').padding({ top: 4, bottom: 4 })
-            } else {
-              Row() {
-                this.ActionButton(() => $r('sys.symbol.ellipsis_bubble'), () => '评论',
-                  () => this.compactCount(this.commentCount), () => false,
-                  () => this.openComments())
-              }.width('100%').padding({ top: 4, bottom: 4 })
+        if (this.wideLandscape()) {
+          // 平板横屏：画面缩到左上角（约 74% 宽、垂直居中，上下留白），
+          // 详情挪到右侧独立滚动；要真全屏仍用右上角的全屏按钮。
+          Row() {
+            Column() {
+              this.VideoArea()
             }
+            .width('74%')
+            .height('100%')
+            .padding({ left: 16, right: 12, top: 10, bottom: 10 })
+            .justifyContent(FlexAlign.Center)
+            .alignItems(HorizontalAlign.Center)
+            .borderRadius(16)
+            .clip(true)
 
-            Column({ space: 11 }) {
-              Row() {
-                Text('播放清晰度').fontSize(14).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary())
-                Blank()
-                if (this.actualResolution > 0) {
-                  Text(`当前 ${this.resolutionTitle(this.actualResolution)}`).fontSize(10).fontColor(TC.textTertiary())
-                }
-              }.width('100%')
-              Row({ space: 9 }) {
-                ForEach(this.resolutions, (resolution: number) => {
-                  Text(this.resolutionTitle(resolution)).layoutWeight(1).height(38).fontSize(11)
-                    .fontWeight(FontWeight.Medium).textAlign(TextAlign.Center)
-                    .fontColor(this.selectedResolution === resolution ? TC.textOnAccent() : TC.textTertiary())
-                    .backgroundColor(this.selectedResolution === resolution ? TC.accent() : TC.surfaceInset())
-                    .borderRadius(12).onClick(() => {
-                      if (this.selectedResolution !== resolution) {
-                        this.loadVideoUrl(resolution)
-                      }
-                    })
-                })
-              }.width('100%')
-            }.width('100%').padding(15).backgroundColor(TC.surfaceCard()).borderRadius(17)
-
-            if (this.actionMessage) {
-              Text(this.actionMessage).width('100%').padding(12).fontSize(11).lineHeight(18)
-                .fontColor(this.actionMessage.includes('已') ? '#65c98c' : '#ff9a78')
-                .textAlign(TextAlign.Center).backgroundColor(TC.surfaceCardAlt()).borderRadius(13)
+            Column() {
+              this.DetailsPane()
             }
-            if (this.message && this.videoUrl) {
-              Row({ space: 8 }) {
-                SymbolGlyph($r('sys.symbol.exclamationmark_triangle_fill')).fontSize(18).fontColor([TC.accentSoft()])
-                Text(this.message).layoutWeight(1).fontSize(11).lineHeight(18).fontColor(TC.accentSoft())
-                Text('重试').fontSize(11).fontColor(TC.accentSoft())
-                  .onClick(() => this.loadVideoUrl(this.selectedResolution))
-              }.width('100%').padding(12).backgroundColor(TC.surfaceInset()).borderRadius(13)
-            }
-          }.width('100%').padding({ left: 16, right: 16, top: 18, bottom: 34 })
-        }.layoutWeight(1).scrollBar(BarState.Off)
+            .layoutWeight(1)
+            .height('100%')
+            .padding({ right: 6 })
+          }
+          .width('100%')
+          .layoutWeight(1)
+          .alignItems(VerticalAlign.Top)
+        } else {
+          this.VideoArea()
+          this.DetailsPane()
+        }
       }
       .width('100%').height('100%').backgroundColor(TC.pageBackground())
+      .onAreaChange((_old: Area, area: Area) => {
+        const width = Number(area.width)
+        const height = Number(area.height)
+        const wasWide = this.wideLandscape()
+        if (width !== this.viewWidth) { this.viewWidth = width }
+        if (height !== this.viewHeight) { this.viewHeight = height }
+        // 布局分支切换会重建 Video：先记下当前进度，新的 onPrepared 里续播
+        if (wasWide !== this.wideLandscape() && this.videoPositionSeconds > 1) {
+          this.resumeSeconds = this.videoPositionSeconds
+        }
+      })
       .bindSheet(this.commentSheetVisible, this.skin_CommentSheet(), {
         height: '72%', backgroundColor: TC.sheetBackground(), showClose: false, dragBar: true,
         onDisappear: () => this.commentSheetVisible = false

@@ -6,6 +6,7 @@ import { TC } from '../services/ThemeColors'
 import { DetailTopBar } from '../components/DetailTopBar'
 import { NoMoreFooter } from '../components/NoMoreFooter'
 import { resizeImageUrl } from '../services/ImageUrl'
+import { Responsive } from '../services/Responsive'
 
 @Component
 export struct NewSongListPage {
@@ -19,6 +20,8 @@ export struct NewSongListPage {
   @State scrollOffset: number = 0
   /** 播放全部行是否已冻结在顶栏下沿（只在跨阈值时翻转）。 */
   @State private frozen: boolean = false
+  /** 页面宽度：大屏上歌曲列表分两列，一屏展示更多，而不是把每行拉长。 */
+  @State private viewWidth: number = 0
   private scroller: Scroller = new Scroller()
 
   aboutToAppear(): void {
@@ -171,6 +174,7 @@ export struct NewSongListPage {
                 })
               }
               .width('100%').scrollBar(BarState.Off)
+              .lanes(this.viewWidth >= Responsive.EXPANDED ? 2 : 1, 12)
             }
             NoMoreFooter()
           }
@@ -201,6 +205,10 @@ export struct NewSongListPage {
         }
       }
       .width('100%').height('100%').backgroundColor(TC.pageBackground())
+      .onAreaChange((_old: Area, area: Area) => {
+        const width = Number(area.width)
+        if (width !== this.viewWidth) { this.viewWidth = width }
+      })
     }
     .hideTitleBar(true)
   }
