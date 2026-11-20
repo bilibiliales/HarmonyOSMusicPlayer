@@ -6,6 +6,14 @@
 - 登录：手机号密码、短信验证码、二维码扫码三种方式。
 - 手机号未注册时在登录页自动进入昵称、验证码和密码补全流程，不提供独立注册入口。
 - 推荐歌单、新歌、Banner、搜索、用户资料、用户歌单、歌单详情与歌曲列表。
+- 发现页（`/homepage/block/page`）**不解析 `orpheus://` 深链**（`services/OrpheusLink.ets` 已删除）：
+  卡片只按 `resourceType` + 纯数字 id 判断能否走原生页面——`song` 直接进播放队列（无歌曲对象时经
+  `/song/detail` 补详情），`program`/`djradio` 进电台页，`digitalAlbum` 进数字专辑详情，其余同理。
+  认不出的类型（`event_topic / concert / fm_radio / orpheus / 网页 / 小程序`）、缺 id 的死链、
+  以及任何必须开网页的入口，由 `Find.isOpenableResource` 在 `normalizeBlock` 阶段整条过滤掉，
+  过滤后为空的 creative / block 一并丢弃；区块标题只做展示，没有箭头也不可点击。
+  Banner 只保留 `targetType = 1 / 10 / 1000 / 1004 / 1005`，网页类活动整条不显示。
+  全程不引入 ArkWeb，也不 `openLink` 跳浏览器。
 - 基于 `AVPlayer` 的真实音频播放、进度跳转、上一首/下一首。
 - 在线播放与下载均为流式：CDN 支持 Range/206，播放按需分段取数（有界内存），下载分块直接写盘，不再把 100MB+ FLAC 整曲载入内存。
 - 流式播放可在设置中关闭（默认开启）；关闭后回退为整曲载入内存再播放的旧策略（`MemoryAudioSource`/`MemoryAudioLoad`），用于兼容无法消费流式 `dataSrc` 的旧设备 / 虚拟机。流式开关是 `playAt` 的**外层分支**：开关 ON 时按 `resource.size` 选择 `StreamingAudioSource`（有界流式）或 `player.url` 直连（直播/电台等无 size 的流）；开关 OFF 时**始终**走 `MemoryAudioLoad` 整曲加载（不受 `resource.size` 影响，绝不走 `player.url`），即“完整加载到内存之前一直是加载状态”。

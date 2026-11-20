@@ -1,7 +1,9 @@
 import {
   AlbumPageParam,
+  ArtistPageParam,
   BannerItem,
   BannerResponse,
+  DigitalAlbumDetailPageParam,
   HomeBlockView,
   HomeCreativeView,
   HomepageBlock,
@@ -10,11 +12,15 @@ import {
   HomepageResource,
   HomepageUiElement,
   HomeResourceView,
+  MvPlayerPageParam,
   mapApiSong,
   playlistType,
+  RadioPageParam,
+  SongDetailResponse,
   songItemType
 } from '../models'
 import { ApiClient } from '../services/ApiClient'
+import { BubbleTip } from '../services/BubbleTip'
 import { DiscoveryPlaylistsService } from '../services/DiscoveryPlaylistsService'
 import { playerController } from '../services/PlayerController'
 import { resizeImageUrl } from '../services/ImageUrl'
@@ -116,6 +122,23 @@ struct Find {
     }
   }
 
+  /**
+   * 这条卡片在本应用里有没有真正的落点。
+   * 只看 resourceType + 数字 id：深链（orpheus://）不再解析，认不出的类型一律不显示。
+   */
+  private isOpenableResource(item: HomeResourceView): boolean {
+    if (item.song) {
+      return true
+    }
+    const type = (item.resourceType || '').toLowerCase()
+    if (type === 'list' || type === 'playlist' || type === 'album' || type === 'digitalalbum' ||
+      type === 'voice' || type === 'program' || type === 'djradio' || type === 'radio' ||
+      type === 'artist' || type === 'mv' || type === 'video' || type === 'song') {
+      return this.isNumericId(item.id)
+    }
+    return false
+  }
+
   private normalizeBlock(block: HomepageBlock, blockIndex: number): HomeBlockView {
     const creativeViews: HomeCreativeView[] = []
     const creatives = block.creatives || []
@@ -124,7 +147,12 @@ struct Find {
       const items: HomeResourceView[] = []
       const resources = creative.resources || []
       for (let resourceIndex = 0; resourceIndex < resources.length; resourceIndex++) {
-        items.push(this.normalizeResource(resources[resourceIndex], creative))
+        const view = this.normalizeResource(resources[resourceIndex], creative)
+        // 打不开的卡片（网页活动、话题、小程序、缺 id 的死链）直接丢掉，不留「点了没反应」的入口
+        if (!this.isOpenableResource(view)) {
+          continue
+        }
+        items.push(view)
       }
       if (items.length > 0) {
         creativeViews.push({
@@ -136,6 +164,7 @@ struct Find {
     }
     return {
       key: block.blockCode || `block-${blockIndex}`,
+      blockCode: block.blockCode || '',
       title: this.subtitleOf(block.uiElement) || this.titleOf(block.uiElement) || '为你推荐',
       showType: block.showType || '',
       creativeType: creatives.length > 0 ? (creatives[0].creativeType || '') : '',
@@ -175,11 +204,27 @@ struct Find {
     }
   }
 
+  /** 只保留能跳进原生页面的 banner；网页活动（targetType 3000 等）整条不显示。 */
+  private isOpenableBanner(item: BannerItem): boolean {
+    if (item.targetId <= 0) {
+      return false
+    }
+    const type = item.targetType
+    return type === 1 || type === 10 || type === 1000 || type === 1004 || type === 1005
+  }
+
   private async loadBanners(): Promise<void> {
     try {
       const response = await ApiClient.get<BannerResponse>('/banner', [{ key: 'type', value: '1' }])
       if (response.code === 200 && response.banners?.length) {
-        this.banners = response.banners
+        const openable: BannerItem[] = []
+        for (let i = 0; i < response.banners.length; i++) {
+          const item = response.banners[i]
+          if (this.isOpenableBanner(item)) {
+            openable.push(item)
+          }
+        }
+        this.banners = openable
       }
     } catch (_error) {
     }
@@ -196,46 +241,145 @@ struct Find {
     return value.toString()
   }
 
-  private openPlaylist(item: HomeResourceView): void {
+  private toast(message: string): void {
+    BubbleTip.show(this.getUIContext(), message)
+  }
+
+  private isNumericId(value: string): boolean {
+    if (!value || value.length === 0) {
+      return false
+    }
+    for (let i = 0; i < value.length; i++) {
+      const code = value.charCodeAt(i)
+      if (code < 48 || code > 57) {
+        return false
+      }
+    }
+    return true
+  }
+
+  private openPlaylistAt(id: string, title: string, cover: string): boolean {
+    if (!this.isNumericId(id)) {
+      return false
+    }
     const playlist: playlistType = {
-      id: item.id,
-      name: item.title,
-      cover: item.image,
+      id: id,
+      name: title.length > 0 ? title : '推荐歌单',
+      cover: cover,
       count: 0,
       creator: '网易云音乐'
     }
     this.pageStack.pushPathByName('PlaylistDetailPage', playlist)
+    return true
   }
 
-  private openAlbum(item: HomeResourceView): void {
+  private openAlbumAt(id: string, title: string, cover: string, artist: string): boolean {
+    if (!this.isNumericId(id)) {
+      return false
+    }
     const param: AlbumPageParam = {
-      id: item.id,
-      name: item.title,
-      picUrl: item.image,
-      artist: item.subtitle
+      id: id,
+      name: title,
+      picUrl: cover,
+      artist: artist
     }
     this.pageStack.pushPathByName('AlbumDetailPage', param)
+    return true
+  }
+
+  private openDigitalAlbumAt(id: string, title: string, cover: string, artist: string): boolean {
+    if (!this.isNumericId(id)) {
+      return false
+    }
+    const param: DigitalAlbumDetailPageParam = {
+      albumId: parseInt(id, 10),
+      albumName: title,
+      artistName: artist,
+      coverUrl: cover
+    }
+    this.pageStack.pushPathByName('DigitalAlbumDetailPage', param)
+    return true
+  }
+
+  private openArtistAt(id: string, name: string, pic: string): boolean {
+    if (!this.isNumericId(id)) {
+      return false
+    }
+    const param: ArtistPageParam = { id: id, name: name, picUrl: pic }
+    this.pageStack.pushPathByName('ArtistPage', param)
+    return true
+  }
+
+  private openMvAt(id: string, name: string, cover: string, artist: string): boolean {
+    if (!this.isNumericId(id)) {
+      return false
+    }
+    const param: MvPlayerPageParam = {
+      isVideo: false,
+      id: id,
+      name: name.length > 0 ? name : 'MV',
+      cover: cover,
+      artistName: artist
+    }
+    this.pageStack.pushPathByName('MvPlayerPage', param)
+    return true
+  }
+
+  private openProgramAt(id: string, name: string, cover: string): boolean {
+    if (!this.isNumericId(id)) {
+      return false
+    }
+    const param: RadioPageParam = { id: id, name: name, cover: cover }
+    this.pageStack.pushPathByName('RadioProgramPage', param)
+    return true
+  }
+
+  private openRadioAt(id: string, name: string, cover: string): boolean {
+    if (!this.isNumericId(id)) {
+      return false
+    }
+    const param: RadioPageParam = { id: id, name: name, cover: cover }
+    this.pageStack.pushPathByName('RadioDetailPage', param)
+    return true
+  }
+
+  /** 只有 id 没有歌曲对象时，按 id 拉一次详情再播。 */
+  private async playSongAt(id: string): Promise<void> {
+    if (!this.isNumericId(id)) {
+      return
+    }
+    try {
+      const response = await ApiClient.get<SongDetailResponse>('/song/detail', [
+        { key: 'ids', value: id }
+      ])
+      const songs = response.songs || []
+      if (response.code !== 200 || songs.length === 0) {
+        this.toast('这首歌暂时打不开')
+        return
+      }
+      await playerController.setQueue([mapApiSong(songs[0])], 0, true)
+    } catch (error) {
+      this.toast(error instanceof Error ? error.message : '这首歌暂时打不开')
+    }
   }
 
   private openBanner(item: BannerItem): void {
     if (item.targetType === 1000 && item.targetId > 0) {
-      const playlist: playlistType = {
-        id: item.targetId.toString(),
-        name: item.typeTitle || '推荐歌单',
-        cover: item.pic,
-        count: 0,
-        creator: '网易云音乐'
-      }
-      this.pageStack.pushPathByName('PlaylistDetailPage', playlist)
-    } else if (item.targetType === 10 && item.targetId > 0) {
-      const param: AlbumPageParam = {
-        id: item.targetId.toString(),
-        name: item.typeTitle || '推荐专辑',
-        picUrl: item.pic,
-        artist: ''
-      }
-      this.pageStack.pushPathByName('AlbumDetailPage', param)
+      this.openPlaylistAt(item.targetId.toString(), item.typeTitle, item.pic)
+      return
     }
+    if (item.targetType === 10 && item.targetId > 0) {
+      this.openAlbumAt(item.targetId.toString(), item.typeTitle, item.pic, '')
+      return
+    }
+    if (item.targetType === 1 && item.targetId > 0) {
+      this.playSongAt(item.targetId.toString())
+      return
+    }
+    if ((item.targetType === 1004 || item.targetType === 1005) && item.targetId > 0) {
+      this.openMvAt(item.targetId.toString(), item.typeTitle, item.pic, '')
+    }
+    // 网页类 banner 已在 loadBanners() 里过滤，这里不需要兜底跳浏览器
   }
 
   private async playResource(block: HomeBlockView, item: HomeResourceView): Promise<void> {
@@ -259,13 +403,47 @@ struct Find {
   }
 
   private openResource(block: HomeBlockView, item: HomeResourceView): void {
-    if (item.resourceType === 'list') {
-      this.openPlaylist(item)
-    } else if (item.resourceType === 'album') {
-      this.openAlbum(item)
-    } else if (item.song || item.resourceType === 'song') {
-      this.playResource(block, item)
+    const type = (item.resourceType || '').toLowerCase()
+    if (type === 'list' || type === 'playlist') {
+      if (this.openPlaylistAt(item.id, item.title, item.image)) {
+        return
+      }
+    } else if (type === 'album') {
+      if (this.openAlbumAt(item.id, item.title, item.image, item.subtitle)) {
+        return
+      }
+    } else if (type === 'digitalalbum') {
+      if (this.openDigitalAlbumAt(item.id, item.title, item.image, item.subtitle)) {
+        return
+      }
+    } else if (type === 'voice' || type === 'program') {
+      if (this.openProgramAt(item.id, item.title, item.image)) {
+        return
+      }
+    } else if (type === 'djradio' || type === 'radio') {
+      if (this.openRadioAt(item.id, item.title, item.image)) {
+        return
+      }
+    } else if (type === 'artist') {
+      if (this.openArtistAt(item.id, item.title, item.image)) {
+        return
+      }
+    } else if (type === 'mv' || type === 'video') {
+      if (this.openMvAt(item.id, item.title, item.image, item.subtitle)) {
+        return
+      }
     }
+
+    // 有歌曲对象就直接进播放队列（歌单里点某一首的体验）
+    if (item.song) {
+      this.playResource(block, item)
+      return
+    }
+    if (type === 'song' && this.isNumericId(item.id)) {
+      this.playSongAt(item.id)
+      return
+    }
+    // 没有原生落点：卡片已在 normalizeBlock() 里被过滤掉，这里静默返回
   }
 
   @Builder
@@ -305,11 +483,11 @@ struct Find {
       .scrollable(ScrollDirection.Horizontal).scrollBar(BarState.Off)
   }
 
+  /** 区块标题只做展示：深链一概不解析，所以没有箭头、也不可点击。 */
   @Builder
   private BlockTitle(title: string) {
     Row() {
       Text(title).layoutWeight(1).fontSize(19).fontWeight(FontWeight.Bold).fontColor(TC.textBody())
-      SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(15).fontColor([TC.textQuaternary()])
     }
     .width('100%').padding({ left: 16, right: 16, top: 24, bottom: 11 })
   }

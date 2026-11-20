@@ -145,10 +145,19 @@ export interface HomepageImage {
   imageUrl?: string
 }
 
+/** 区块右上角按钮（「查看更多 / 播放全部」），带客户端深链。 */
+export interface HomepageButton {
+  action?: string
+  actionType?: string
+  text?: string
+  iconUrl?: string
+}
+
 export interface HomepageUiElement {
   mainTitle?: HomepageTitle
   subTitle?: HomepageTitle
   image?: HomepageImage
+  button?: HomepageButton
 }
 
 export interface HomepageResourceExtInfo {
@@ -162,6 +171,9 @@ export interface HomepageResource {
   resourceType?: string
   resourceId?: string
   resourceUrl?: string
+  /** 客户端深链（orpheus://…）。本应用不解析深链，字段仅用于描述载荷，不参与跳转。 */
+  action?: string
+  actionType?: string
   uiElement?: HomepageUiElement
   resourceExtInfo?: HomepageResourceExtInfo
 }
@@ -175,6 +187,9 @@ export interface HomepageCreative {
 export interface HomepageBlock {
   blockCode?: string
   showType?: string
+  /** 整个区块的入口深链（通常是「查看更多」）。本应用不解析，不参与跳转。 */
+  action?: string
+  actionType?: string
   uiElement?: HomepageUiElement
   creatives?: HomepageCreative[]
 }
@@ -209,6 +224,8 @@ export interface HomeCreativeView {
 
 export interface HomeBlockView {
   key: string
+  /** 原始区块编码，用于少量特殊区块的判断。 */
+  blockCode: string
   title: string
   showType: string
   creativeType: string
