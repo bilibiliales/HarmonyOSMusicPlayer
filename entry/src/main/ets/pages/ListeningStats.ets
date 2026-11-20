@@ -16,7 +16,7 @@ import { ApiClient } from '../services/ApiClient'
 import { AuthStore } from '../stores/AuthStore'
 import {
   buildListeningPeriod, ListeningDay, ListeningPeriod, listeningDayBackground, listeningDayColor,
-  listeningPeriodOffsetLabel, listeningPeriodTitle, periodEndTimestamp
+  listeningPeriodEnd, listeningPeriodOffsetLabel, listeningPeriodStart, listeningPeriodTitle, listeningTimeValue
 } from '../services/ListeningFootprint'
 import { TC } from '../services/ThemeColors'
 
@@ -37,10 +37,15 @@ export struct ListeningStatsPage {
   @State selectedDay: string = ''
   @State weekMessage: string = ''
   @State monthMessage: string = ''
-  /** 0 = 当前周期；负数 = 往前翻了几个周期。周、月各自独立。 */
+  /** 0 = 本周/本月（不传 endTime）；负数 = 往前翻了几个周期。周、月各自独立。 */
   @State weekOffset: number = 0
   @State monthOffset: number = 0
   @State switching: boolean = false
+  /** 不带 endTime 请求返回的 endTime，作为所有翻页的唯一基准（毫秒）。 */
+  @State weekBaseEnd: number = 0
+  @State monthBaseEnd: number = 0
+  /** 每次数据落到界面上自增：用来重建下面的整块内容，避免参数化 @Builder 复用到旧值。 */
+  @State dataRevision: number = 0
 
   /** 已翻过的周期缓存，来回切换不再重复请求。 */
   private reportCache: Map<string, ListenReportData> = new Map<string, ListenReportData>()
@@ -49,13 +54,56 @@ export struct ListeningStatsPage {
   private cacheKey(period: string, offset: number): string { return `${period}:${offset}` }
   private offsetFor(period: string): number { return period === 'week' ? this.weekOffset : this.monthOffset }
   private activeOffset(): number { return this.offsetFor(this.currentPeriod) }
+  private baseEndFor(period: string): number { return period === 'week' ? this.weekBaseEnd : this.monthBaseEnd }
+
   /**
-   * 按接口约定算出所选周期的 endTime（毫秒）：
-   * 周=该周周六 0 点、月=该月最后一天 0 点；offset<0 往前翻。
-   * 严格用顶部选中的周期计算，保证请求与展示一致。
+   * 只用接口基准递减：offset=0 不传 endTime，offset<0 从「接口返回的本周/本月 endTime」往前推。
+   * 不按本地今天推算——接口的周/月切分和本地未必一致，自己算会和数据错位。
    */
   private endTimeFor(period: string, offset: number): number {
-    return periodEndTimestamp(period, offset)
+    return listeningPeriodEnd(period, this.baseEndFor(period), offset)
+  }
+
+  /** 当前选中的周期第一天（画日期网格用），与 endTime 同源。 */
+  private periodStartFor(period: string, offset: number): Date | null {
+    const base = this.baseEndFor(period)
+    if (base <= 0) { return null }
+    return listeningPeriodStart(period, base, offset)
+  }
+
+  /** 首次（不传 endTime）成功后记录基准；缺 endTime 时用 startTime 补算。 */
+  private calibrateBase(period: string, data: ListenReportData): void {
+    let end = listeningTimeValue(data.endTime)
+    const start = listeningTimeValue(data.startTime)
+    if (end <= 0 && start > 0) {
+      if (period === 'week') {
+        end = start + 6 * 24 * 60 * 60 * 1000
+      } else {
+        const d = new Date(start)
+        const days = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate()
+        end = start + (days - 1) * 24 * 60 * 60 * 1000
+      }
+    }
+    if (end <= 0) { return }
+    if (period === 'week') { this.weekBaseEnd = end } else { this.monthBaseEnd = end }
+  }
+
+  /**
+   * 返回的数据是否就是请求的那个周期。
+   * 服务端万一忽略 endTime 又回了默认的本周/本月，界面会出现「标题是上周、数据是本周」，
+   * 所以这里按 startTime 做一次校验（拿不到 startTime 时只能信任服务端）。
+   */
+  private matchesPeriod(period: string, offset: number, data: ListenReportData): boolean {
+    const start = listeningTimeValue(data.startTime)
+    if (start <= 0) { return true }
+    const expected = this.periodStartFor(period, offset)
+    if (!expected) { return true }
+    const actual = new Date(start)
+    if (period === 'month') {
+      return actual.getFullYear() === expected.getFullYear() && actual.getMonth() === expected.getMonth()
+    }
+    // 周边界可能因时区/零点差一天，给 1.5 天容差
+    return Math.abs(actual.getTime() - expected.getTime()) <= 36 * 60 * 60 * 1000
   }
 
   private activeReport(): ListenReportData | null { return this.currentPeriod === 'week' ? this.weekReport : this.monthReport }
@@ -65,7 +113,7 @@ export struct ListeningStatsPage {
   private activeChartTitle(): string {
     const chart = this.activeChart()
     return chart ? chart.title :
-      listeningPeriodTitle(this.currentPeriod, this.activeOffset())
+      listeningPeriodTitle(this.currentPeriod, this.baseEndFor(this.currentPeriod), this.activeOffset())
   }
 
   /** 下一周期：最多回到最新的本周/本月，不能翻到未来。 */
@@ -97,11 +145,11 @@ export struct ListeningStatsPage {
     this.switching = false
   }
 
-  private async fetchReport(period: string, endTime: number): Promise<ListenReportResponse> {
+  private async fetchReport(period: string, endTime: number, seconds: boolean): Promise<ListenReportResponse> {
     const params: ApiParam[] = [{ key: 'type', value: period }]
     if (endTime > 0) {
-      // endTime 统一按秒传；接口需要毫秒时由调用方再补一次
-      params.push({ key: 'endTime', value: Math.floor(endTime / 1000).toString() })
+      // 先按毫秒传（与接口返回的 endTime 同单位），空数据时再退回秒
+      params.push({ key: 'endTime', value: (seconds ? Math.floor(endTime / 1000) : endTime).toString() })
     }
     return await ApiClient.get<ListenReportResponse>('/listen/data/report', params)
   }
@@ -110,9 +158,12 @@ export struct ListeningStatsPage {
     // 异步返回时用户可能已翻到别的周期，此时结果只留在缓存里，不覆盖当前展示
     if (this.offsetFor(period) !== offset) { return }
     const monthly = period === 'month'
-    // 日期网格与标题一律以接口返回的 startTime 为准，不再用本地日期推算
+    // 网格优先用接口返回的 startTime（那是这份数据的权威周期）；
+    // 只有接口没给 startTime 时，才用与 endTime 同源的周期起点兜底，保证不会画错月份。
+    const hasApiStart = data !== null && listeningTimeValue(data.startTime) > 0
+    const start = !hasApiStart && offset !== 0 ? this.periodStartFor(period, offset) : null
     let chart: ListeningPeriod | null = null
-    if (data) { chart = buildListeningPeriod(data, monthly) }
+    if (data) { chart = buildListeningPeriod(data, monthly, new Date(), start ?? undefined) }
     if (period === 'week') {
       this.weekReport = data
       this.weekChart = chart
@@ -122,6 +173,7 @@ export struct ListeningStatsPage {
       this.monthChart = chart
       this.monthMessage = errorMessage
     }
+    this.dataRevision++
   }
 
   private async loadReport(period: string, offset: number): Promise<void> {
@@ -135,20 +187,32 @@ export struct ListeningStatsPage {
       return
     }
     const endTime = this.endTimeFor(period, offset)
+    // 翻到历史周期却还没有基准（本周/本月还没回来）：不要发不带 endTime 的请求，
+    // 否则会把「本周」的数据当成历史周期显示。
+    if (offset !== 0 && endTime <= 0) {
+      // 不写缓存：等基准到了再次点击就能正常请求
+      this.applyReport(period, offset, null, '本周数据还没加载完成，稍后再试')
+      return
+    }
     try {
-      let response = await this.fetchReport(period, endTime)
-      // 时间戳单位自适应：秒级返回空时再尝试毫秒
-      if (endTime > 0 && (response.code !== 200 || !response.data)) {
-        const params: ApiParam[] = [
-          { key: 'type', value: period },
-          { key: 'endTime', value: endTime.toString() }
-        ]
-        response = await ApiClient.get<ListenReportResponse>('/listen/data/report', params)
+      let response = await this.fetchReport(period, endTime, false)
+      let data = response.data
+      // 毫秒没拿到「该周期的」数据时退回秒级再试一次
+      if (endTime > 0 && (response.code !== 200 || !data || !this.matchesPeriod(period, offset, data))) {
+        const retry = await this.fetchReport(period, endTime, true)
+        if (retry.code === 200 && retry.data && this.matchesPeriod(period, offset, retry.data)) {
+          response = retry
+          data = retry.data
+        }
       }
-      const data = response.data
       if (response.code !== 200 || !data) {
         throw new Error(response.message || '暂无该周期的听歌足迹')
       }
+      // 服务端忽略了 endTime、回的还是当前周期：宁可显示暂无，也不要张冠李戴
+      if (!this.matchesPeriod(period, offset, data)) {
+        throw new Error('该周期暂无听歌足迹')
+      }
+      if (offset === 0) { this.calibrateBase(period, data) }
       this.reportCache.set(key, data)
       this.applyReport(period, offset, data, '')
     } catch (error) {
@@ -644,29 +708,33 @@ export struct ListeningStatsPage {
           .layoutWeight(1).justifyContent(FlexAlign.Center).padding(24)
         } else {
           Scroll() {
-            Column({ space: 16 }) {
+            // 用周期 + 数据版本做 key：换周期或新数据到达时整块重建，
+            // 避免有参 @Builder 复用旧值导致「标题变了、下面还是上一份数据」。
+            ForEach([`${this.currentPeriod}:${this.activeOffset()}:${this.dataRevision}`], (token: string) => {
+              Column({ space: 16 }) {
 
-              if (this.activeChart()) {
-                // 周期标题只保留导航条那一份；label 随周期变化，强制有参 builder 重建
-                if (this.currentPeriod === 'week' && this.weekChart) {
-                  this.DurationCard(this.weekChart, this.periodLabel())
-                  this.ReportDetail(this.weekReport, this.periodLabel())
-                } else if (this.currentPeriod === 'month' && this.monthChart) {
-                  this.DurationCard(this.monthChart, this.periodLabel())
-                  this.ReportDetail(this.monthReport, this.periodLabel())
+                if (this.activeChart()) {
+                  if (this.currentPeriod === 'week' && this.weekChart) {
+                    this.DurationCard(this.weekChart, this.periodLabel())
+                    this.ReportDetail(this.weekReport, this.periodLabel())
+                  } else if (this.currentPeriod === 'month' && this.monthChart) {
+                    this.DurationCard(this.monthChart, this.periodLabel())
+                    this.ReportDetail(this.monthReport, this.periodLabel())
+                  }
+                } else {
+                  Text(this.activeMessage() || '暂无该周期的听歌数据').width('100%').fontSize(13)
+                    .fontColor(TC.textSecondary()).textAlign(TextAlign.Center).padding(24)
+                  Button('重新加载').fontColor(TC.textOnAccent()).backgroundColor(TC.accent())
+                    .onClick(() => this.retryCurrent())
                 }
-              } else {
-                Text(this.activeMessage() || '暂无该周期的听歌数据').width('100%').fontSize(13)
-                  .fontColor(TC.textSecondary()).textAlign(TextAlign.Center).padding(24)
-                Button('重新加载').fontColor(TC.textOnAccent()).backgroundColor(TC.accent())
-                  .onClick(() => this.retryCurrent())
-              }
 
-              Text('听歌足迹数据由网易云接口提供，部分账号或数据维度可能需要会员权益。')
-                .width('100%').fontSize(11).lineHeight(18).fontColor(TC.textQuaternary())
-                .padding(16).backgroundColor(TC.surfaceCardAlt()).borderRadius(16)
-            }
-            .padding({ left: 16, right: 16, top: 12, bottom: 32 })
+                Text('听歌足迹数据由网易云接口提供，部分账号或数据维度可能需要会员权益。')
+                  .width('100%').fontSize(11).lineHeight(18).fontColor(TC.textQuaternary())
+                  .padding(16).backgroundColor(TC.surfaceCardAlt()).borderRadius(16)
+              }
+              .width('100%')
+              .padding({ left: 16, right: 16, top: 12, bottom: 32 })
+            }, (token: string) => token)
           }
           .layoutWeight(1)
         }

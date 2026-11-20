@@ -38,7 +38,7 @@ import { AuthStore } from '../stores/AuthStore'
 import { PlayerStore } from '../stores/PlayerStore'
 import { ShareSheet } from '../components/ShareSheet'
 import { VinylRecord } from '../components/VinylRecord'
-import { PlayerBackdrop } from '../components/PlayerBackdrop'
+import { PlayerBackdrop, PlayerAboveLayers } from '../components/PlayerBackdrop'
 import { HeartBurst } from '../components/HeartBurst'
 import { RingtonePageParam } from './RingtonePage'
 import { PlayerStyleConfig } from '../models/decoration'
@@ -2253,6 +2253,9 @@ export struct Play {
         }
         .width('100%').height('100%').scrollBar(BarState.Off)
         .scrollable(this.lyricsImmersive ? ScrollDirection.None : ScrollDirection.Vertical)
+
+        // 标了「叠在黑胶上层」的图层画在这里：盖住旋转唱片，但仍在半模态之下
+        PlayerAboveLayers({ style: this.playerStyle })
 
         if (this.activeSheet) {
           this.BottomSheet()

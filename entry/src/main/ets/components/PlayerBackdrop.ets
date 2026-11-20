@@ -2,6 +2,12 @@ import { PlayerLayer, PlayerStyleConfig } from '../models/decoration'
 import { DecorationMedia } from '../services/DecorationMedia'
 import { TC } from '../services/ThemeColors'
 
+/** 图层的宽高比：w / h 都是「按舞台宽度」的百分比，所以宽高比就是 w:h。 */
+function layerAspect(layer: PlayerLayer): number {
+  if (layer.w <= 0 || layer.h <= 0) { return 1 }
+  return layer.w / layer.h
+}
+
 /**
  * 播放页全屏背景：背景色 / 图片 / 循环视频 / 用户图层 / 可读性蒙版。
  *
@@ -22,11 +28,17 @@ export struct PlayerBackdrop {
     return this.style.bgVideo.length > 0 || this.style.bgImage.length > 0 || this.style.bgColor.length > 0
   }
 
+  /** 背景层图层：压在黑胶与所有内容后面。 */
+  private backLayers(): PlayerLayer[] {
+    return this.style.layers.filter((layer: PlayerLayer) => layer.above !== true)
+  }
+
   @Builder
   private LayerView(layer: PlayerLayer) {
     Image(DecorationMedia.displayUri(layer.src))
       .width(`${layer.w}%`)
-      .height(`${layer.h}%`)
+      // h 与 w 一样是「按舞台宽度」的百分比，用宽高比换算，才能和编辑器预览完全一致
+      .aspectRatio(layerAspect(layer))
       .objectFit(ImageFit.Contain)
       .rotate({ angle: layer.rotation })
       .opacity(Math.max(0, Math.min(100, layer.opacity)) / 100)
@@ -84,7 +96,7 @@ export struct PlayerBackdrop {
         Column().width('100%').height('100%').backgroundColor(this.scrimColor())
       }
 
-      ForEach(this.style.layers, (layer: PlayerLayer) => {
+      ForEach(this.backLayers(), (layer: PlayerLayer) => {
         this.LayerView(layer)
       }, (layer: PlayerLayer) => layer.id)
 
@@ -104,5 +116,38 @@ export struct PlayerBackdrop {
     .width('100%')
     .height('100%')
     .clip(true)
+  }
+}
+
+/**
+ * 前景图层：盖在旋转黑胶之上的一层贴图。
+ *
+ * 与背景层共用同一套百分比坐标，所以编辑器里摆在唱片上的位置，播放页就是同一个位置；
+ * 整层 `hitTestBehavior(None)`，不会挡住播放页上的手势与按钮。
+ */
+@Component
+export struct PlayerAboveLayers {
+  @StorageProp('skinVersion') skinVersionObs: number = 0
+  @Prop style: PlayerStyleConfig = new PlayerStyleConfig()
+
+  private frontLayers(): PlayerLayer[] {
+    return this.style.layers.filter((layer: PlayerLayer) => layer.above === true)
+  }
+
+  build() {
+    Stack({ alignContent: Alignment.TopStart }) {
+      ForEach(this.frontLayers(), (layer: PlayerLayer) => {
+        Image(DecorationMedia.displayUri(layer.src))
+          .width(`${layer.w}%`)
+          .aspectRatio(layerAspect(layer))
+          .objectFit(ImageFit.Contain)
+          .rotate({ angle: layer.rotation })
+          .opacity(Math.max(0, Math.min(100, layer.opacity)) / 100)
+          .position({ x: `${layer.x}%`, y: `${layer.y}%` })
+      }, (layer: PlayerLayer) => `front-${layer.id}`)
+    }
+    .width('100%')
+    .height('100%')
+    .hitTestBehavior(HitTestMode.None)
   }
 }

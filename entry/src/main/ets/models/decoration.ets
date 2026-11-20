@@ -224,6 +224,12 @@ export class PlayerLayer {
   rotation: number = 0
   /** 不透明度 0-100。 */
   opacity: number = 100
+  /**
+   * 是否叠在黑胶唱片上层。
+   * false（默认）= 背景层，压在唱片后面，可用来铺氛围 / 光效；
+   * true = 前景层，盖在旋转唱片上面，可用来做边缘装饰、人物立绘、贴纸，或只露出唱片一角。
+   */
+  above: boolean = false
 }
 
 export class PlayerStyleConfig {
@@ -671,6 +677,8 @@ export class DecorationCodec {
       layer.h = src.h ?? 30
       layer.rotation = src.rotation ?? 0
       layer.opacity = src.opacity ?? 100
+      // 旧存档没有这个字段：一律当作背景层，观感与升级前一致
+      layer.above = src.above === true
       out.push(layer)
     }
     return out

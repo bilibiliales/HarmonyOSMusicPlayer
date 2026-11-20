@@ -655,6 +655,8 @@ export struct DecorationEditorPage {
     layer.h = 40
     layer.rotation = 0
     layer.opacity = 100
+    // 默认当背景层：新加的图先压在唱片后面，需要压住唱片再单独打开「叠在黑胶上层」
+    layer.above = false
     this.playerLayers = this.playerLayers.concat([layer])
     this.selectedLayerId = layer.id
   }
@@ -669,6 +671,7 @@ export struct DecorationEditorPage {
     copy.h = src.h
     copy.rotation = src.rotation
     copy.opacity = src.opacity
+    copy.above = src.above
     return copy
   }
 
@@ -1070,6 +1073,11 @@ export struct DecorationEditorPage {
           .hitTestBehavior(HitTestMode.None)
       }
 
+      // 背景层图层：压在黑胶后面
+      ForEach(this.playerLayers.filter((layer: PlayerLayer) => layer.above !== true), (layer: PlayerLayer) => {
+        this.StageLayer(layer)
+      }, (layer: PlayerLayer) => layer.id)
+
       // 黑胶
       Stack({ alignContent: Alignment.Center }) {
         if (this.vinylImage) {
@@ -1102,8 +1110,8 @@ export struct DecorationEditorPage {
         y: this.stageH * 0.34 - this.stageVinylSize() / 2 + this.vinylY
       })
 
-      // 用户图层
-      ForEach(this.playerLayers, (layer: PlayerLayer) => {
+      // 前景层图层：盖在旋转唱片上面
+      ForEach(this.playerLayers.filter((layer: PlayerLayer) => layer.above === true), (layer: PlayerLayer) => {
         this.StageLayer(layer)
       }, (layer: PlayerLayer) => layer.id)
 
@@ -1243,9 +1251,19 @@ export struct DecorationEditorPage {
         .objectFit(ImageFit.Cover)
         .backgroundColor(TC.surfaceInset())
       Column({ space: 2 }) {
-        Text(layer.id === this.selectedLayerId ? '已选中图层' : '图层')
-          .fontSize(12)
-          .fontColor(layer.id === this.selectedLayerId ? TC.accent() : TC.textBody())
+        Row({ space: 5 }) {
+          Text(layer.id === this.selectedLayerId ? '已选中图层' : '图层')
+            .fontSize(12)
+            .fontColor(layer.id === this.selectedLayerId ? TC.accent() : TC.textBody())
+          if (layer.above === true) {
+            Text('上层')
+              .fontSize(9)
+              .fontColor(TC.accentSoft())
+              .padding({ left: 4, right: 4, top: 1, bottom: 1 })
+              .backgroundColor(TC.accentContainer())
+              .borderRadius(4)
+          }
+        }
         Text(`位置 ${Math.round(layer.x)},${Math.round(layer.y)}  大小 ${Math.round(layer.w)}%`)
           .fontSize(10)
           .fontColor(TC.textTertiary())
@@ -1270,6 +1288,13 @@ export struct DecorationEditorPage {
   @Builder
   private LayerParams(layer: PlayerLayer) {
     Column({ space: 8 }) {
+      DecoToggleRow({
+        label: '叠在黑胶唱片上层', isOn: layer.above === true,
+        onChange: (value: boolean) => this.updateSelected((copy: PlayerLayer) => { copy.above = value })
+      })
+      Text(layer.above === true ? '前景层：会盖住旋转中的唱片，适合做边缘装饰或贴纸'
+        : '背景层：压在唱片后面，适合做光效、氛围或整屏底图')
+        .width('100%').fontSize(10).fontColor(TC.textTertiary())
       DecoSlider({
         label: '左右位置', value: layer.x, min: -20, max: 120, step: 1, unit: '%',
         onChange: (v: number) => this.updateSelected((copy: PlayerLayer) => { copy.x = v })
@@ -1333,7 +1358,7 @@ export struct DecorationEditorPage {
         })
       }
 
-      DecoCard({ title: '图层', hint: '像 PS 一样叠图：可加多个图层，各自位置、大小、旋转与透明度独立' }) {
+      DecoCard({ title: '图层', hint: '像 PS 一样叠图：可加多个图层，各自位置、大小、旋转与透明度独立；勾选「叠在黑胶唱片上层」即可盖在旋转唱片前面' }) {
         Button('添加图层（选图片 / 动图）')
           .width('100%')
           .height(42)
@@ -1350,11 +1375,11 @@ export struct DecorationEditorPage {
         } else {
           ForEach(this.playerLayers, (layer: PlayerLayer) => {
             this.LayerRow(layer)
-          }, (layer: PlayerLayer) => layer.id)
+          }, (layer: PlayerLayer) => `${layer.id}_${layer.above === true ? 'a' : 'b'}`)
 
           ForEach(this.selectedLayers(), (layer: PlayerLayer) => {
             this.LayerParams(layer)
-          }, (layer: PlayerLayer) => `param_${layer.id}`)
+          }, (layer: PlayerLayer) => `param_${layer.id}_${layer.above === true ? 'a' : 'b'}`)
         }
       }
 
