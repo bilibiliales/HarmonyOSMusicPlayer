@@ -708,35 +708,40 @@ export struct ListeningStatsPage {
           .layoutWeight(1).justifyContent(FlexAlign.Center).padding(24)
         } else {
           Scroll() {
-            // 用周期 + 数据版本做 key：换周期或新数据到达时整块重建，
-            // 避免有参 @Builder 复用旧值导致「标题变了、下面还是上一份数据」。
-            ForEach([`${this.currentPeriod}:${this.activeOffset()}:${this.dataRevision}`], (token: string) => {
-              Column({ space: 16 }) {
+            // Scroll 只允许一个子组件，ForEach 包一层 Column 再放进去
+            Column() {
+              // 用周期 + 数据版本做 key：换周期或新数据到达时整块重建，
+              // 避免有参 @Builder 复用旧值导致「标题变了、下面还是上一份数据」。
+              ForEach([`${this.currentPeriod}:${this.activeOffset()}:${this.dataRevision}`], (token: string) => {
+                Column({ space: 16 }) {
 
-                if (this.activeChart()) {
-                  if (this.currentPeriod === 'week' && this.weekChart) {
-                    this.DurationCard(this.weekChart, this.periodLabel())
-                    this.ReportDetail(this.weekReport, this.periodLabel())
-                  } else if (this.currentPeriod === 'month' && this.monthChart) {
-                    this.DurationCard(this.monthChart, this.periodLabel())
-                    this.ReportDetail(this.monthReport, this.periodLabel())
+                  if (this.activeChart()) {
+                    if (this.currentPeriod === 'week' && this.weekChart) {
+                      this.DurationCard(this.weekChart, this.periodLabel())
+                      this.ReportDetail(this.weekReport, this.periodLabel())
+                    } else if (this.currentPeriod === 'month' && this.monthChart) {
+                      this.DurationCard(this.monthChart, this.periodLabel())
+                      this.ReportDetail(this.monthReport, this.periodLabel())
+                    }
+                  } else {
+                    Text(this.activeMessage() || '暂无该周期的听歌数据').width('100%').fontSize(13)
+                      .fontColor(TC.textSecondary()).textAlign(TextAlign.Center).padding(24)
+                    Button('重新加载').fontColor(TC.textOnAccent()).backgroundColor(TC.accent())
+                      .onClick(() => this.retryCurrent())
                   }
-                } else {
-                  Text(this.activeMessage() || '暂无该周期的听歌数据').width('100%').fontSize(13)
-                    .fontColor(TC.textSecondary()).textAlign(TextAlign.Center).padding(24)
-                  Button('重新加载').fontColor(TC.textOnAccent()).backgroundColor(TC.accent())
-                    .onClick(() => this.retryCurrent())
-                }
 
-                Text('听歌足迹数据由网易云接口提供，部分账号或数据维度可能需要会员权益。')
-                  .width('100%').fontSize(11).lineHeight(18).fontColor(TC.textQuaternary())
-                  .padding(16).backgroundColor(TC.surfaceCardAlt()).borderRadius(16)
-              }
-              .width('100%')
-              .padding({ left: 16, right: 16, top: 12, bottom: 32 })
-            }, (token: string) => token)
+                  Text('听歌足迹数据由网易云接口提供，部分账号或数据维度可能需要会员权益。')
+                    .width('100%').fontSize(11).lineHeight(18).fontColor(TC.textQuaternary())
+                    .padding(16).backgroundColor(TC.surfaceCardAlt()).borderRadius(16)
+                }
+                .width('100%')
+                .padding({ left: 16, right: 16, top: 12, bottom: 32 })
+              }, (token: string) => token)
+            }
+            .width('100%')
           }
           .layoutWeight(1)
+          .scrollBar(BarState.Off)
         }
       }
       .width('100%').height('100%').backgroundColor(TC.pageBackground())
