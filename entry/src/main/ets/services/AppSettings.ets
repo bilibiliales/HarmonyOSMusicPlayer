@@ -232,6 +232,42 @@ export class AppSettings {
     await store.flush()
   }
 
+  /**
+   * 重置本地偏好为出厂默认。
+   * 只删偏好类键：登录态（cookie / uid / 昵称 / 头像）与设备别名在同一 preferences 库里，
+   * 不能整库删除，否则会把账号一起清掉。后端地址也单独由「重置后端服务地址」处理。
+   */
+  static async resetLocalSettings(context: common.Context): Promise<void> {
+    const store = await preferences.getPreferences(context, AppSettings.STORE_NAME)
+    const keys: string[] = [
+      'lyric_preferences', 'desktop_lyrics_enabled', 'desktop_lyrics_locked', 'effects_enabled',
+      'download_save_mode', 'ask_download_save_mode', 'background_playback_enabled',
+      'streaming_playback_enabled', 'scrobble_enabled', 'default_play_mode',
+      'default_online_quality', 'default_download_quality',
+      'ai_base_url', 'ai_api_key', 'ai_model'
+    ]
+    for (const key of keys) {
+      await store.delete(key)
+    }
+    await store.flush()
+    AppSettings.lyricPreferences = new LyricPreferences()
+    AppSettings.desktopLyricsEnabled = false
+    AppSettings.desktopLyricsLocked = false
+    AppSettings.effectsEnabled = true
+    AppSettings.downloadSaveMode = 'download'
+    AppSettings.askDownloadSaveMode = true
+    // 后台播放不能只改内存：会话的装载/卸载由 PlayerController 负责，
+    // 由调用方在重置后按需调用 setBackgroundPlayback(true)，否则开关显示 ON 但会话仍是卸载态。
+    AppSettings.streamingPlaybackEnabled = true
+    AppSettings.scrobbleEnabled = true
+    AppSettings.defaultPlayMode = PlayMode.LOOP
+    AppSettings.defaultOnlineQuality = 'exhigh'
+    AppSettings.defaultDownloadQuality = 'exhigh'
+    AppSettings.aiBaseUrl = 'https://api.openai.com/v1'
+    AppSettings.aiApiKey = ''
+    AppSettings.aiModel = 'gpt-3.5-turbo'
+  }
+
   static async saveBackgroundPlayback(context: common.Context, enabled: boolean): Promise<void> {
     const store = await preferences.getPreferences(context, AppSettings.STORE_NAME)
     await store.put(AppSettings.BACKGROUND_PLAYBACK_KEY, enabled)

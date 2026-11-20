@@ -2,8 +2,15 @@ import { http } from '@kit.NetworkKit'
 import { ApiParam } from '../models/api'
 
 export class ApiClient {
+  /** 出厂默认后端地址，用于「重置后端服务地址」还原。 */
+  static readonly DEFAULT_BASE_URL: string = 'https://ncme.scfd.top'
   static baseUrl: string = 'https://ncme.scfd.top'
   static cookie: string = ''
+
+  /** 当前地址是否为出厂默认（用于设置页展示与重置判断）。 */
+  static isDefaultBaseUrl(): boolean {
+    return ApiClient.baseUrl === ApiClient.DEFAULT_BASE_URL
+  }
 
   static setBaseUrl(value: string): void {
     const normalized = value.trim().replace(/\/$/, '')

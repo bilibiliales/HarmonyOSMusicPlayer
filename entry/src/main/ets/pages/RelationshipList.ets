@@ -1,4 +1,5 @@
 import { SkinBackdrop } from '../components/SkinBackdrop'
+import { util } from '@kit.ArkTS'
 import {
   ArtistFanItem,
   ArtistPageParam,
@@ -11,6 +12,7 @@ import {
   OperationResponse,
   SocialUser,
   UserEventItem,
+  UserEventResponse,
   UserFollowedsResponse,
   UserFollowsResponse,
   UserProfilePageParam
@@ -48,6 +50,14 @@ interface EventByIdResponse {
   events?: UserEventItem[]
 }
 
+/** showContent.consumeParam 解开后的载荷：f=动态作者 uid，rid=动态 id，t=时间戳。 */
+interface ConsumeParamData {
+  f?: number
+  rid?: string
+  rt?: number
+  t?: number
+}
+
 /**
  * 列表行模型：普通用户、歌手、以及混合列表里附带的最近动态，
  * 全部压成同一种结构，列表只按这一种渲染。
@@ -75,6 +85,8 @@ interface RelationRow {
   bubbleId: string
   bubbleTitle: string
   bubbleCover: string
+  /** 气泡里那条动态的作者 uid（用于 /user/event 拉详情），拿不到时为空。 */
+  noteUid: string
 }
 
 @Component
@@ -138,7 +150,8 @@ export struct RelationshipListPage {
       bubbleType: 0,
       bubbleId: '',
       bubbleTitle: '',
-      bubbleCover: ''
+      bubbleCover: '',
+      noteUid: ''
     }
   }
 
@@ -239,6 +252,7 @@ export struct RelationshipListPage {
     let bubbleId = ''
     let bubbleTitle = ''
     let bubbleCover = ''
+    let noteUid = ''
     const show = record.showContent
     if (show) {
       const text: string = show.message || ''
@@ -251,6 +265,14 @@ export struct RelationshipListPage {
           bubbleType = resource.resourceType || 0
           bubbleId = resource.resourceId || ''
           bubbleCover = resource.coverUrl || ''
+        }
+        // consumeParam 里的 f 才是动态真正的作者（歌手行的 userProfile 可能为空）
+        const consume: ConsumeParamData | null = show.consumeParam ? this.decodeConsumeParam(show.consumeParam) : null
+        if (consume !== null) {
+          const fromUid: number = consume.f === undefined ? 0 : consume.f
+          if (fromUid > 0) {
+            noteUid = fromUid.toString()
+          }
         }
       } else {
         showMessage = text
@@ -284,6 +306,7 @@ export struct RelationshipListPage {
     row.bubbleId = bubbleId
     row.bubbleTitle = bubbleTitle
     row.bubbleCover = bubbleCover
+    row.noteUid = noteUid.length > 0 ? noteUid : (userId > 0 ? userId.toString() : '')
     if (signature.length > 0) {
       row.subtitle = signature
     } else if (followDay.length > 0) {
@@ -297,6 +320,27 @@ export struct RelationshipListPage {
   /** 关注态参与 key：状态一变就换 key，单行立刻重绘。 */
   private rowKey(row: RelationRow): string {
     return `${row.key}-${row.followed ? 1 : 0}${row.mutual ? 1 : 0}`
+  }
+
+  /**
+   * 解析 showContent.consumeParam（base64 的 JSON，可能缺 padding / 用 URL 安全字符集）。
+   * 失败一律返回 null，交给调用方兜底。
+   */
+  private decodeConsumeParam(param: string): ConsumeParamData | null {
+    if (param.length === 0) {
+      return null
+    }
+    try {
+      let normalized = param.replace(/-/g, '+').replace(/_/g, '/')
+      while (normalized.length % 4 !== 0) {
+        normalized += '='
+      }
+      const bytes = new util.Base64Helper().decodeSync(normalized, util.Type.BASIC)
+      const text = util.TextDecoder.create('utf-8').decodeToString(bytes)
+      return JSON.parse(text) as ConsumeParamData
+    } catch (_error) {
+      return null
+    }
   }
 
   /* ---------------- 数据加载 ---------------- */
@@ -581,7 +625,7 @@ export struct RelationshipListPage {
 
   private openBubble(row: RelationRow): void {
     if (row.bubbleType === 2) {
-      this.openNote(row.bubbleId)
+      this.openNote(row)
       return
     }
     if (row.bubbleType === 5) {
@@ -592,11 +636,47 @@ export struct RelationshipListPage {
     BubbleTip.show(this.getUIContext(), '这条动态暂时打不开')
   }
 
-  /** 笔记：先按 id 拉详情，再进详情页。 */
-  private async openNote(eventId: string): Promise<void> {
+  /**
+   * 打开气泡里的笔记。
+   * `/event?id=` 拿不到这类动态（服务端会当匿名请求拒掉），改为去作者的动态列表取：
+   * `GET /user/event?uid=&limit=5` 按时间倒序返回，先按 id 精确匹配，
+   * 匹配不到就取第一条（气泡本来就展示该作者的最新动态）。
+   */
+  private async openNote(row: RelationRow): Promise<void> {
+    const eventId = row.bubbleId
     if (eventId.length === 0) {
       return
     }
+    const uid = row.noteUid
+    if (uid.length > 0) {
+      try {
+        // 与实测可用的请求保持一致：只带 uid + limit，不加 lasttime/timestamp，避免代理侧行为差异
+        const response = await ApiClient.get<UserEventResponse>('/user/event', [
+          { key: 'uid', value: uid },
+          { key: 'limit', value: '5' }
+        ])
+        const events: UserEventItem[] = response.events || []
+        if (response.code === 200 && events.length > 0) {
+          const wanted = Number(eventId)
+          let target: UserEventItem = events[0]
+          events.forEach((item: UserEventItem) => {
+            if (item.id === wanted) {
+              target = item
+            }
+          })
+          const param: EventDetailPageParam = { event: target }
+          this.pageStack.pushPathByName('EventDetailPage', param)
+          return
+        }
+      } catch (_error) {
+        // 落到下面的按 id 兜底
+      }
+    }
+    await this.openNoteById(eventId)
+  }
+
+  /** 兜底：知道动态 id 但拿不到作者时，仍按 id 试一次单条详情。 */
+  private async openNoteById(eventId: string): Promise<void> {
     try {
       const response = await ApiClient.get<EventByIdResponse>('/event', [
         { key: 'id', value: eventId }
@@ -631,17 +711,20 @@ export struct RelationshipListPage {
 
   @Builder
   private SceneChips() {
-    Row({ space: 4 }) {
+    Row({ space: 6 }) {
       ForEach(SCENES, (item: SceneOption) => {
         Text(item.label)
-          .fontSize(11)
+          .fontSize(12)
           .fontColor(this.scene === item.value ? TC.textOnAccent() : TC.textSecondary())
-          .padding({ left: 9, right: 9, top: 4, bottom: 4 })
+          .padding({ left: 13, right: 13, top: 5, bottom: 5 })
           .backgroundColor(this.scene === item.value ? TC.accent() : TC.surfaceRaised())
-          .borderRadius(11)
+          .borderRadius(14)
           .onClick(() => this.changeScene(item.value))
       }, (item: SceneOption) => `scene-${item.value}`)
     }
+    .width('100%')
+    .justifyContent(FlexAlign.Center)
+    .padding({ bottom: 8 })
   }
 
   @Builder
@@ -873,32 +956,27 @@ export struct RelationshipListPage {
       Stack() {
         Column() {
           Column().width('100%').height(this.topAvoidHeight)
-          // 场景筛选叠在右侧，标题仍在整行居中
-          Stack({ alignContent: Alignment.End }) {
-            Row() {
-              SymbolGlyph($r('sys.symbol.chevron_left'))
-                .fontSize(24)
-                .fontColor([TC.textPrimary()])
-                .onClick(() => this.pageStack.pop())
-              Text(this.pageParam.title)
-                .layoutWeight(1)
-                .fontSize(18)
-                .fontWeight(FontWeight.Bold)
-                .fontColor(TC.textPrimary())
-                .textAlign(TextAlign.Center)
-              Column().width(24)
-            }
-            .height(56)
-            .width('100%')
-            .padding({ left: 16, right: 16 })
-
-            if (this.isMixedMode()) {
-              this.SceneChips()
-            }
+          // 标题行保持单行居中；场景筛选放在标题下面居中
+          Row() {
+            SymbolGlyph($r('sys.symbol.chevron_left'))
+              .fontSize(24)
+              .fontColor([TC.textPrimary()])
+              .onClick(() => this.pageStack.pop())
+            Text(this.pageParam.title)
+              .layoutWeight(1)
+              .fontSize(18)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(TC.textPrimary())
+              .textAlign(TextAlign.Center)
+            Column().width(24)
           }
           .height(56)
           .width('100%')
-          .padding({ right: this.isMixedMode() ? 16 : 0 })
+          .padding({ left: 16, right: 16 })
+
+          if (this.isMixedMode()) {
+            this.SceneChips()
+          }
 
           if (!this.authStore.loggedIn && !this.isArtistFans()) {
             Column({ space: 14 }) {
