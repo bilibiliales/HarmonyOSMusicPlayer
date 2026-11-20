@@ -22,6 +22,9 @@
 - 用户等级、听歌时长、指定用户歌单与动态页面。
 - “我的-音乐”三级分栏：创建歌单、收藏歌单、收藏专辑。
 - 歌单详情分享/评论/收藏统计操作、歌单内搜索与评论半屏。
+- 听歌识曲：麦克风识曲（3 次 × 5 秒）与本机文件识曲（`AudioViewPicker` 选音频文件）。
+  指纹在隐藏的离线网页引擎里用官方 wasm 计算（`rawfile/audiofp/index.html` + `AudioFingerprintWeb`），
+  文件由网页侧解码、混单声道、重采样到 8kHz 并挑最响的 3 秒，再查 `/audio/match`。
 
 ## 当前无法完整实现或需要额外系统能力
 
@@ -33,6 +36,10 @@
 - 后台播放、锁屏卡片、耳机按键：需要 AVSession 与后台任务配置。
 - 下载到公共“音乐”目录：当前下载到应用沙箱，导出到公共目录需要用户授权和 FilePicker 流程。
 - 登录态持久化：当前 Cookie 在本次应用生命周期内有效，正式版应使用 Preferences/KeyStore 加密保存。
+- 内录识曲（采集其它应用正在播放的声音）：需要 API 26 的 `playbackCaptureMode` +
+  `requestPlaybackCaptureStart()`；当前 SDK 6.1.1(24) 只有已废弃的 `playbackCaptureConfig`，实测拿不到可用音频。
+  **功能暂时下线**，代码保留在 `SongRecognitionPage`（`PLAYBACK_CAPTURE_ENABLED = false`），
+  等 2027 年初把版本下限抬到 API 26 后改回 `true` 即可接回（页面会自动多出「内录识曲」入口）。
 
 ## 联调说明
 

@@ -503,7 +503,7 @@ export struct Sidebar {
 
         Flex({ wrap: FlexWrap.Wrap, justifyContent: FlexAlign.SpaceBetween, alignContent: FlexAlign.SpaceBetween }) {
           ForEach([10, 20, 30, 45, 60, 90], (minutes: number) => {
-            Column({ space: 2 }) {
+            Column({ space: 4 }) {
               Text(`${minutes}`)
                 .fontSize(20)
                 .fontWeight(FontWeight.Bold)
@@ -512,9 +512,9 @@ export struct Sidebar {
                 .fontSize(10)
                 .fontColor(TC.textSecondary())
             }
-            .width(80)
-            .height(80)
-            .borderRadius(40)
+            .width(86)
+            .height(86)
+            .borderRadius(43)
             .backgroundColor(this.selectedMinutes === minutes && this.sleepEnabled ? TC.accent() : TC.surfaceInset())
             .justifyContent(FlexAlign.Center)
             .alignItems(HorizontalAlign.Center)

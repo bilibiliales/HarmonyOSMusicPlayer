@@ -3,7 +3,7 @@
     {
       "shortcutId": "shortcut_song_recognition",
       "label": "$string:shortcut_song_recognition",
-      "icon": "$media:ic_find",
+      "icon": "$media:ic_shortcut_identify",
       "wants": [
         {
           "bundleName": "com.hmos.cloudmusic",
@@ -18,7 +18,7 @@
     {
       "shortcutId": "shortcut_heart_mode",
       "label": "$string:shortcut_heart_mode",
-      "icon": "$media:ic_like",
+      "icon": "$media:ic_shortcut_heart",
       "wants": [
         {
           "bundleName": "com.hmos.cloudmusic",
@@ -33,7 +33,7 @@
     {
       "shortcutId": "shortcut_search",
       "label": "$string:shortcut_search",
-      "icon": "$media:ic_search",
+      "icon": "$media:ic_shortcut_search",
       "wants": [
         {
           "bundleName": "com.hmos.cloudmusic",
@@ -48,7 +48,7 @@
     {
       "shortcutId": "shortcut_local_music",
       "label": "$string:shortcut_local_music",
-      "icon": "$media:ic_music",
+      "icon": "$media:ic_shortcut_local",
       "wants": [
         {
           "bundleName": "com.hmos.cloudmusic",

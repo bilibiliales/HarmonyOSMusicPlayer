@@ -1613,13 +1613,31 @@ let AudioFingerprintRuntime = (() => {
 // This is probably not what actaully happened, but
 // for now, everytime an FP is generated, the entire
 // WASM module is reloaded as a workaround
+let lastRuntimeError = null;
 function instantiateRuntime(){
     return new Promise((resolve, reject) => {
         var fpRuntime = AudioFingerprintRuntime()
+        var deadline = Date.now() + 8000
         var monitor = setInterval(() => {
-            if (typeof fpRuntime.ExtractQueryFP == "function") 
-                clearInterval(monitor) || resolve(fpRuntime)
-        }) 
+            // 只拿到函数还不够：embind 的 std::string 类型可能晚于函数注册完成，
+            // 这时调用会抛 unbound types。先等 calledRun，再用探针确认能真正计算。
+            if (fpRuntime.calledRun === true && typeof fpRuntime.ExtractQueryFP == "function") {
+                try {
+                    var probe = fpRuntime.ExtractQueryFP(new Float32Array(8000).buffer)
+                    try { if (probe && typeof probe.delete == "function") probe.delete() } catch (_e) {}
+                    clearInterval(monitor)
+                    resolve(fpRuntime)
+                    return
+                } catch (e) {
+                    lastRuntimeError = e
+                }
+            }
+            if (Date.now() > deadline) {
+                clearInterval(monitor)
+                var detail = lastRuntimeError && lastRuntimeError.message ? (": " + lastRuntimeError.message) : ""
+                reject(new Error("指纹引擎初始化超时" + detail))
+            }
+        }, 10)
     })
 }
 

@@ -35,8 +35,18 @@ export class AudioMatchService {
   static readonly SAMPLE_COUNT: number = AudioMatchService.SAMPLE_RATE * AudioMatchService.DURATION_SECONDS
 
   static async recognize(pcm: Float32Array): Promise<MatchedSong[]> {
+    const audioFP: string = await AudioMatchService.fingerprintNative(pcm)
+    return AudioMatchService.recognizeByFP(audioFP)
+  }
+
+  /** 原生（wasm2js）指纹实现，作为网页引擎不可用时的兜底。 */
+  static async fingerprintNative(pcm: Float32Array): Promise<string> {
     const pending: ESObject = GenerateFP(pcm)
-    const audioFP: string = await (pending as Promise<string>)
+    return await (pending as Promise<string>)
+  }
+
+  /** 用已经算好的 base64 音频指纹查询 /audio/match。 */
+  static async recognizeByFP(audioFP: string): Promise<MatchedSong[]> {
     const duration = AudioMatchService.DURATION_SECONDS.toString()
     const boundary = '----HarmonyAfpBoundary' + Date.now().toString()
     const body = `--${boundary}\r\n` +
