@@ -19,6 +19,14 @@
       { "name": "ohos.permission.FILE_ACCESS_PERSIST" },
       { "name": "ohos.permission.GET_NETWORK_INFO" },
       {
+        "name": "ohos.permission.MICROPHONE",
+        "reason": "$string:reason_microphone",
+        "usedScene": {
+          "abilities": ["EntryAbility"],
+          "when": "inuse"
+        }
+      },
+      {
         "name": "ohos.permission.INTERNET"
       },
       {
@@ -37,6 +45,12 @@
         "exported": true,
         "backgroundModes": [
           "audioPlayback"
+        ],
+        "metadata": [
+          {
+            "name": "ohos.ability.shortcuts",
+            "resource": "$profile:shortcuts_config"
+          }
         ],
         "skills": [
           {

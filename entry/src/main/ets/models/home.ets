@@ -145,10 +145,19 @@ export interface HomepageImage {
   imageUrl?: string
 }
 
+/** 区块右上角按钮（「查看更多 / 播放全部」），带客户端深链。 */
+export interface HomepageButton {
+  action?: string
+  actionType?: string
+  text?: string
+  iconUrl?: string
+}
+
 export interface HomepageUiElement {
   mainTitle?: HomepageTitle
   subTitle?: HomepageTitle
   image?: HomepageImage
+  button?: HomepageButton
 }
 
 export interface HomepageResourceExtInfo {
@@ -162,6 +171,9 @@ export interface HomepageResource {
   resourceType?: string
   resourceId?: string
   resourceUrl?: string
+  /** 客户端深链（orpheus://…）。本应用不解析深链，字段仅用于描述载荷，不参与跳转。 */
+  action?: string
+  actionType?: string
   uiElement?: HomepageUiElement
   resourceExtInfo?: HomepageResourceExtInfo
 }
@@ -175,6 +187,9 @@ export interface HomepageCreative {
 export interface HomepageBlock {
   blockCode?: string
   showType?: string
+  /** 整个区块的入口深链（通常是「查看更多」）。本应用不解析，不参与跳转。 */
+  action?: string
+  actionType?: string
   uiElement?: HomepageUiElement
   creatives?: HomepageCreative[]
 }
@@ -209,8 +224,107 @@ export interface HomeCreativeView {
 
 export interface HomeBlockView {
   key: string
+  /** 原始区块编码，用于少量特殊区块的判断。 */
+  blockCode: string
   title: string
   showType: string
   creativeType: string
   creatives: HomeCreativeView[]
+}
+
+// ---- 历史日推 ----
+
+/** /history/recommend/songs 的可选返回字段。 */
+export interface HistoryRecommendData {
+  dates?: string[]
+  purchaseUrl?: string
+  description?: string | null
+  noHistoryMessage?: string
+}
+
+export interface HistoryRecommendResponse {
+  code: number
+  message?: string
+  data?: HistoryRecommendData
+}
+
+/** /history/recommend/songs/detail 的返回体：songs 与每日推荐歌曲同构。 */
+export interface HistoryDetailData {
+  dates?: string[]
+  songs?: DailySong[]
+  description?: string | null
+  noHistoryMessage?: string
+}
+
+export interface HistoryDetailResponse {
+  code: number
+  message?: string
+  data?: HistoryDetailData
+}
+
+/** 历史日推日期与说明，交给页面展示。 */
+export class HistoryRecommendSummary {
+  dates: string[] = []
+  description: string = ''
+  noHistoryMessage: string = ''
+  purchaseUrl: string = ''
+}
+
+// ---- 今日乐签 ----
+
+export interface HappySignHotCommentRaw {
+  content?: string
+  authorName?: string
+}
+
+export class HappySignHotComment {
+  content: string = ''
+  authorName: string = ''
+}
+
+/** /sign/happy/info 的原始 info。 */
+export interface HappySignInfoRaw {
+  id?: number
+  type?: number
+  picUrl?: string
+  newPicUrl?: string
+  backColor?: string
+  mainText?: string
+  author?: string
+  resourceName?: string
+  resourceAuthor?: string
+  resourceCover?: string
+  resourceUrl?: string
+  qrCodeUrl?: string
+  qrCodeWithLogoUrl?: string
+  sharePicUrl?: string
+  currentUserName?: string
+  status?: number
+  hotComments?: HappySignHotCommentRaw[]
+}
+
+export interface HappySignData {
+  info?: HappySignInfoRaw
+}
+
+export interface HappySignResponse {
+  code: number
+  message?: string
+  data?: HappySignData
+}
+
+/** 弹窗直接消费的乐签内容。 */
+export class HappySignInfo {
+  mainText: string = ''
+  author: string = ''
+  backColor: string = ''
+  cover: string = ''
+  resourceName: string = ''
+  resourceAuthor: string = ''
+  resourceCover: string = ''
+  resourceUrl: string = ''
+  qrCode: string = ''
+  sharePic: string = ''
+  currentUserName: string = ''
+  hotComments: HappySignHotComment[] = []
 }

@@ -9,6 +9,7 @@ import { LyricPreferences } from '../models/lyricPreferences'
 import { LyricSettingsSheet } from '../components/LyricSettingsSheet'
 import { RadioPageParam } from '../models/radio'
 import { common } from '@kit.AbilityKit'
+import { avSession } from '@kit.AVSessionKit'
 import { fileIo, fileUri } from '@kit.CoreFileKit'
 import { photoAccessHelper } from '@kit.MediaLibraryKit'
 import { http } from '@kit.NetworkKit'
@@ -37,7 +38,7 @@ import { AuthStore } from '../stores/AuthStore'
 import { PlayerStore } from '../stores/PlayerStore'
 import { ShareSheet } from '../components/ShareSheet'
 import { VinylRecord } from '../components/VinylRecord'
-import { PlayerBackdrop } from '../components/PlayerBackdrop'
+import { PlayerBackdrop, PlayerAboveLayers } from '../components/PlayerBackdrop'
 import { HeartBurst } from '../components/HeartBurst'
 import { RingtonePageParam } from './RingtonePage'
 import { PlayerStyleConfig } from '../models/decoration'
@@ -78,6 +79,8 @@ export struct Play {
   @State lyricUserScrolling: boolean = false
   @State lyricProgressPosition: number = 0
   @State lyricAppearance: LyricPreferences = AppSettings.lyricPreferences
+  /** 后台播放关闭时，多端协同改成提示开启，不直接拉起系统设备选择器。 */
+  @State private castBlocked: boolean = !AppSettings.backgroundPlaybackEnabled
   /** 当前歌曲是否有译文 / 罗马音（决定歌词区左下角气泡是否出现）。 */
   @State translationAvailable: boolean = false
   @State romaAvailable: boolean = false
@@ -133,6 +136,7 @@ export struct Play {
       this.pageStack.pop()
       return
     }
+    this.castBlocked = !AppSettings.backgroundPlaybackEnabled
     this.checkNetwork()
     this.liked = this.playerStore.currentSong.liked || false
     this.loadCommentSummary()
@@ -1594,6 +1598,22 @@ export struct Play {
     .padding({ top: 8 })
   }
 
+  /** 多端协同：命令式拉起系统设备选择面板，避免 AVCastPicker 组件二次点击失效。 */
+  private async openCastPicker(): Promise<void> {
+    if (this.castBlocked) {
+      BubbleTip.show(this.getUIContext(), '请先开启后台播放以使用多端协同')
+      return
+    }
+    try {
+      const context = this.getUIContext().getHostContext() as common.Context
+      const helper = new avSession.AVCastPickerHelper(context)
+      await helper.select()
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '投播暂不可用'
+      BubbleTip.show(this.getUIContext(), `多端协同：${message}`)
+    }
+  }
+
   @Builder
   private SmallAction(icon: Resource, text: string, onClick: () => void) {
     // 只留图标：无底版、无文字。灰色在深浅画布下都可读，
@@ -2201,6 +2221,7 @@ export struct Play {
             .alignItems(VerticalAlign.Center)
 
             Row() {
+            this.SmallAction($r('sys.symbol.media_center'), '多端协同', () => this.openCastPicker())
             if (this.isNonCatalogAudio()) {
               this.SmallAction($r('sys.symbol.info_circle'), this.playerStore.currentSong.localUri ? '本地音乐' : this.playerStore.currentSong.programId ? '节目详情' : '音乐电台', () => this.openAudioDetails())
             } else {
@@ -2232,6 +2253,9 @@ export struct Play {
         }
         .width('100%').height('100%').scrollBar(BarState.Off)
         .scrollable(this.lyricsImmersive ? ScrollDirection.None : ScrollDirection.Vertical)
+
+        // 标了「叠在黑胶上层」的图层画在这里：盖住旋转唱片，但仍在半模态之下
+        PlayerAboveLayers({ style: this.playerStyle })
 
         if (this.activeSheet) {
           this.BottomSheet()

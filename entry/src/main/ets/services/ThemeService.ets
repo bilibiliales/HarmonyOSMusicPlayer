@@ -14,7 +14,7 @@ const AS_SYSTEM_DARK: string = 'systemDarkMode'
 const AS_CURRENT: string = 'currentColorMode'
 
 export class ThemeService {
-  private static context: common.Context | undefined = undefined
+  private static context: common.UIAbilityContext | undefined = undefined
   private static mode: string = ThemeMode.SYSTEM
   private static systemDark: boolean = false
   private static listeners: Array<(isDark: boolean) => void> = []
@@ -97,13 +97,21 @@ export class ThemeService {
   }
 
   static async setMode(mode: string): Promise<void> {
-    ThemeService.mode = mode
+    const normalized = ThemeService.parse(mode)
+    // 必须先持久化再 apply：apply 会触发 onConfigurationUpdate，
+    // 若此时存档仍是旧值，会被回调重新读回旧模式，表现为开关自动弹回。
+    if (ThemeService.context) {
+      const store = await preferences.getPreferences(ThemeService.context, STORE_NAME)
+      await store.put(KEY_MODE, normalized)
+      await store.flush()
+    }
+    ThemeService.mode = normalized
+    if (normalized === ThemeMode.SYSTEM && ThemeService.context) {
+      ThemeService.systemDark =
+        ThemeService.context.config.colorMode === ConfigurationConstant.ColorMode.COLOR_MODE_DARK
+    }
     ThemeService.publish()
     ThemeService.apply()
-    if (!ThemeService.context) { return }
-    const store = await preferences.getPreferences(ThemeService.context, STORE_NAME)
-    await store.put(KEY_MODE, mode)
-    await store.flush()
   }
 
   /** 仅在「跟随系统」时，系统切换才影响应用；手动模式下保持用户选择。 */

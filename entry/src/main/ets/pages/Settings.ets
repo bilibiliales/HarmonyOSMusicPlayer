@@ -1,5 +1,5 @@
 import { SkinBackdrop } from '../components/SkinBackdrop'
-import { common } from '@kit.AbilityKit'
+import { bundleManager, common } from '@kit.AbilityKit'
 import { PlayMode, QUALITY_OPTIONS, QualityOption } from '../models/music'
 import { ApiClient } from '../services/ApiClient'
 import { AppSettings } from '../services/AppSettings'
@@ -57,11 +57,167 @@ export struct SettingsPage {
   @State defaultDownloadQuality: string = AppSettings.defaultDownloadQuality
   @State backgroundPlaybackEnabled: boolean = AppSettings.backgroundPlaybackEnabled
   @State streamingPlaybackEnabled: boolean = AppSettings.streamingPlaybackEnabled
+  @State scrobbleEnabled: boolean = AppSettings.scrobbleEnabled
   @State effectsEnabled: boolean = AppSettings.effectsEnabled
   @State downloadSaveMode: string = AppSettings.downloadSaveMode
   @State askDownloadSaveMode: boolean = AppSettings.askDownloadSaveMode
   @StorageProp('themeMode') themeMode: string = 'system'
   @StorageProp('systemDarkMode') systemDark: boolean = false
+
+  /** 重置本地偏好设置（保留登录态与后端地址，立即回写界面状态）。 */
+  private confirmReset(): void {
+    this.getUIContext().showAlertDialog({
+      title: '重置本地设置',
+      message: '将恢复主题、播放、音效、下载与 AI 连接的默认值；登录状态与后端地址保持不变。确定继续？',
+      primaryButton: { value: '取消', action: () => {} },
+      secondaryButton: {
+        value: '重置',
+        fontColor: TC.accent(),
+        action: () => {
+          this.resetLocalSettings()
+        }
+      }
+    })
+  }
+
+  private async resetLocalSettings(): Promise<void> {
+    try {
+      const context = this.getUIContext().getHostContext() as common.UIAbilityContext
+      // 后台播放默认开启，若此前是关闭状态需要走控制器重新装载媒体会话。
+      const reenableBackground = !AppSettings.backgroundPlaybackEnabled
+      // 桌面歌词默认关闭，只有原本开着时才需要通知控制器收起浮窗。
+      const hadDesktopLyrics = this.playerStore.desktopLyricsVisible
+      // 音效默认开启，只有原本关着时才需要重挂音效链。
+      const needEffectsOn = !AppSettings.effectsEnabled
+      await AppSettings.resetLocalSettings(context)
+      await ThemeService.setMode(ThemeMode.SYSTEM).catch(() => {})
+      if (reenableBackground) {
+        await playerController.setBackgroundPlayback(context, true).catch(() => {})
+      }
+      if (hadDesktopLyrics) {
+        await playerController.setDesktopLyrics(false, false).catch(() => {})
+      }
+      if (needEffectsOn) {
+        await playerController.setEffects(true).catch(() => {})
+      }
+      this.syncSettingsState()
+      BubbleTip.show(this.getUIContext(), '本地设置已恢复默认')
+    } catch (error) {
+      BubbleTip.show(this.getUIContext(), error instanceof Error ? error.message : '重置失败')
+    }
+  }
+
+  /** 把内存里的设置回填到页面 @State，避免重置后界面仍显示旧值。 */
+  private syncSettingsState(): void {
+    this.defaultPlayMode = AppSettings.defaultPlayMode
+    this.defaultOnlineQuality = AppSettings.defaultOnlineQuality
+    this.defaultDownloadQuality = AppSettings.defaultDownloadQuality
+    this.backgroundPlaybackEnabled = AppSettings.backgroundPlaybackEnabled
+    this.streamingPlaybackEnabled = AppSettings.streamingPlaybackEnabled
+    this.scrobbleEnabled = AppSettings.scrobbleEnabled
+    this.effectsEnabled = AppSettings.effectsEnabled
+    this.downloadSaveMode = AppSettings.downloadSaveMode
+    this.askDownloadSaveMode = AppSettings.askDownloadSaveMode
+    this.aiBaseUrl = AppSettings.aiBaseUrl
+    this.aiApiKey = AppSettings.aiApiKey
+    this.aiModel = AppSettings.aiModel
+    this.playerStore.playMode = AppSettings.defaultPlayMode
+  }
+
+  /** 右上角「更多」菜单：重置后端地址、重置本地设置、清空队列、关于。 */
+  private moreMenu(): MenuElement[] {
+    const items: MenuElement[] = [
+      { value: '重置后端服务地址', action: () => this.confirmResetServer() },
+      { value: '重置本地设置', action: () => this.confirmReset() },
+      { value: '清空播放队列', action: () => this.confirmClearQueue() },
+      { value: '关于本应用', action: () => this.showAbout() }
+    ]
+    return items
+  }
+
+  /** 后端服务地址还原为出厂默认（不动登录态与本地偏好）。 */
+  private confirmResetServer(): void {
+    if (ApiClient.isDefaultBaseUrl()) {
+      BubbleTip.show(this.getUIContext(), `当前已是默认地址 ${ApiClient.DEFAULT_BASE_URL}`)
+      return
+    }
+    this.getUIContext().showAlertDialog({
+      title: '重置后端服务地址',
+      message: `将恢复为默认地址 ${ApiClient.DEFAULT_BASE_URL}，登录状态与本地偏好不受影响。确定继续？`,
+      primaryButton: { value: '取消', action: () => {} },
+      secondaryButton: {
+        value: '重置',
+        fontColor: TC.accent(),
+        action: () => {
+          this.resetServerUrl()
+        }
+      }
+    })
+  }
+
+  private async resetServerUrl(): Promise<void> {
+    try {
+      const context = this.getUIContext().getHostContext() as common.UIAbilityContext
+      await AppSettings.saveBaseUrl(context, ApiClient.DEFAULT_BASE_URL)
+      this.serverUrl = ApiClient.baseUrl
+      BubbleTip.show(this.getUIContext(), `服务地址已恢复为 ${ApiClient.baseUrl}`)
+    } catch (error) {
+      BubbleTip.show(this.getUIContext(), error instanceof Error ? error.message : '服务地址重置失败')
+    }
+  }
+
+  private confirmClearQueue(): void {
+    const size = this.playerStore.queue.length
+    if (size === 0) {
+      BubbleTip.show(this.getUIContext(), '播放队列已经是空的')
+      return
+    }
+    this.getUIContext().showAlertDialog({
+      title: '清空播放队列',
+      message: `将停止播放并移除队列中的 ${size} 首歌曲，本地已下载文件不会被删除。确定继续？`,
+      primaryButton: { value: '取消', action: () => {} },
+      secondaryButton: {
+        value: '清空',
+        fontColor: TC.accent(),
+        action: () => {
+          this.clearQueue()
+        }
+      }
+    })
+  }
+
+  private async clearQueue(): Promise<void> {
+    try {
+      await playerController.clearQueue()
+      BubbleTip.show(this.getUIContext(), '播放队列已清空')
+    } catch (error) {
+      BubbleTip.show(this.getUIContext(), error instanceof Error ? error.message : '清空播放队列失败')
+    }
+  }
+
+  private appVersion(): string {
+    try {
+      const info = bundleManager.getBundleInfoForSelfSync(bundleManager.BundleFlag.GET_BUNDLE_INFO_DEFAULT)
+      return typeof info.versionName === 'string' ? info.versionName : ''
+    } catch (_error) {
+      return ''
+    }
+  }
+
+  private showAbout(): void {
+    const version = this.appVersion()
+    const account = this.authStore.loggedIn ? `${this.authStore.nickname}（${this.authStore.userId}）` : '未登录'
+    const lines: string[] = []
+    lines.push(`版本 ${version.length > 0 ? version : '未知'}`)
+    lines.push(`后端服务：${ApiClient.baseUrl}`)
+    lines.push(`账号：${account}`)
+    lines.push(`在线音质：${this.defaultOnlineQuality}　下载音质：${this.defaultDownloadQuality}`)
+    this.getUIContext().showAlertDialog({
+      title: '关于本应用',
+      message: lines.join('\n'),
+      confirm: { value: '好', action: () => {} }
+    })
+  }
 
   private isFollowSystem(): boolean {
     return this.themeMode === ThemeMode.SYSTEM
@@ -262,6 +418,19 @@ export struct SettingsPage {
     }
   }
 
+  private async changeScrobble(enabled: boolean): Promise<void> {
+    if (enabled === AppSettings.scrobbleEnabled) { return }
+    try {
+      const context = this.getUIContext().getHostContext() as common.UIAbilityContext
+      await AppSettings.saveScrobble(context, enabled)
+      BubbleTip.show(this.getUIContext(), enabled ? '已开启听歌记录上报' : '已关闭听歌记录上报，本机播放不会计入网易云听歌记录与排行')
+    } catch (error) {
+      BubbleTip.show(this.getUIContext(), error instanceof Error ? error.message : '听歌记录设置失败')
+    } finally {
+      this.scrobbleEnabled = AppSettings.scrobbleEnabled
+    }
+  }
+
   private async savePlaybackDefaults(): Promise<void> {
     try {
       const context = this.getUIContext().getHostContext() as common.UIAbilityContext
@@ -307,10 +476,14 @@ export struct SettingsPage {
         Column().width('100%').height(this.topAvoidHeight)
         Row() {
           SymbolGlyph($r('sys.symbol.chevron_left')).fontSize(24).fontColor([TC.textPrimary()])
+            .width(36).height(36)
             .onClick(() => this.pageStack.pop())
           Text('设置').layoutWeight(1).fontSize(18).fontWeight(FontWeight.Bold)
             .fontColor(TC.textPrimary()).textAlign(TextAlign.Center)
-          Column().width(24)
+          SymbolGlyph($r('sys.symbol.ellipsis_circle'))
+            .fontSize(22).fontColor([TC.textSecondary()])
+            .width(36).height(36)
+            .bindMenu(this.moreMenu())
         }.height(56).constraintSize({ minHeight: 56 }).width('100%').padding({ left: 16, right: 16 })
         Scroll() {
           Column({ space: 16 }) {
@@ -345,6 +518,16 @@ export struct SettingsPage {
                 Toggle({ type: ToggleType.Switch, isOn: this.streamingPlaybackEnabled })
                   .selectedColor(TC.accent()).enabled(!this.changingPlayback)
                   .onChange((enabled: boolean) => this.changeStreamingPlayback(enabled))
+              }.width('100%').margin({ top: 6 })
+              Row({ space: 12 }) {
+                Column({ space: 6 }) {
+                  Text('记录听歌').fontSize(14).fontColor(TC.textPrimary())
+                  Text('开启后向网易云上报听歌打卡，计入听歌记录与听歌排行；关闭则不上报。')
+                    .fontSize(11).fontColor(TC.textSecondary()).width('100%')
+                }.layoutWeight(1).alignItems(HorizontalAlign.Start)
+                Toggle({ type: ToggleType.Switch, isOn: this.scrobbleEnabled })
+                  .selectedColor(TC.accent()).enabled(!this.featureBusy)
+                  .onChange((enabled: boolean) => this.changeScrobble(enabled))
               }.width('100%').margin({ top: 6 })
               Text('播放顺序').width('100%').fontSize(12).fontColor(TC.textBody())
               Row({ space: 8 }) {
@@ -401,24 +584,30 @@ export struct SettingsPage {
 
             Column({ space: 10 }) {
               Text('后端服务').width('100%').fontSize(16).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary())
-              TextInput({ text: this.serverUrl, placeholder: '后端服务 Base URL，例如 https://api.enzymeym.top' })
-                .height(50).fontColor(TC.textPrimary()).placeholderColor(TC.textQuaternary()).backgroundColor(TC.surfaceInset())
-                .borderRadius(14).onChange((value: string) => this.serverUrl = value)
+              TextInput({ text: this.serverUrl, placeholder: '后端服务 Base URL' })
+                .height(50).fontSize(14).fontColor(TC.textPrimary()).placeholderColor(TC.textQuaternary())
+                .backgroundColor(TC.surfaceInset()).borderRadius(25).padding({ left: 18, right: 18 })
+                .onChange((value: string) => this.serverUrl = value)
+              Text(`默认地址 ${ApiClient.DEFAULT_BASE_URL}`).width('100%').fontSize(11)
+                .fontColor(TC.textTertiary()).padding({ left: 4 })
               Button('保存服务地址').width('100%').height(46).borderRadius(23)
                 .fontColor(TC.textOnAccent()).backgroundColor(TC.accent()).onClick(() => this.saveServer())
             }.width('100%').padding(18).backgroundColor(TC.surfaceCard()).borderRadius(20)
 
             Column({ space: 10 }) {
               Text('AI 模型连接').width('100%').fontSize(16).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary())
-              TextInput({ text: this.aiBaseUrl, placeholder: 'AI 服务 Base URL，例如 https://api.openai.com/v1' })
-                .height(48).fontColor(TC.textPrimary()).placeholderColor(TC.textQuaternary()).backgroundColor(TC.surfaceInset())
-                .borderRadius(14).onChange((value: string) => this.aiBaseUrl = value)
+              TextInput({ text: this.aiBaseUrl, placeholder: 'AI 服务 Base URL' })
+                .height(48).fontSize(14).fontColor(TC.textPrimary()).placeholderColor(TC.textQuaternary())
+                .backgroundColor(TC.surfaceInset()).borderRadius(24).padding({ left: 18, right: 18 })
+                .onChange((value: string) => this.aiBaseUrl = value)
               TextInput({ text: this.aiApiKey, placeholder: 'API Key' }).type(InputType.Password)
-                .height(48).fontColor(TC.textPrimary()).placeholderColor(TC.textQuaternary()).backgroundColor(TC.surfaceInset())
-                .borderRadius(14).onChange((value: string) => this.aiApiKey = value)
+                .height(48).fontSize(14).fontColor(TC.textPrimary()).placeholderColor(TC.textQuaternary())
+                .backgroundColor(TC.surfaceInset()).borderRadius(24).padding({ left: 18, right: 18 })
+                .onChange((value: string) => this.aiApiKey = value)
               TextInput({ text: this.aiModel, placeholder: '模型名称，例如 gpt-3.5-turbo' })
-                .height(48).fontColor(TC.textPrimary()).placeholderColor(TC.textQuaternary()).backgroundColor(TC.surfaceInset())
-                .borderRadius(14).onChange((value: string) => this.aiModel = value)
+                .height(48).fontSize(14).fontColor(TC.textPrimary()).placeholderColor(TC.textQuaternary())
+                .backgroundColor(TC.surfaceInset()).borderRadius(24).padding({ left: 18, right: 18 })
+                .onChange((value: string) => this.aiModel = value)
               Button('保存 AI 模型连接').width('100%').height(46).borderRadius(23)
                 .fontColor(TC.textOnAccent()).backgroundColor(TC.accent()).onClick(() => this.saveAiConnection())
             }.width('100%').padding(18).backgroundColor(TC.surfaceCard()).borderRadius(20)

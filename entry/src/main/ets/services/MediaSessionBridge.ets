@@ -56,6 +56,12 @@ class MediaSessionRuntime implements MediaSessionApi {
 
   async activate(): Promise<void> {
     await this.session.activate()
+    // 声明支持 URL 投播，系统投播组件才能发现并连接远端设备
+    try {
+      await this.session.setExtras({ 'requireAbilityList': ['url-cast'] })
+    } catch (_error) {
+      // 老版本系统不支持投播时忽略，不影响普通播放
+    }
   }
 
   async destroy(): Promise<void> {

@@ -25,6 +25,7 @@ import { resizeImageUrl } from '../services/ImageUrl'
 import { AuthStore } from '../stores/AuthStore'
 import { PlayerStore } from '../stores/PlayerStore'
 import { TC } from '../services/ThemeColors'
+import { Responsive } from '../services/Responsive'
 
 @Component
 struct Moment {
@@ -43,6 +44,8 @@ struct Moment {
   @State lasttime: number = -1
   @State message: string = ''
   @State isRefreshing: boolean = false
+  /** 页面宽度：大屏上动态流与瀑布流都改成多列，避免单列被拉长。 */
+  @State private viewWidth: number = 0
   // 一个话题仍按接口要求取 30 条，但避免同时创建 5 个话题、最多 150 张原图节点。
   private readonly topicPageSize: number = 1
 
@@ -72,6 +75,16 @@ struct Moment {
     } finally {
       this.isRefreshing = false
     }
+  }
+
+  /** 发现页瀑布流列数：手机 2 列，平板 3 列，全屏 4 列。 */
+  private discoverColumns(): string {
+    return Responsive.waterFlowColumns(Responsive.columns(this.viewWidth, 2, 3, 4))
+  }
+
+  /** 关注动态的列表列数：大屏两列，一屏看到更多条。 */
+  private feedLanes(): number {
+    return this.viewWidth >= Responsive.EXPANDED ? 2 : 1
   }
 
   private hasEventPicture(item: UserEventItem): boolean {
@@ -518,6 +531,7 @@ struct Moment {
                 }
               }
               .layoutWeight(1).padding({ left: 12, right: 12 }).onReachEnd(() => this.loadEvents())
+              .lanes(this.feedLanes(), 12)
             }
           } else {
             if (this.discoverLoading && this.discoverEvents.length === 0) {
@@ -547,7 +561,7 @@ struct Moment {
                   .width('100%').height(52).justifyContent(FlexAlign.Center)
                 }
               }
-              .layoutWeight(1).columnsTemplate('1fr 1fr').columnsGap(10).rowsGap(10)
+              .layoutWeight(1).columnsTemplate(this.discoverColumns()).columnsGap(10).rowsGap(10)
               .padding({ left: 10, right: 10, top: 10 }).onReachEnd(() => this.loadDiscoverEvents())
             }
           }
@@ -557,6 +571,10 @@ struct Moment {
       .onRefreshing(() => this.refreshCurrentTab())
     }
     .width('100%').height('100%')
+    .onAreaChange((_old: Area, area: Area) => {
+      const width = Number(area.width)
+      if (width !== this.viewWidth) { this.viewWidth = width }
+    })
   }
 }
 

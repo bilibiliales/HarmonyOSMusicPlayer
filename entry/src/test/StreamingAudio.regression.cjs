@@ -60,7 +60,7 @@ function assertRangeHeaders(label, headers, from, to, total) {
 }
 
 async function verifyLive() {
-  const base = (process.env.MUSIC_API_BASE || 'https://api.enzymeym.top').replace(/\/$/, '')
+  const base = (process.env.MUSIC_API_BASE || 'https://ncme.scfd.top').replace(/\/$/, '')
   const songId = process.env.MUSIC_SONG_ID || '33894312'
   const stamp = Date.now()
   const endpoints = [

@@ -1,0 +1,64 @@
+{
+  "shortcuts": [
+    {
+      "shortcutId": "shortcut_song_recognition",
+      "label": "$string:shortcut_song_recognition",
+      "icon": "$media:ic_shortcut_identify",
+      "wants": [
+        {
+          "bundleName": "com.hmos.cloudmusic",
+          "moduleName": "entry",
+          "abilityName": "EntryAbility",
+          "parameters": {
+            "shortcutAction": "song_recognition"
+          }
+        }
+      ]
+    },
+    {
+      "shortcutId": "shortcut_heart_mode",
+      "label": "$string:shortcut_heart_mode",
+      "icon": "$media:ic_shortcut_heart",
+      "wants": [
+        {
+          "bundleName": "com.hmos.cloudmusic",
+          "moduleName": "entry",
+          "abilityName": "EntryAbility",
+          "parameters": {
+            "shortcutAction": "heart_mode"
+          }
+        }
+      ]
+    },
+    {
+      "shortcutId": "shortcut_search",
+      "label": "$string:shortcut_search",
+      "icon": "$media:ic_shortcut_search",
+      "wants": [
+        {
+          "bundleName": "com.hmos.cloudmusic",
+          "moduleName": "entry",
+          "abilityName": "EntryAbility",
+          "parameters": {
+            "shortcutAction": "search"
+          }
+        }
+      ]
+    },
+    {
+      "shortcutId": "shortcut_local_music",
+      "label": "$string:shortcut_local_music",
+      "icon": "$media:ic_shortcut_local",
+      "wants": [
+        {
+          "bundleName": "com.hmos.cloudmusic",
+          "moduleName": "entry",
+          "abilityName": "EntryAbility",
+          "parameters": {
+            "shortcutAction": "local_music"
+          }
+        }
+      ]
+    }
+  ]
+}

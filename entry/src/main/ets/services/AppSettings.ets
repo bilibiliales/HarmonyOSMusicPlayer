@@ -44,6 +44,7 @@ export class AppSettings {
   private static readonly DEFAULT_DOWNLOAD_QUALITY_KEY: string = 'default_download_quality'
   private static readonly BACKGROUND_PLAYBACK_KEY: string = 'background_playback_enabled'
   private static readonly STREAMING_PLAYBACK_KEY: string = 'streaming_playback_enabled'
+  private static readonly SCROBBLE_KEY: string = 'scrobble_enabled'
   private static readonly DEVICE_ALIAS_KEY: string = 'device_alias'
 
   static lyricPreferences: LyricPreferences = new LyricPreferences()
@@ -52,6 +53,8 @@ export class AppSettings {
   static downloadSaveMode: string = 'download'
   static askDownloadSaveMode: boolean = true
   static effectsEnabled: boolean = true
+  /** 是否在本机记录听歌记录（关闭则不调用网易云 V2 打卡，不计入听歌记录/排行）。 */
+  static scrobbleEnabled: boolean = true
 
   static async saveFeature(key: string, value: preferences.ValueType): Promise<void> {
     if (!AppSettings.context) { throw new Error('设置存储尚未初始化') }
@@ -109,7 +112,7 @@ export class AppSettings {
    */
   static settingsLoaded: boolean = false
 
-  static aiBaseUrl: string = 'https://api.enzymeym.top'
+  static aiBaseUrl: string = 'https://ncme.scfd.top'
   static aiApiKey: string = ''
   static aiModel: string = 'gpt-3.5-turbo'
   static defaultPlayMode: PlayMode = PlayMode.LOOP
@@ -131,6 +134,7 @@ export class AppSettings {
     const backgroundValue = await store.get(AppSettings.BACKGROUND_PLAYBACK_KEY, true)
     AppSettings.backgroundPlaybackEnabled = typeof backgroundValue === 'boolean' ? backgroundValue : true
     AppSettings.streamingPlaybackEnabled = await store.get(AppSettings.STREAMING_PLAYBACK_KEY, true) === true
+    AppSettings.scrobbleEnabled = await store.get(AppSettings.SCROBBLE_KEY, true) === true
     AppSettings.settingsLoaded = true
     AppSettings.deviceAlias = AppSettings.resolveDeviceAlias(await store.get(AppSettings.DEVICE_ALIAS_KEY,
       AppSettings.LEGACY_DEVICE_ALIAS))
@@ -228,6 +232,42 @@ export class AppSettings {
     await store.flush()
   }
 
+  /**
+   * 重置本地偏好为出厂默认。
+   * 只删偏好类键：登录态（cookie / uid / 昵称 / 头像）与设备别名在同一 preferences 库里，
+   * 不能整库删除，否则会把账号一起清掉。后端地址也单独由「重置后端服务地址」处理。
+   */
+  static async resetLocalSettings(context: common.Context): Promise<void> {
+    const store = await preferences.getPreferences(context, AppSettings.STORE_NAME)
+    const keys: string[] = [
+      'lyric_preferences', 'desktop_lyrics_enabled', 'desktop_lyrics_locked', 'effects_enabled',
+      'download_save_mode', 'ask_download_save_mode', 'background_playback_enabled',
+      'streaming_playback_enabled', 'scrobble_enabled', 'default_play_mode',
+      'default_online_quality', 'default_download_quality',
+      'ai_base_url', 'ai_api_key', 'ai_model'
+    ]
+    for (const key of keys) {
+      await store.delete(key)
+    }
+    await store.flush()
+    AppSettings.lyricPreferences = new LyricPreferences()
+    AppSettings.desktopLyricsEnabled = false
+    AppSettings.desktopLyricsLocked = false
+    AppSettings.effectsEnabled = true
+    AppSettings.downloadSaveMode = 'download'
+    AppSettings.askDownloadSaveMode = true
+    // 后台播放不能只改内存：会话的装载/卸载由 PlayerController 负责，
+    // 由调用方在重置后按需调用 setBackgroundPlayback(true)，否则开关显示 ON 但会话仍是卸载态。
+    AppSettings.streamingPlaybackEnabled = true
+    AppSettings.scrobbleEnabled = true
+    AppSettings.defaultPlayMode = PlayMode.LOOP
+    AppSettings.defaultOnlineQuality = 'exhigh'
+    AppSettings.defaultDownloadQuality = 'exhigh'
+    AppSettings.aiBaseUrl = 'https://api.openai.com/v1'
+    AppSettings.aiApiKey = ''
+    AppSettings.aiModel = 'gpt-3.5-turbo'
+  }
+
   static async saveBackgroundPlayback(context: common.Context, enabled: boolean): Promise<void> {
     const store = await preferences.getPreferences(context, AppSettings.STORE_NAME)
     await store.put(AppSettings.BACKGROUND_PLAYBACK_KEY, enabled)
@@ -242,6 +282,13 @@ export class AppSettings {
     await store.put(AppSettings.STREAMING_PLAYBACK_KEY, enabled)
     await store.flush()
     AppSettings.streamingPlaybackEnabled = enabled
+  }
+
+  static async saveScrobble(context: common.Context, enabled: boolean): Promise<void> {
+    const store = await preferences.getPreferences(context, AppSettings.STORE_NAME)
+    await store.put(AppSettings.SCROBBLE_KEY, enabled)
+    await store.flush()
+    AppSettings.scrobbleEnabled = enabled
   }
 
   static async saveAiSettings(context: common.Context, baseUrl: string, apiKey: string,

@@ -6,6 +6,7 @@ import { DecorationStore } from '../services/DecorationStore'
 import { DecoKind, DecorationCodec, DecorationItem } from '../models/decoration'
 import { TC } from '../services/ThemeColors'
 import { DecorationEditorParam } from './DecorationEditor'
+import { Responsive } from '../services/Responsive'
 
 /**
  * 装扮中心。
@@ -23,12 +24,27 @@ export struct DecorationCenterPage {
   @StorageProp('decorationActiveCount') activeCount: number = 0
   @State private mineVisible: boolean = false
   @State private tick: number = 0
+  /** 页面宽度：大屏上一栏放更多分类卡片，而不是把卡片拉长。 */
+  @State private viewWidth: number = 0
   private kinds: string[] = [
     DecoKind.SKIN, DecoKind.PLAYER, DecoKind.DOCK, DecoKind.SIDEBAR, DecoKind.HOME_BG,
     DecoKind.HEART, DecoKind.STARTUP, DecoKind.AVATAR_FRAME, DecoKind.VIP_CARD,
     DecoKind.VIP_BADGE, DecoKind.MINI_PLAYER, DecoKind.SHEET,
     DecoKind.SUIT
   ]
+
+  /** 分类卡片列数：手机两列，平板三列，全屏四列。 */
+  private kindColumns(): number {
+    return Responsive.columns(this.viewWidth, 2, 3, 4)
+  }
+
+  /** 列数变多后卡片适当加高，避免被拉成细长条。 */
+  private cardHeight(): number {
+    const columns = this.kindColumns()
+    if (columns >= 4) { return 152 }
+    if (columns === 3) { return 140 }
+    return 124
+  }
 
   // ---- 数据查询（tick / activeCount 变化时重新取值，驱动界面刷新） ----
 
@@ -133,7 +149,7 @@ export struct DecorationCenterPage {
       .alignItems(HorizontalAlign.Start)
     }
     .width('100%')
-    .height(124)
+    .height(this.cardHeight())
     .borderRadius(18)
     .clip(true)
     .onClick(() => this.open(kind))
@@ -331,7 +347,7 @@ export struct DecorationCenterPage {
                 Column() {
                   this.KindCard(kind)
                 }
-                .width('48.5%')
+                .width(Responsive.itemPercent(this.kindColumns()))
                 .margin({ bottom: 11 })
               }, (kind: string) => kind)
             }
@@ -353,6 +369,10 @@ export struct DecorationCenterPage {
       .width('100%')
       .height('100%')
       .backgroundColor(TC.pageBackground())
+      .onAreaChange((_old: Area, area: Area) => {
+        const width = Number(area.width)
+        if (width !== this.viewWidth) { this.viewWidth = width }
+      })
       .bindSheet(this.mineVisible, this.skin_MineSheet(), {
         height: '68%',
         backgroundColor: TC.sheetBackground(),

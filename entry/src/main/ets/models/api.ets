@@ -234,6 +234,7 @@ export interface ArtistFanProfile {
   authStatus?: number
   follows?: number
   followeds?: number
+  avatarDetail?: ArtistAvatarDetail
 }
 
 export interface ArtistFanItem {
@@ -513,6 +514,7 @@ export interface ApiUser {
   signature?: string
   userType?: number
   authStatus?: number
+  avatarDetail?: ArtistAvatarDetail
   followed?: boolean
   mutual?: boolean
   backgroundUrl?: string
@@ -567,16 +569,83 @@ export interface SocialUser {
   followeds?: number
   userType?: number
   authStatus?: number
+  /** 头像右下角的认证角标（音乐人 / 官方号等）。 */
+  avatarDetail?: ArtistAvatarDetail
+}
+
+/** /user/follow/mixed：我关注的用户/歌手混合列表。 */
+export interface FollowBoxResource {
+  resourceType?: number
+  subType?: number
+  resourceId?: string
+  coverUrl?: string
+  orpheusUrl?: string
+  picCount?: number
+}
+
+export interface FollowBoxContent {
+  title?: string
+  resource?: FollowBoxResource
+}
+
+export interface FollowShowContent {
+  message?: string
+  time?: number
+  active?: boolean
+  boxContent?: FollowBoxContent
+  consumeParam?: string
+}
+
+export interface FollowFansGroupInfo {
+  level?: string
+  segment?: string
+  fansGroupIdStr?: string
+  fansGroupInnerPageUrl?: string
+  showUpgrade?: boolean
+}
+
+export interface MixedFollowRecord {
+  type?: number
+  followId?: number
+  userProfile?: ApiUser | null
+  artistInfo?: ApiArtist | null
+  showContent?: FollowShowContent | null
+  followTime?: number
+  mutualFollowTime?: number | null
+  followDay?: string
+  mutualFollowDay?: string | null
+  fansGroupInfo?: FollowFansGroupInfo | null
+}
+
+export interface MixedFollowPage {
+  size?: number
+  cursor?: string
+  more?: boolean
+}
+
+export interface MixedFollowData {
+  records?: MixedFollowRecord[]
+  page?: MixedFollowPage
+}
+
+export interface MixedFollowResponse {
+  code: number
+  message?: string
+  data?: MixedFollowData
 }
 
 export interface UserFollowsResponse {
   code: number
+  /** 隐私设置等拒绝原因，例如「用户隐私无权限查看」。 */
+  message?: string
   follow: SocialUser[]
   more: boolean
 }
 
 export interface UserFollowedsResponse {
   code: number
+  /** 隐私设置等拒绝原因，例如「用户隐私无权限查看」。 */
+  message?: string
   followeds: SocialUser[]
   more: boolean
   size?: number
@@ -1311,17 +1380,19 @@ export interface SheetPreviewResponse {
 }
 
 export function mapApiSong(song: ApiSong): songItemType {
-  const artists = song.ar || song.artists || []
+  const rawArtists = song.ar || song.artists || []
+  const artists: ApiArtist[] = rawArtists.filter((item: ApiArtist | null | undefined) =>
+    item !== null && item !== undefined && typeof item.name === 'string') as ApiArtist[]
   const album = song.al || song.album
   return {
-    id: song.id.toString(),
-    name: song.name,
+    id: song.id !== undefined && song.id !== null ? song.id.toString() : '',
+    name: typeof song.name === 'string' ? song.name : '未知歌曲',
     author: artists.map((item: ApiArtist) => item.name).join(' / '),
     img: album?.picUrl || song.picUrl || '',
     url: '',
     duration: song.dt || song.duration || 0,
     album: album?.name || '',
-    albumId: album?.id?.toString() || '',
+    albumId: album?.id !== undefined && album?.id !== null ? album.id.toString() : '',
     fee: song.fee || 0,
     artists: artists.map((item: ApiArtist) => {
       const artist: SongArtist = {

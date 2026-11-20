@@ -36,6 +36,7 @@ import { playerController } from '../services/PlayerController'
 import { AuthStore } from '../stores/AuthStore'
 import { resizeImageUrl } from '../services/ImageUrl'
 import { TC } from '../services/ThemeColors'
+import { Responsive } from '../services/Responsive'
 
 @Component
 struct Recommend {
@@ -75,11 +76,18 @@ struct Recommend {
   @State refreshText: string = ''
   @State isRefreshing: boolean = false
   @State heartModeLoading: boolean = false
+  /** 页面宽度：大屏上新歌速递改成换行平铺，一屏看全，不再横向拉一长条。 */
+  @State private viewWidth: number = 0
   @State heartModeCover: string = ''
   private todayDate: string = new Date().getDate().toString()
 
   aboutToAppear(): void {
     this.loadHomeData()
+  }
+
+  /** 新歌速递在大屏上换行平铺，而不是一条横向滚动长条。 */
+  private newSongTiles(): boolean {
+    return this.viewWidth >= Responsive.EXPANDED
   }
 
   private toColumns(list: songItemType[]): SongColumn[] {
@@ -504,6 +512,23 @@ struct Recommend {
     .padding({ left: 16, right: 16, top: 22, bottom: 10 })
   }
 
+  /** 新歌速递分类卡片：宽高固定，大屏平铺时也不会被拉伸。 */
+  @Builder
+  private NewSongCategoryCard(item: NewSongCategory) {
+    Stack({ alignContent: Alignment.BottomStart }) {
+      Image(item.cover).width(200).height(120).borderRadius(18).objectFit(ImageFit.Cover)
+      Column({ space: 3 }) {
+        Text(item.title).fontSize(17).fontWeight(FontWeight.Bold).fontColor(TC.textOnMedia())
+        Text(item.subtitle).fontSize(9).fontColor(TC.textOnMediaSecondary()).maxLines(1)
+      }
+      .width('60%').padding(12)
+      .linearGradient({ angle: 0, colors: [['rgba(0,0,0,0.72)', 0], ['rgba(0,0,0,0)', 1]] })
+    }
+    .width(200).height(120)
+    .borderRadius(18).clip(true)
+    .onClick(() => this.openNewSongCategory(item))
+  }
+
   @Builder
   private ThreeRowSongs(columns: SongColumn[]) {
     Scroll() {
@@ -716,6 +741,12 @@ struct Recommend {
             .layoutWeight(1).height(42).padding({ left: 14, right: 14 })
             .backgroundColor(TC.surfaceCardAlt()).borderRadius(21)
             .onClick(() => this.pageStack.pushPathByName('SearchPage', null))
+
+            Stack() {
+              SymbolGlyph($r('sys.symbol.identify_song')).fontSize(20).fontColor([TC.accent()])
+            }
+            .width(42).height(42).borderRadius(21).backgroundColor(TC.surfaceCardAlt())
+            .onClick(() => this.pageStack.pushPathByName('SongRecognitionPage', null))
           }
           .width('100%').padding({ left: 14, right: 14, top: 12 })
 
@@ -834,25 +865,28 @@ struct Recommend {
           }
 
           this.SectionTitle('新歌速递', '全部、华语、欧美、日本、韩国')
-          Scroll() {
-            Row({ space: 12 }) {
+          if (this.newSongTiles()) {
+            // 大屏：分类卡片保持原尺寸换行平铺，一行摆下全部，不拉长也不横向滚动
+            Flex({ wrap: FlexWrap.Wrap }) {
               ForEach(this.newSongCategories, (item: NewSongCategory) => {
-                Stack({ alignContent: Alignment.BottomStart }) {
-                  Image(item.cover).width(200).height(120).borderRadius(18).objectFit(ImageFit.Cover)
-                  Column({ space: 3 }) {
-                    Text(item.title).fontSize(17).fontWeight(FontWeight.Bold).fontColor(TC.textOnMedia())
-                    Text(item.subtitle).fontSize(9).fontColor(TC.textOnMediaSecondary()).maxLines(1)
-                  }
-                  .width('60%').padding(12)
-                  .linearGradient({ angle: 0, colors: [['rgba(0,0,0,0.72)', 0], ['rgba(0,0,0,0)', 1]] })
+                Column() {
+                  this.NewSongCategoryCard(item)
                 }
-                .borderRadius(18).clip(true)
-                .onClick(() => this.openNewSongCategory(item))
+                .margin({ right: 12, bottom: 12 })
               })
             }
-            .padding({ left: 16, right: 16 })
+            .width('100%').padding({ left: 16, right: 16 })
+          } else {
+            Scroll() {
+              Row({ space: 12 }) {
+                ForEach(this.newSongCategories, (item: NewSongCategory) => {
+                  this.NewSongCategoryCard(item)
+                })
+              }
+              .padding({ left: 16, right: 16 })
+            }
+            .scrollable(ScrollDirection.Horizontal).scrollBar(BarState.Off).width('100%')
           }
-          .scrollable(ScrollDirection.Horizontal).scrollBar(BarState.Off).width('100%')
 
           if (this.radioCards.length > 0) {
             this.SectionTitle('推荐电台', '编辑精选的声音内容')
@@ -893,6 +927,10 @@ struct Recommend {
       .width('100%').height('100%').scrollBar(BarState.Off)
     }
     .width('100%').height('100%').backgroundColor(TC.pageBackground())
+    .onAreaChange((_old: Area, area: Area) => {
+      const width = Number(area.width)
+      if (width !== this.viewWidth) { this.viewWidth = width }
+    })
     .onRefreshing(async () => {
       this.isRefreshing = true
       await this.loadHomeData()

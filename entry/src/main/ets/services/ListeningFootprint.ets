@@ -69,10 +69,9 @@ export function listeningTimeValue(raw: number | string | undefined): number {
 }
 
 /**
- * 以「不带 endTime 请求返回的 endTime」为唯一基准递减（不要再按本地今天推算）。
- * 周：每期 -7 天（周六 0 点）；月：每期 -该月天数（月末 0 点）。
- * offset = 0 返回 0，表示不传 endTime，即接口默认的本周 / 本月。
- * 因为永远是基准减去正数，不可能产生比基准更新的日期。
+ * 以「不带 endTime 请求返回的 endTime」为唯一基准递减（不要按本地今天推算，否则会和接口的
+ * 周/月切分错位）。周：每期 -7 天；月：每期 -该月天数。offset = 0 返回 0，
+ * 表示不传 endTime，即接口默认的本周 / 本月；因为永远是基准减正数，不会翻到未来。
  */
 export function listeningPeriodEnd(period: string, baseEnd: number, offset: number): number {
   if (offset === 0 || baseEnd <= 0) { return 0 }
@@ -86,6 +85,21 @@ export function listeningPeriodEnd(period: string, baseEnd: number, offset: numb
     end += step * days * DAY_MS
   }
   return end
+}
+
+/**
+ * 该周期的第一天（本地日期），用于画日期网格。
+ * 与 endTime 共用同一个基准，保证「顶部写的周期」与「下面格子的日期」永远对得上。
+ */
+export function listeningPeriodStart(period: string, baseEnd: number, offset: number): Date | null {
+  if (baseEnd <= 0) { return null }
+  const end = offset === 0 ? baseEnd : listeningPeriodEnd(period, baseEnd, offset)
+  if (end <= 0) { return null }
+  const d = new Date(end)
+  if (period === 'week') {
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate() - 6)
+  }
+  return new Date(d.getFullYear(), d.getMonth(), 1)
 }
 
 /** 无数据时导航条显示的周期名，同样从接口基准推导。 */

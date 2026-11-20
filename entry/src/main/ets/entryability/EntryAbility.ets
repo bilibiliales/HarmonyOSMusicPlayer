@@ -7,6 +7,7 @@ import { SkinService } from '../services/SkinService';
 import { DecorationStore } from '../services/DecorationStore';
 import { playerController } from '../services/PlayerController';
 import { PlaybackControlBridge } from '../services/PlaybackControlBridge';
+import { ShortcutBridge } from '../services/ShortcutBridge';
 import { NearbyShareSession, SystemShareService } from '../services/SystemShareService';
 
 const DOMAIN = 0x0000;
@@ -33,6 +34,13 @@ export default class EntryAbility extends UIAbility {
     } else if (want.action === PlaybackControlBridge.CONTROL_ACTION && action === 'pause') {
       PlaybackControlBridge.dispatch('pause');
     }
+  }
+
+  /** 桌面图标长按快捷方式：把动作写进 AppStorage，等首页绑定播放控制器后再执行。 */
+  private handleShortcutWant(want: Want): void {
+    const raw = want.parameters?.[ShortcutBridge.ACTION_KEY];
+    if (typeof raw !== 'string') { return; }
+    ShortcutBridge.publish(raw);
   }
 
   /** 应用被系统的「打开方式 / FileOpen」拉起时，把音频 URI 交给界面层播放。 */
@@ -67,6 +75,7 @@ export default class EntryAbility extends UIAbility {
     SystemShareService.bindAbility(this.context);
     this.handlePlaybackWant(want);
     this.handleOpenAudioWant(want);
+    this.handleShortcutWant(want);
     hilog.info(DOMAIN, 'testTag', '%{public}s', 'Ability onCreate');
   }
 
@@ -108,6 +117,7 @@ export default class EntryAbility extends UIAbility {
   onNewWant(want: Want, launchParam: AbilityConstant.LaunchParam): void {
     this.handlePlaybackWant(want);
     this.handleOpenAudioWant(want);
+    this.handleShortcutWant(want);
   }
 
   onConfigurationUpdate(newConfig: Configuration): void {

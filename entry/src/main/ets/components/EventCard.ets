@@ -157,7 +157,7 @@ export struct EventCard {
       Row({ space: 11 }) {
         Stack({ alignContent: Alignment.BottomEnd }) {
           Image(resizeImageUrl(this.item.user.avatarUrl, 96, 96)).width(46).height(46)
-            .sourceSize({ width: 96, height: 96 }).borderRadius(18).objectFit(ImageFit.Cover)
+            .sourceSize({ width: 96, height: 96 }).borderRadius(23).objectFit(ImageFit.Cover)
           if (this.item.user.userType === 4) { Image($r('app.media.ic_singer')).width(18).height(18).borderRadius(9) }
         }.width(46).height(46).onClick(() => this.openUser(this.item.user.userId))
         Column({ space: 4 }) {

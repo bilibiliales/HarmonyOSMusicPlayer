@@ -1,3 +1,5 @@
+import { ShortcutBridge } from '../services/ShortcutBridge'
+import { BubbleTip } from '../services/BubbleTip'
 import { LocalMusicPage } from './LocalMusic'
 import { DecorationMedia } from '../services/DecorationMedia'
 import { YunbeiPage } from './Yunbei'
@@ -50,6 +52,7 @@ import { SatiPage } from './Sati'
 import { PlaylistCoverPreview, PlaylistCoverPreviewPageParam } from './PlaylistCoverPreview'
 import { ImagePreviewPage, ImagePreviewPageParam } from './ImagePreviewPage'
 import { RingtonePage, RingtonePageParam } from './RingtonePage'
+import { SongRecognitionPage } from './SongRecognitionPage'
 import {
   AlbumPageParam,
   ArtistPageParam,
@@ -87,6 +90,10 @@ struct HomeIndex {
   @StorageProp('skinVersion') skinVersionObs: number = 0
   @StorageLink('openAudioUri') openAudioUri: string = ''
   @StorageLink('openAudioSeq') @Watch('onExternalAudio') openAudioSeq: number = 0
+  @StorageLink('shortcutSeq') @Watch('onShortcut') shortcutSeq: number = 0
+  @StorageLink('shortcutAction') shortcutAction: string = ''
+  private shortcutHandledSeq: number = -1
+  private shortcutReady: boolean = false
   @Provide('pageStack') pageStack: NavPathStack = new NavPathStack()
   @Provide('authStore') authStore: AuthStore = new AuthStore()
   @Provide('playerStore') playerStore: PlayerStore = new PlayerStore()
@@ -161,6 +168,26 @@ struct HomeIndex {
       this.openAudioUri = ''
       this.openExternalAudio(uri)
     }
+    // 快捷方式冷启动：onCreate 已写入 action，等控制器绑定完成后在这里执行
+    this.shortcutReady = true
+    this.consumeShortcut()
+  }
+
+  /** 热启动时系统再次以快捷方式拉起应用。 */
+  onShortcut(): void {
+    this.consumeShortcut()
+  }
+
+  private consumeShortcut(): void {
+    if (!this.shortcutReady) { return }
+    if (this.shortcutSeq <= 0 || this.shortcutHandledSeq === this.shortcutSeq) { return }
+    const action = this.shortcutAction
+    this.shortcutHandledSeq = this.shortcutSeq
+    if (!action) { return }
+    const context = this.getUIContext().getHostContext() as common.UIAbilityContext
+    ShortcutBridge.handle(action, context, this.authStore,
+      (name: string, param: object | null) => this.pageStack.pushPathByName(name, param),
+      (text: string) => BubbleTip.show(this.getUIContext(), text))
   }
 
   /** 热启动时系统再次以「打开方式」拉起应用。 */
@@ -245,7 +272,8 @@ struct HomeIndex {
       const context = this.getUIContext().getHostContext() as common.UIAbilityContext
       const mainWindow = await window.getLastWindow(context)
       const avoidArea = mainWindow.getWindowAvoidArea(window.AvoidAreaType.TYPE_SYSTEM)
-      this.topAvoidHeight = px2vp(avoidArea.topRect.height)
+      // 某些平板横屏会给出异常的顶部避让高度，钳一下，避免整页被顶下去、底部 Tab 划出屏幕
+      this.topAvoidHeight = Math.min(px2vp(avoidArea.topRect.height), 60)
     } catch (error) {
       console.error(`[HomeIndex] Failed to obtain the top avoid area: ${JSON.stringify(error)}`)
       this.topAvoidHeight = 0
@@ -375,6 +403,8 @@ struct HomeIndex {
       ImagePreviewPage({ pageParam: param as ImagePreviewPageParam })
     } else if (name === 'RingtonePage') {
       RingtonePage({ pageParam: param as RingtonePageParam })
+    } else if (name === 'SongRecognitionPage') {
+      SongRecognitionPage()
     }
   }
 
@@ -468,6 +498,10 @@ struct HomeIndex {
         }
         .barHeight(60)
         .barMode(BarMode.Fixed)
+        // 必须显式撑满：Tabs 会按内容撑高，平板横屏内容比窗口高时
+        // 底部的 5 个 Tab 会被顶到屏幕外，甚至要滑动页面才能点到。
+        .width('100%')
+        .height('100%')
         .barBackgroundColor(this.dockBgImage ? 'rgba(0,0,0,0)' :
           (this.dockBgColor ? this.dockBgColor : TC.navBackground()))
         .onChange((index: number) => {

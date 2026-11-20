@@ -5,6 +5,8 @@ import { playerController } from '../services/PlayerController'
 import { TC } from '../services/ThemeColors'
 import { DetailTopBar } from '../components/DetailTopBar'
 import { NoMoreFooter } from '../components/NoMoreFooter'
+import { resizeImageUrl } from '../services/ImageUrl'
+import { Responsive } from '../services/Responsive'
 
 @Component
 export struct NewSongListPage {
@@ -18,6 +20,8 @@ export struct NewSongListPage {
   @State scrollOffset: number = 0
   /** 播放全部行是否已冻结在顶栏下沿（只在跨阈值时翻转）。 */
   @State private frozen: boolean = false
+  /** 页面宽度：大屏上歌曲列表分两列，一屏展示更多，而不是把每行拉长。 */
+  @State private viewWidth: number = 0
   private scroller: Scroller = new Scroller()
 
   aboutToAppear(): void {
@@ -99,7 +103,7 @@ export struct NewSongListPage {
     }
     .width('100%')
     .backgroundColor(Color.Transparent)
-    .backdropBlur(30)
+    .backdropBlur(12)
     .position({ x: 0, y: this.topAvoidHeight + 54 })
     .zIndex(3)
   }
@@ -112,7 +116,7 @@ export struct NewSongListPage {
           Column() {
             Stack({ alignContent: Alignment.BottomStart }) {
               if (this.pageParam.cover && this.pageParam.cover.length > 0) {
-                Image(this.pageParam.cover).width('100%').height(210 + this.topAvoidHeight).objectFit(ImageFit.Cover)
+                Image(resizeImageUrl(this.pageParam.cover, 750, 560)).width('100%').height(210 + this.topAvoidHeight).objectFit(ImageFit.Cover)
               } else {
                 Column().width('100%').height(210 + this.topAvoidHeight)
                   .linearGradient({ angle: 135, colors: [['#6f2536', 0], ['#202039', 1]] })
@@ -152,7 +156,7 @@ export struct NewSongListPage {
                     Row({ space: 12 }) {
                       Text((index + 1).toString()).width(28).fontSize(12)
                         .fontColor(index < 3 ? TC.accent() : TC.textTertiary()).textAlign(TextAlign.Center)
-                      Image(item.img).width(52).height(52).borderRadius(11).objectFit(ImageFit.Cover)
+                      Image(resizeImageUrl(item.img, 104, 104)).width(52).height(52).borderRadius(11).objectFit(ImageFit.Cover)
                       Column({ space: 5 }) {
                         Text(item.name).width('100%').fontSize(14).fontColor(TC.textBody()).maxLines(1)
                           .textOverflow({ overflow: TextOverflow.Ellipsis })
@@ -170,6 +174,7 @@ export struct NewSongListPage {
                 })
               }
               .width('100%').scrollBar(BarState.Off)
+              .lanes(this.viewWidth >= Responsive.EXPANDED ? 2 : 1, 12)
             }
             NoMoreFooter()
           }
@@ -200,6 +205,10 @@ export struct NewSongListPage {
         }
       }
       .width('100%').height('100%').backgroundColor(TC.pageBackground())
+      .onAreaChange((_old: Area, area: Area) => {
+        const width = Number(area.width)
+        if (width !== this.viewWidth) { this.viewWidth = width }
+      })
     }
     .hideTitleBar(true)
   }
