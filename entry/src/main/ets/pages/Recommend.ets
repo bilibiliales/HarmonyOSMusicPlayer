@@ -815,8 +815,8 @@ struct Recommend {
                   Column().width(132).height(132).borderRadius(17).backgroundColor('rgba(0,0,0,0.35)')
                   Image(FM_ICON).width(46).height(46).borderRadius(23)
                 }.width(132).height(132)
-                Text('私人FM').width(132).fontSize(14).fontWeight(FontWeight.Bold).fontColor(TC.textBody())
-                Text('为你推荐的下一首').width(132).fontSize(10).fontColor(TC.textTertiary())
+                Text('私人漫游').width(132).fontSize(14).fontWeight(FontWeight.Bold).fontColor(TC.textBody())
+                Text('无限推荐，放到最后一首会继续').width(132).fontSize(10).fontColor(TC.textTertiary()).maxLines(1)
               }.alignItems(HorizontalAlign.Start).onClick(() =>
                 this.pageStack.pushPathByName('PlaylistDetailPage', DiscoveryPlaylistsService.playlist()))
 

@@ -22,6 +22,14 @@
 - AVSession 隔离性静态依赖扫描 + 门控真值表 + 真实门控代码运行时模拟：`entry/src/test/AvSessionIsolation.regression.cjs`。
 - 顺序播放、列表循环、单曲循环、随机播放。
 - 全局共享播放队列，迷你播放器与详情页状态同步。
+- 私人漫游（原「私人 FM」，`services/PrivateFmService.ets`）：推荐页入口、歌单页标题与文案统一改名。
+  队列放到最后一首（或手动点下一首到队尾）时，`PrivateFmService.refill()` 再取一批并
+  `PlayerController.appendToQueue()` 追加到队尾，实现无限漫游；追加按 id 去重，取不到歌时退回从头循环。
+  续歌由 `PlayerController.setQueueFiller()` 挂载，`setQueue()` / `clearQueue()` 自动摘除，
+  普通歌单不会被污染。
+  歌单页右上角图标（`sys.symbol.wand_and_stars`）打开「私人漫游模式」半屏：默认 / 熟悉 / 探索 /
+  运动 / 专注 / 夜间情绪；选择后写入 `AppSettings.saveFmMode()`，默认模式走 `/personal_fm`，
+  其余走 `/personal/fm/mode`（场景模式带 `submode`）。`AppSettings.resetLocalSettings()` 会一并复位。
 - 播放详情页音质半屏切换、评论半屏、收藏到指定歌单半屏。
 - 喜欢/取消喜欢、应用沙箱下载、系统分享、歌曲百科。
 - 后端服务地址仅在侧边栏“设置”中展示和修改。
@@ -42,6 +50,20 @@
 - 用户等级、听歌时长、指定用户歌单与动态页面。
 - “我的-音乐”三级分栏：创建歌单、收藏歌单、收藏专辑。
 - 歌单详情分享/评论/收藏统计操作、歌单内搜索与评论半屏。
+- 歌词本（`pages/LyricBook.ets`，侧边栏「歌词本」在「AI 写歌」之上）：走 `/song/lyrics/mark/user/page`
+  游标分页（`limit` + 后端返回的 `offset`/`hasMore`），卡片依次渲染摘录时间与歌词时间点、歌词原文、
+  译文/音译（`translateType` 1 译文 / 2 音译）、播放组件（封面+歌名+歌手，点击把该歌并入当前队列并播放）。
+  手机一行一张卡片、平板一行两张（`Responsive.itemPercent` + `Flex.wrap`，与装扮中心同一套断点）。
+  卡片右上角三个操作：分享复用 `ShareSheet`（按歌曲分享）、编辑进 `pages/LyricMarkEditor.ets`
+  （原文、译文/音译与时间点，保存走 `/song/lyrics/mark/add` 并带 `markId`）、删除走
+  `/song/lyrics/mark/del` 且先弹确认框。
+- 摘录入口：播放页歌词行**长按**（`LongPressGesture`，480ms）进入 `pages/LyricMarkPick.ets`，
+  版式与铃声制作页一致（顶栏、歌曲信息、带边框的歌词列表、底部操作）。
+  歌词列表点击选中/取消（选中项高亮 + 勾选），`/song/lyrics/mark` 已摘录的句子按时间容差
+  1.2s 自动选中；底部固定「删除歌词 / 复制歌词 / 分享歌词」三个工具（删除先确认、复制走
+  `pasteboard`、分享走 `SystemShareService.showText`），主按钮把选中集合同步到服务端：
+  新增句子批量提交（`saveMany`，10 句一批），取消选中的已摘录句子逐个 `del`。
+  长按打开后 800ms 内忽略该行的 click（避免顺手把歌词页收起）。
 - 听歌识曲：麦克风识曲（3 次 × 5 秒）与本机文件识曲（`AudioViewPicker` 选音频文件）。
   指纹在隐藏的离线网页引擎里用官方 wasm 计算（`rawfile/audiofp/index.html` + `AudioFingerprintWeb`），
   文件由网页侧解码、混单声道、重采样到 8kHz 并挑最响的 3 秒，再查 `/audio/match`。

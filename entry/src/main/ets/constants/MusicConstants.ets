@@ -71,7 +71,7 @@ export const findDragonBallList: findDragonBallType[] = [
     action: 'orpheus://songrcmd'
   },
   {
-    title: '私人FM',
+    title: '私人漫游',
     imageUrl: 'http://p1.music.126.net/Shi7cRT1bDhwpVDM7AOFXg==/109951165265330616.jpg',
     action: 'orpheus://privatefm'
   },

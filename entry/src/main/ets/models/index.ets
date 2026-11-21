@@ -5,6 +5,7 @@ export * from './style'
 export * from './radio'
 export * from './digitalAlbum'
 export * from './sati'
+export * from './lyricmark'
 
 export class TabClass {
   title: string = ''

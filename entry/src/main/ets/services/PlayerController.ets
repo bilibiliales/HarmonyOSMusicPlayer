@@ -63,6 +63,15 @@ export class PlayerController {
   private released: boolean = false
   private scrobble: ListeningScrobble = new ListeningScrobble()
 
+  /**
+   * 队列放完后的「续歌」钩子：私人漫游用它在最后一首播完时再取一批。
+   * 返回追加的歌曲数，0 表示没取到（退回原来的从头循环）。
+   * 只在 `setQueue` 时挂载/清空，普通歌单不会误触发。
+   */
+  private queueFiller?: () => Promise<number>
+  /** 续歌进行中，避免 completed 回调重复触发时叠加多次请求。 */
+  private refilling: boolean = false
+
   // The streaming source must outlive the load call: AVPlayer keeps calling its
   // descriptor callback while the song is playing. Cancelled on song switch / teardown.
   private audioStream?: StreamingAudioSource
@@ -1008,6 +1017,8 @@ export class PlayerController {
     if (!this.store) {
       return
     }
+    // 换队列时先摘掉续歌钩子，避免上个场景（私人漫游）继续给新队列续歌
+    this.queueFiller = undefined
     if (queue.length === 0) {
       await this.clearQueue()
       return
@@ -1018,6 +1029,27 @@ export class PlayerController {
     this.store.setQueue(queue, safeIndex, preservePlayback)
     this.persistState()
     await this.playAt(this.store.currentIndex, autoPlay)
+  }
+
+  /** 挂载 / 摘除「队列放完再取一批」的钩子（私人漫游）。 */
+  setQueueFiller(filler?: () => Promise<number>): void {
+    this.queueFiller = filler
+  }
+
+  /** 当前队列快照（续歌去重、页面展示用）。 */
+  queueSnapshot(): songItemType[] {
+    return this.store ? this.store.queue.slice() : []
+  }
+
+  /** 往队尾追加歌曲，不改当前播放位置；返回实际追加数量。 */
+  appendToQueue(songs: songItemType[]): number {
+    if (!this.store || songs.length === 0) {
+      return 0
+    }
+    const queue = this.store.queue.concat(songs)
+    this.store.setQueue(queue, this.store.currentIndex, true)
+    this.persistState()
+    return songs.length
   }
 
   async insertNext(songs: songItemType[]): Promise<void> {
@@ -1092,9 +1124,44 @@ export class PlayerController {
     if (this.store.playMode === PlayMode.SHUFFLE && this.store.queue.length > 1) {
       index = this.randomIndex()
     } else if (index >= this.store.queue.length) {
+      // 私人漫游：手动点下一首到队尾时也续歌，而不是回到第一首
+      if (this.queueFiller) {
+        await this.advancePastEnd()
+        return
+      }
       index = 0
     }
     await this.playAt(index, true)
+  }
+
+  /**
+   * 播到队列末尾：挂了续歌钩子（私人漫游）就先取一批追加，再从下一首继续；
+   * 钩子缺失或没取到歌时退回原来的「从头循环」。
+   */
+  private async advancePastEnd(): Promise<void> {
+    const token = this.playRequestToken
+    const filler = this.queueFiller
+    if (!filler) {
+      await this.playAt(0, true)
+      return
+    }
+    if (this.refilling) {
+      return
+    }
+    this.refilling = true
+    try {
+      const added = await filler()
+      if (added > 0 && token === this.playRequestToken && this.store) {
+        await this.playAt(this.store.currentIndex + 1, true)
+        return
+      }
+    } catch (_error) {
+    } finally {
+      this.refilling = false
+    }
+    if (token === this.playRequestToken && this.store) {
+      await this.playAt(0, true)
+    }
   }
 
   private handleCompleted(): void {
@@ -1113,7 +1180,8 @@ export class PlayerController {
       return
     }
     if (this.store.currentIndex >= this.store.queue.length - 1) {
-      this.playAt(0, true)
+      // 私人漫游等无限队列在这里续歌，其余场景保持从头循环
+      this.advancePastEnd()
     } else {
       this.playAt(this.store.currentIndex + 1, true)
     }
@@ -1218,6 +1286,7 @@ export class PlayerController {
     if (!this.store) {
       return
     }
+    this.queueFiller = undefined
     this.store.clearQueue()
     await this.stopAndClearSource()
     this.persistState()

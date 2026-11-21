@@ -69,6 +69,7 @@ export struct Sidebar {
     { icon: $r('sys.symbol.cloud'), title: '我的云盘', subtitle: '上传、管理与播放云盘音乐', available: true, route: 'CloudDrivePage' },
     { icon: $r('sys.symbol.arrow_down_circle'), title: '本地与下载', subtitle: '下载管理、导入音乐与离线播放', available: true, route: 'LocalMusicPage' },
     { icon: $r('sys.symbol.square_and_pencil'), title: '装扮中心', subtitle: '皮肤、播放器与图标自定义', available: true, route: 'DecorationCenterPage' },
+    { icon: $r('sys.symbol.text_alignleft'), title: '歌词本', subtitle: '收集你摘录过的歌词', available: true, route: 'LyricBookPage' },
     { icon: $r('sys.symbol.wand_and_stars'), title: 'AI 写歌', subtitle: '风格改编、AI 作词与灵感创作', available: true, route: 'AiSongStudioPage' },
     { icon: $r('sys.symbol.cart'), title: '云贝中心', subtitle: '签到、任务与收支记录', available: true, route: 'YunbeiPage' },
     { icon: $r('sys.symbol.clock'), title: '定时关闭', subtitle: '倒计时结束自动暂停播放', available: true, action: 'sleep' },

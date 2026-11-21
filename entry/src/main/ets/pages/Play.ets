@@ -41,6 +41,7 @@ import { VinylRecord } from '../components/VinylRecord'
 import { PlayerBackdrop, PlayerAboveLayers } from '../components/PlayerBackdrop'
 import { HeartBurst } from '../components/HeartBurst'
 import { RingtonePageParam } from './RingtonePage'
+import { LyricMarkPickParam } from '../models/lyricmark'
 import { PlayerStyleConfig } from '../models/decoration'
 import { DecoKeys } from '../services/DecorationRuntime'
 import { DecoColor } from '../services/DecorationColor'
@@ -119,6 +120,8 @@ export struct Play {
   private lastNetworkCheck: number = 0
   private loadedLyricSongId: string = ''
   private lyricLoadRevision: number = 0
+  /** 长按歌词进入摘录页的时刻，用来吞掉长按抬起时那次误触的点击。 */
+  private lyricLongPressAt: number = 0
   private loadedRedSongId: string = ''
   private loadedQualitySongId: string = ''
   private likedSongIds: string[] = []
@@ -642,11 +645,27 @@ export struct Play {
    *  - 暂停跟随状态（手动滑动浏览中）：点击歌词立即取消暂停跟随并跳转到对应进度。
    */
   private onLyricTap(line: LyricLine, index: number): void {
+    // 刚长按打开摘录页时，抬手可能还会补一次 click，这里忽略掉
+    if (Date.now() - this.lyricLongPressAt < 800) {
+      return
+    }
     if (this.lyricUserScrolling) {
       this.seekToLyric(line, index)
       return
     }
     this.closeLyrics()
+  }
+
+  /** 长按歌词：进入这首歌的歌词摘录页（挑选要收进歌词本的句子）。 */
+  private openLyricMark(): void {
+    const song = this.playerStore.currentSong
+    if (!song.id || !/^\d+$/.test(song.id)) {
+      BubbleTip.show(this.getUIContext(), '这首歌暂不支持歌词摘录')
+      return
+    }
+    this.lyricLongPressAt = Date.now()
+    const param: LyricMarkPickParam = { song: song }
+    this.pageStack.pushPathByName('LyricMarkPickPage', param)
   }
 
   private seekToLyric(line: LyricLine, index: number): void {
@@ -1557,6 +1576,10 @@ export struct Play {
                   delay: this.lyricLineDelay(index)
                 })
                 .onClick(() => this.onLyricTap(line, index))
+                .gesture(
+                  LongPressGesture({ fingers: 1, repeat: false, duration: 480 })
+                    .onAction(() => this.openLyricMark())
+                )
               }
             }, (line: LyricLine, index: number) =>
               `${index}-${line.time}-${this.lyricCentered() ? 'c' : 'l'}-${this.showTranslation ? 1 : 0}-${this.showRoma ? 1 : 0}`)

@@ -29,6 +29,10 @@ import { UserProfilePage } from './UserProfile'
 import { PrivateChatPage } from './PrivateChat'
 import { MessageCenterPage } from './MessageCenter'
 import { AiSongStudioPage } from './AiSongStudio'
+import { LyricBookPage } from './LyricBook'
+import { LyricMarkEditorPage } from './LyricMarkEditor'
+import { LyricMarkPickPage } from './LyricMarkPick'
+import { LyricMarkEditorParam, LyricMarkPickParam } from '../models/lyricmark'
 import { ArtistPage } from './Artist'
 import { EventDetailPage } from './EventDetail'
 import { AlbumDetail } from './AlbumDetail'
@@ -349,6 +353,12 @@ struct HomeIndex {
       MessageCenterPage()
     } else if (name === 'AiSongStudioPage') {
       AiSongStudioPage()
+    } else if (name === 'LyricBookPage') {
+      LyricBookPage()
+    } else if (name === 'LyricMarkEditorPage') {
+      LyricMarkEditorPage({ pageParam: param as LyricMarkEditorParam })
+    } else if (name === 'LyricMarkPickPage') {
+      LyricMarkPickPage({ pageParam: param as LyricMarkPickParam })
     } else if (name === 'ArtistPage') {
       ArtistPage({ pageParam: param as ArtistPageParam })
     } else if (name === 'ArtistSongsPage') {

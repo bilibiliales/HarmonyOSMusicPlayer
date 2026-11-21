@@ -46,6 +46,8 @@ export class AppSettings {
   private static readonly STREAMING_PLAYBACK_KEY: string = 'streaming_playback_enabled'
   private static readonly SCROBBLE_KEY: string = 'scrobble_enabled'
   private static readonly DEVICE_ALIAS_KEY: string = 'device_alias'
+  private static readonly FM_MODE_KEY: string = 'fm_mode'
+  private static readonly FM_SUBMODE_KEY: string = 'fm_submode'
 
   static lyricPreferences: LyricPreferences = new LyricPreferences()
   static desktopLyricsEnabled: boolean = false
@@ -55,6 +57,10 @@ export class AppSettings {
   static effectsEnabled: boolean = true
   /** 是否在本机记录听歌记录（关闭则不调用网易云 V2 打卡，不计入听歌记录/排行）。 */
   static scrobbleEnabled: boolean = true
+  /** 私人漫游模式：DEFAULT / FAMILIAR / EXPLORE / SCENE_RCMD。 */
+  static fmMode: string = 'DEFAULT'
+  /** 场景模式细分：EXERCISE / FOCUS / NIGHT_EMO（仅 SCENE_RCMD 生效）。 */
+  static fmSubmode: string = ''
 
   static async saveFeature(key: string, value: preferences.ValueType): Promise<void> {
     if (!AppSettings.context) { throw new Error('设置存储尚未初始化') }
@@ -135,6 +141,10 @@ export class AppSettings {
     AppSettings.backgroundPlaybackEnabled = typeof backgroundValue === 'boolean' ? backgroundValue : true
     AppSettings.streamingPlaybackEnabled = await store.get(AppSettings.STREAMING_PLAYBACK_KEY, true) === true
     AppSettings.scrobbleEnabled = await store.get(AppSettings.SCROBBLE_KEY, true) === true
+    const fmModeValue = await store.get(AppSettings.FM_MODE_KEY, 'DEFAULT')
+    const fmSubmodeValue = await store.get(AppSettings.FM_SUBMODE_KEY, '')
+    AppSettings.fmMode = typeof fmModeValue === 'string' && fmModeValue.length > 0 ? fmModeValue : 'DEFAULT'
+    AppSettings.fmSubmode = typeof fmSubmodeValue === 'string' ? fmSubmodeValue : ''
     AppSettings.settingsLoaded = true
     AppSettings.deviceAlias = AppSettings.resolveDeviceAlias(await store.get(AppSettings.DEVICE_ALIAS_KEY,
       AppSettings.LEGACY_DEVICE_ALIAS))
@@ -243,7 +253,7 @@ export class AppSettings {
       'lyric_preferences', 'desktop_lyrics_enabled', 'desktop_lyrics_locked', 'effects_enabled',
       'download_save_mode', 'ask_download_save_mode', 'background_playback_enabled',
       'streaming_playback_enabled', 'scrobble_enabled', 'default_play_mode',
-      'default_online_quality', 'default_download_quality',
+      'default_online_quality', 'default_download_quality', 'fm_mode', 'fm_submode',
       'ai_base_url', 'ai_api_key', 'ai_model'
     ]
     for (const key of keys) {
@@ -260,6 +270,8 @@ export class AppSettings {
     // 由调用方在重置后按需调用 setBackgroundPlayback(true)，否则开关显示 ON 但会话仍是卸载态。
     AppSettings.streamingPlaybackEnabled = true
     AppSettings.scrobbleEnabled = true
+    AppSettings.fmMode = 'DEFAULT'
+    AppSettings.fmSubmode = ''
     AppSettings.defaultPlayMode = PlayMode.LOOP
     AppSettings.defaultOnlineQuality = 'exhigh'
     AppSettings.defaultDownloadQuality = 'exhigh'
@@ -289,6 +301,14 @@ export class AppSettings {
     await store.put(AppSettings.SCROBBLE_KEY, enabled)
     await store.flush()
     AppSettings.scrobbleEnabled = enabled
+  }
+
+  /** 私人漫游模式（mode + scene 细分）持久化。 */
+  static async saveFmMode(mode: string, submode: string): Promise<void> {
+    AppSettings.fmMode = mode.length > 0 ? mode : 'DEFAULT'
+    AppSettings.fmSubmode = submode
+    await AppSettings.saveFeature(AppSettings.FM_MODE_KEY, AppSettings.fmMode)
+    await AppSettings.saveFeature(AppSettings.FM_SUBMODE_KEY, AppSettings.fmSubmode)
   }
 
   static async saveAiSettings(context: common.Context, baseUrl: string, apiKey: string,
