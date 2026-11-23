@@ -22,6 +22,7 @@ export class PlayerStore {
   position: number = 0
   duration: number = 0
   playMode: PlayMode = PlayMode.LOOP
+  isRoaming: boolean = false
   quality: string = 'exhigh'
   actualQuality: string = ''
   errorMessage: string = ''

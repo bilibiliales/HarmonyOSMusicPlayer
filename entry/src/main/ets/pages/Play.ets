@@ -1,3 +1,4 @@
+import { HeartLike } from '../components/HeartLike'
 import { SheetSkinFrame } from '../components/SheetSkin'
 import { ResourceComments } from '../components/ResourceComments'
 import { CommentResource } from '../models/CommentResource'
@@ -39,7 +40,6 @@ import { PlayerStore } from '../stores/PlayerStore'
 import { ShareSheet } from '../components/ShareSheet'
 import { VinylRecord } from '../components/VinylRecord'
 import { PlayerBackdrop, PlayerAboveLayers } from '../components/PlayerBackdrop'
-import { HeartBurst } from '../components/HeartBurst'
 import { RingtonePageParam } from './RingtonePage'
 import { LyricMarkPickParam } from '../models/lyricmark'
 import { PlayerStyleConfig } from '../models/decoration'
@@ -47,15 +47,70 @@ import { DecoKeys } from '../services/DecorationRuntime'
 import { DecoColor } from '../services/DecorationColor'
 import { AppSettings } from '../services/AppSettings'
 import { BubbleTip } from '../services/BubbleTip'
+import { QueueBatchService } from '../services/QueueBatchService'
 import { RectShape } from '@kit.ArkUI'
 import { TC } from '../services/ThemeColors'
 
 @Component
 export struct Play {
+  @State queueSelecting: boolean = false
+  @State queueSelected: number[] = []
+  @State queueBatchBusy: boolean = false
+  @State queueBatchMessage: string = ''
+  @State batchCollectSongs: songItemType[] = []
+  private queueDragSong?: songItemType
+  private queueDragIndex: number = -1
+  private finishQueueDrag(to: number): void {
+    const from = this.queueDragIndex
+    const song = this.queueDragSong
+    this.queueDragSong = undefined
+    this.queueDragIndex = -1
+    if (!song || this.queueSelecting || this.queueBatchBusy || this.playerStore.queue[from] !== song) { return }
+    playerController.moveQueueItem(from, to)
+  }
+
+  @Builder
+  private QueueDragPreview(index: number) {
+    Row({ space: 10 }) {
+      SymbolGlyph($r('sys.symbol.music')).fontSize(20).fontColor([TC.accent()])
+      Text(this.playerStore.queue[index]?.name || '').fontSize(14).fontColor(TC.textPrimary()).maxLines(1)
+    }.padding(16).backgroundColor(TC.surfaceCard()).borderRadius(14)
+  }
+
+  private selectedQueueSongs(): songItemType[] {
+    return this.playerStore.queue.filter((_song: songItemType, index: number) => this.queueSelected.includes(index))
+  }
+
+  private toggleQueueSelection(index: number): void {
+    if (this.queueBatchBusy) { return }
+    this.queueSelected = this.queueSelected.includes(index) ? this.queueSelected.filter((value: number) => value !== index) :
+      this.queueSelected.concat([index])
+  }
+
+  private async queueBatch(action: string): Promise<void> {
+    if (this.queueBatchBusy || !this.selectedQueueSongs().length) { return }
+    const songs = this.selectedQueueSongs()
+    if (action === 'collect') {
+      if (!this.authStore.loggedIn) { this.pageStack.pushPathByName('LoginPage', null); return }
+      this.batchCollectSongs = songs
+      await this.openCollectSheet()
+      return
+    }
+    this.queueBatchBusy = true
+    try {
+      if (action === 'remove') {
+        await playerController.removeMany(this.queueSelected)
+        this.queueSelected = []
+      } else {
+        const context = this.getUIContext().getHostContext() as common.UIAbilityContext
+        this.queueBatchMessage = await QueueBatchService.download(context, songs, (message: string) => this.queueBatchMessage = message)
+      }
+    } catch (error) { this.queueBatchMessage = error instanceof Error ? error.message : '批量操作失败' }
+    finally { this.queueBatchBusy = false }
+  }
   @StorageProp('skinVersion') skinVersionObs: number = 0
   @StorageProp(DecoKeys.PLAYER_STYLE) @Watch('onPlayerStyleChanged') playerStyleRaw: string = ''
   @State playerStyle: PlayerStyleConfig = new PlayerStyleConfig()
-  @State heartTrigger: number = 0
   @Consume('pageStack') pageStack: NavPathStack
   @Consume('topAvoidHeight') topAvoidHeight: number
   @Consume('playerStore') playerStore: PlayerStore
@@ -975,6 +1030,7 @@ export struct Play {
       if (response.code === 200) {
         this.liked = nextLiked
         this.playerStore.currentSong.liked = nextLiked
+        playerController.updateLiked(this.playerStore.currentSong.id, nextLiked)
         if (nextLiked) {
           if (!this.likedSongIds.includes(this.playerStore.currentSong.id)) {
             this.likedSongIds.push(this.playerStore.currentSong.id)
@@ -983,9 +1039,6 @@ export struct Play {
           this.likedSongIds = this.likedSongIds.filter((id: string) => id !== this.playerStore.currentSong.id)
         }
         this.redCount = Math.max(0, this.redCount + (nextLiked ? 1 : -1))
-        if (nextLiked) {
-          this.heartTrigger = this.heartTrigger + 1
-        }
         BubbleTip.show(this.getUIContext(), nextLiked ? '已加入我喜欢的音乐' : '已取消喜欢')
       }
     } catch (error) {
@@ -1070,7 +1123,19 @@ export struct Play {
   }
 
   private async collectTo(playlist: playlistType): Promise<void> {
+    if (this.queueBatchBusy) { return }
     try {
+      if (this.batchCollectSongs.length) {
+        this.queueBatchBusy = true
+        try {
+          await QueueBatchService.collect(playlist.id, this.batchCollectSongs)
+          this.batchCollectSongs = []
+          this.queueSelected = []
+          this.activeSheet = 'queue'
+          BubbleTip.show(this.getUIContext(), `已批量收藏到「${playlist.name}」`)
+        } finally { this.queueBatchBusy = false }
+        return
+      }
       const response = await ApiClient.get<CommentResponse>('/playlist/tracks', [
         { key: 'op', value: 'add' },
         { key: 'pid', value: playlist.id },
@@ -1732,6 +1797,8 @@ export struct Play {
   }
 
   private closeSheet(): void {
+    if (this.queueBatchBusy) { return }
+    this.batchCollectSongs = []
     this.activeSheet = ''
     if (!this.playerStore.hasQueue()) { this.pageStack.pop() }
   }
@@ -1739,45 +1806,75 @@ export struct Play {
   @Builder
   private QueueSheet() {
     Column() {
-      this.SheetHeader(`播放队列 · ${this.playerStore.queue.length} 首`, this.playerStore.modeTitle())
-      if (this.playerStore.queue.length === 0) {
-        Column({ space: 10 }) {
-          SymbolGlyph($r('sys.symbol.music')).fontSize(38).fontColor([TC.textQuaternary()])
-          Text('播放列表为空').fontSize(14).fontColor(TC.textTertiary())
-        }
-        .layoutWeight(1).justifyContent(FlexAlign.Center)
-      } else {
-        List() {
-          ForEach(this.playerStore.queue, (item: songItemType, index: number) => {
-            ListItem() {
-              Row({ space: 12 }) {
-                if (index === this.playerStore.currentIndex) {
-                  SymbolGlyph($r('sys.symbol.text_alignleft')).width(24).fontSize(18).fontColor([TC.accent()])
-                } else {
-                  Text((index + 1).toString()).width(24).fontSize(12).fontColor(TC.textQuaternary())
-                    .textAlign(TextAlign.Center)
-                }
-                Column({ space: 3 }) {
-                  Text(item.name).fontSize(14)
-                    .fontColor(index === this.playerStore.currentIndex ? TC.accent() : TC.textPrimary()).maxLines(1)
-                  Text(item.author).fontSize(11).fontColor(TC.textTertiary()).maxLines(1)
-                }
-                .layoutWeight(1).alignItems(HorizontalAlign.Start)
-                  .onClick(() => this.selectQueueSong(index))
+      Row({ space: 8 }) {
+        Text(`播放队列 · ${this.playerStore.queue.length} 首`).layoutWeight(1).fontSize(17).fontColor(TC.textPrimary())
+        SymbolGlyph($r('sys.symbol.checkmark_circle_fill')).fontSize(21)
+          .fontColor([this.queueSelecting ? TC.accent() : TC.textSecondary()]).padding(6)
+          .accessibilityText('多选').enabled(!this.queueBatchBusy).onClick(() => {
+            this.queueSelecting = !this.queueSelecting; this.queueSelected = []; this.queueBatchMessage = ''
+          })
+        SymbolGlyph($r('sys.symbol.trash')).fontSize(21).fontColor([TC.textSecondary()]).padding(6)
+          .accessibilityText('清空播放队列').enabled(!this.queueBatchBusy).onClick(async () => {
+            await playerController.clearQueue(); this.queueSelected = []; this.queueSelecting = false
+          })
+        SymbolGlyph($r('sys.symbol.xmark')).fontSize(20).fontColor([TC.textSecondary()]).padding(6)
+          .onClick(() => this.closeSheet())
+      }.width('100%').height(56).padding({ left: 18, right: 12 })
+      Row({ space: 6 }) {
+        SymbolGlyph(this.modeSymbol()).fontSize(15).fontColor([TC.textSecondary()])
+        Text(this.playerStore.isRoaming && this.playerStore.playMode === PlayMode.LOOP ? '顺序播放' : this.playerStore.modeTitle())
+          .fontSize(12).fontColor(TC.textSecondary())
+      }.padding({ left: 12, right: 12, top: 7, bottom: 7 }).borderRadius(18)
+        .backgroundColor(TC.chipBackground()).margin({ left: 18, bottom: 8 }).alignSelf(ItemAlign.Start)
+        .onClick(() => playerController.cycleMode())
+      if (this.queueSelecting) {
+        Text(this.queueSelected.length === this.playerStore.queue.length ? '取消全选' : '全选')
+          .fontSize(12).fontColor(TC.accent()).padding({ left: 18, bottom: 8 }).alignSelf(ItemAlign.Start)
+          .enabled(!this.queueBatchBusy).onClick(() => {
+            this.queueSelected = this.queueSelected.length === this.playerStore.queue.length ? [] : this.playerStore.queue.map((_song: songItemType, index: number) => index)
+          })
+      }
+      List() {
+        ForEach(this.playerStore.queue, (item: songItemType, index: number) => {
+          ListItem() {
+            Row({ space: 12 }) {
+              if (this.queueSelecting) {
+                SymbolGlyph(this.queueSelected.includes(index) ? $r('sys.symbol.checkmark_circle_fill') : $r('sys.symbol.circle'))
+                  .fontSize(20).fontColor([this.queueSelected.includes(index) ? TC.accent() : TC.textSecondary()])
+              } else {
+                Text((index + 1).toString()).width(24).fontSize(12).fontColor(TC.textQuaternary()).textAlign(TextAlign.Center)
+              }
+              Column({ space: 3 }) {
+                Text(item.name).fontSize(14).fontColor(index === this.playerStore.currentIndex ? TC.accent() : TC.textPrimary()).maxLines(1)
+                Text(item.author).fontSize(11).fontColor(TC.textTertiary()).maxLines(1)
+              }.layoutWeight(1).alignItems(HorizontalAlign.Start)
+                .onClick(() => { if (this.queueSelecting) { this.toggleQueueSelection(index) } else { this.selectQueueSong(index) } })
+              if (!this.queueSelecting) {
+                SymbolGlyph($r('sys.symbol.line_3_horizontal')).fontSize(18).fontColor([TC.textSecondary()])
+                  .width(32).height(40).draggable(!this.queueBatchBusy)
+                  .accessibilityText('按住拖动调整顺序')
+                  .onDragStart(() => {
+                    this.queueDragSong = item; this.queueDragIndex = index
+                    return () => { this.QueueDragPreview(index) }
+                  })
+                  .onDragEnd(() => { this.queueDragSong = undefined; this.queueDragIndex = -1 })
                 SymbolGlyph($r('sys.symbol.xmark')).fontSize(15).fontColor([TC.textQuaternary()])
                   .onClick(() => playerController.removeAt(index))
               }
-              .height(58).padding({ left: 18, right: 18 })
-            }
-          })
-        }
-        .layoutWeight(1)
-        Text('清空播放列表').width('100%').height(48).fontSize(13).fontColor(TC.accentSoft())
-          .textAlign(TextAlign.Center).onClick(async () => {
-            await playerController.clearQueue()
-          })
+            }.height(58).padding({ left: 18, right: 18 }).enabled(!this.queueBatchBusy)
+          }.onDrop(() => this.finishQueueDrag(index))
+        })
+      }.layoutWeight(1).scrollBar(BarState.Off)
+        .onDrop(() => this.finishQueueDrag(this.playerStore.queue.length - 1))
+      if (this.queueSelecting) {
+        Row({ space: 12 }) {
+          Button('移除').layoutWeight(1).backgroundColor(TC.accent()).fontColor(TC.textOnAccent()).onClick(() => this.queueBatch('remove'))
+          Button('下载').layoutWeight(1).backgroundColor(TC.accent()).fontColor(TC.textOnAccent()).onClick(() => this.queueBatch('download'))
+          Button('收藏').layoutWeight(1).backgroundColor(TC.accent()).fontColor(TC.textOnAccent()).onClick(() => this.queueBatch('collect'))
+        }.width('100%').padding(12).enabled(!this.queueBatchBusy && this.selectedQueueSongs().length > 0)
       }
-    }
+      if (this.queueBatchMessage) { Text(this.queueBatchMessage).width('100%').fontSize(11).fontColor(TC.accentSoft()).padding(12) }
+    }.height('100%')
   }
 
   @Builder
@@ -2134,9 +2231,7 @@ export struct Play {
 
             if (!this.isNonCatalogAudio()) {
             Column({ space: 3 }) {
-              SymbolGlyph(this.liked ? $r('sys.symbol.heart_fill') : $r('sys.symbol.heart'))
-                .fontSize(27)
-                .fontColor([this.liked ? '#ff4058' : this.psIcon()])
+              HeartLike({ liked: this.liked, iconSize: 27, iconColor: this.liked ? '#ff4058' : this.psIcon() })
               Text(this.redCountLoading ? '…' : this.formatMetricCount(this.redCount))
                 .fontSize(9).fontColor(this.psDim())
             }
@@ -2295,9 +2390,6 @@ export struct Play {
         if (this.coverPreviewVisible) {
           this.CoverPreview()
         }
-
-        HeartBurst({ trigger: this.heartTrigger })
-          .position({ x: '68%', y: '40%' })
         }
         .width('100%')
         .height('100%')

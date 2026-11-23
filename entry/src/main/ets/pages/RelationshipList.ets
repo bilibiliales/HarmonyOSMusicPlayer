@@ -760,7 +760,7 @@ export struct RelationshipListPage {
   private FanClubChip(row: RelationRow) {
     Row({ space: 3 }) {
       SymbolGlyph($r('sys.symbol.person_2_fill')).fontSize(10).fontColor([TC.accent()])
-      Text(row.fansGroupLevel.length > 0 ? `乐迷团 Lv.${row.fansGroupLevel}` : '乐迷团')
+      Text('乐迷团')
         .fontSize(9)
         .fontColor(TC.accent())
     }

@@ -3,6 +3,8 @@ import { SkinBackdrop } from '../components/SkinBackdrop'
 import { EventUpdates } from '../services/EventUpdates'
 import { EventPresentation } from '../services/EventPresentation'
 import { EventCard } from '../components/EventCard'
+import { EventWaterfall } from '../components/EventWaterfall'
+import { UserStatusBadge } from '../components/UserStatusBadge'
 import { ListeningPlaylistService } from '../services/ListeningPlaylistService'
 import { ListeningPlaylistCard } from '../components/ListeningPlaylistCard'
 import {
@@ -36,6 +38,7 @@ import { parseVipInfo } from '../services/VipService'
 import { resizeImageUrl } from '../services/ImageUrl'
 import { AuthStore } from '../stores/AuthStore'
 import { RelationshipPageParam } from './RelationshipList'
+import { SecondaryTabContent, SecondaryTabMotion } from '../components/SecondaryTabContent'
 import { TC } from '../services/ThemeColors'
 import { DetailTopBar } from '../components/DetailTopBar'
 import { ShareSheet } from '../components/ShareSheet'
@@ -58,7 +61,9 @@ export struct UserProfilePage {
   @State recordPreviewType: 0 | 1 = 1
   @State recordError: string = ''
   @State events: UserEventItem[] = []
+  @State tabDirection: number = -1
   @State currentTab: string = 'home'
+  @State eventViewMode: string = 'list'
   @State loading: boolean = true
   @State message: string = ''
   @State cancelSheetVisible: boolean = false
@@ -69,6 +74,9 @@ export struct UserProfilePage {
   @State followedByTarget: boolean = false
   @State shareSheetVisible: boolean = false
   @State scrollOffset: number = 0
+  @State tabsPinned: boolean = false
+  @State statusRefreshRevision: number = 0
+  @State isRefreshing: boolean = false
   /** 页面宽度：大屏上歌单改成多列卡片，而不是一条超长行。 */
   @State private viewWidth: number = 0
   private scroller: Scroller = new Scroller()
@@ -132,9 +140,10 @@ export struct UserProfilePage {
   }
 
   private async loadProfile(): Promise<void> {
+    this.statusRefreshRevision++
     try {
       const detail = await ApiClient.get<UserDetailResponse>('/user/detail', [
-        { key: 'uid', value: this.pageParam.uid }
+        { key: 'uid', value: this.pageParam.uid }, { key: 'timestamp', value: String(Date.now()) }
       ])
       this.detail = detail
       if (this.hasRelationHint()) {
@@ -564,6 +573,10 @@ export struct UserProfilePage {
         }
       }
       .width('100%').padding({ bottom: 18 })
+      Row() {
+        UserStatusBadge({ uid: this.pageParam.uid, refreshRevision: this.statusRefreshRevision })
+      }.width('100%').height(54).justifyContent(FlexAlign.Center).padding({ left: 64, right: 64 })
+        .position({ x: 0, y: this.topAvoidHeight })
     }
     .width('100%').height(280 + this.topAvoidHeight + 54)
   }
@@ -653,6 +666,31 @@ export struct UserProfilePage {
     this.pageStack.pushPathByName('ImagePreviewPage', param)
   }
 
+  private switchTab(tab: string): void {
+    if (tab === this.currentTab) { return }
+    this.tabDirection = SecondaryTabMotion.direction(this.currentTab, tab, ['home', 'playlists', 'events'])
+    this.getUIContext().animateTo({ duration: SecondaryTabMotion.DURATION, curve: Curve.EaseOut }, () => this.currentTab = tab)
+  }
+
+  @Builder
+  private ProfileNavigation() {
+    Row() {
+                  ForEach(['home', 'playlists', 'events'], (tab: string) => {
+                    Column({ space: 8 }) {
+                      Text(tab === 'home' ? '主页' : tab === 'playlists' ? '歌单' : '动态')
+                        .fontSize(15)
+                        .fontWeight(this.currentTab === tab ? FontWeight.Bold : FontWeight.Regular)
+                        .fontColor(this.currentTab === tab ? TC.textPrimary() : TC.textTertiary())
+                      Column().width(this.currentTab === tab ? 28 : 0).height(3).borderRadius(2)
+                        .backgroundColor(TC.accent())
+                    }
+                    .layoutWeight(1).height(52).justifyContent(FlexAlign.Center)
+                    .onClick(() => this.switchTab(tab))
+                  }, (tab: string) => tab)
+                }
+                .width('100%')
+  }
+
   build() {
     NavDestination() {
       SkinBackdrop()
@@ -666,6 +704,7 @@ export struct UserProfilePage {
             }
             .layoutWeight(1).justifyContent(FlexAlign.Center)
           } else {
+            Refresh({ refreshing: $$this.isRefreshing }) {
             Scroll(this.scroller) {
               Column() {
                 this.Header()
@@ -699,22 +738,10 @@ export struct UserProfilePage {
                 }
                 .height(52).width('100%').justifyContent(FlexAlign.Center)
 
-                Row() {
-                  ForEach(['home', 'playlists', 'events'], (tab: string) => {
-                    Column({ space: 8 }) {
-                      Text(tab === 'home' ? '主页' : tab === 'playlists' ? '歌单' : '动态')
-                        .fontSize(15)
-                        .fontWeight(this.currentTab === tab ? FontWeight.Bold : FontWeight.Regular)
-                        .fontColor(this.currentTab === tab ? TC.textPrimary() : TC.textTertiary())
-                      Column().width(this.currentTab === tab ? 28 : 0).height(3).borderRadius(2)
-                        .backgroundColor(TC.accent())
-                    }
-                    .layoutWeight(1).height(52).justifyContent(FlexAlign.Center)
-                    .onClick(() => this.currentTab = tab)
-                  }, (tab: string) => tab)
-                }
-                .width('100%')
+                Column() { this.ProfileNavigation() }
+                  .width('100%').visibility(this.tabsPinned ? Visibility.Hidden : Visibility.Visible)
 
+                SecondaryTabContent({ value: this.currentTab, motionDirection: this.tabDirection }) {
                 if (this.currentTab === 'home') {
                   this.HomeTab()
                 } else if (this.currentTab === 'playlists') {
@@ -747,12 +774,26 @@ export struct UserProfilePage {
                   }
                 } else {
                   Column({ space: 12 }) {
-                    ForEach(this.events, (item: UserEventItem) => {
-                      EventCard({ item: item,
+                    Row() {
+                      Text('动态').fontSize(14).fontColor(TC.textPrimary()).fontWeight(FontWeight.Medium)
+                      Blank()
+                      SymbolGlyph(this.eventViewMode === 'list' ? $r('sys.symbol.square_grid_2x2') : $r('sys.symbol.list_bullet'))
+                        .fontSize(20).fontColor([TC.textTertiary()])
+                        .accessibilityText(this.eventViewMode === 'list' ? '切换为瀑布流' : '切换为列表')
+                        .onClick(() => this.eventViewMode = this.eventViewMode === 'list' ? 'waterfall' : 'list')
+                    }.width('100%').height(40)
+                    if (this.eventViewMode === 'waterfall') {
+                      EventWaterfall({ items: this.events,
                         onChanged: (event: UserEventItem, deleted: boolean) => this.applyEventChange(event, deleted) })
-                    }, (item: UserEventItem) => item.id.toString())
+                    } else {
+                      ForEach(this.events, (item: UserEventItem) => {
+                        EventCard({ item: item,
+                          onChanged: (event: UserEventItem, deleted: boolean) => this.applyEventChange(event, deleted) })
+                      }, (item: UserEventItem) => item.id.toString())
+                    }
                   }
                   .padding({ left: 16, right: 16, bottom: 28 })
+                }
                 }
                 NoMoreFooter()
               }
@@ -761,11 +802,16 @@ export struct UserProfilePage {
             .layoutWeight(1).scrollBar(BarState.Off)
             .onDidScroll(() => {
               const y = this.scroller.currentOffset().yOffset
+              const pinned = y >= 332
+              if (pinned !== this.tabsPinned) { this.tabsPinned = pinned }
               // 顶栏只用到 0~160 这段做渐显，钳住后长列表滚动时不再逐帧刷新页面
               const barOffset = y > 170 ? 170 : y
               if (barOffset !== this.scrollOffset) {
                 this.scrollOffset = barOffset
               }
+            })
+            }.layoutWeight(1).onRefreshing(() => {
+              Promise.all([this.loadProfile(), this.loadRecord()]).finally(() => this.isRefreshing = false)
             })
           }
         }
@@ -777,8 +823,17 @@ export struct UserProfilePage {
           dragBar: false,
           onDisappear: () => this.cancelSheetVisible = false
         })
+        if (this.tabsPinned) {
+          Column() { this.ProfileNavigation() }
+            .width('100%').height(52).backgroundColor(Color.Transparent).backdropBlur(30)
+            .position({ x: 0, y: this.topAvoidHeight + 54 }).zIndex(4)
+        }
         DetailTopBar({
           title: this.detail?.profile.nickname || '用户主页',
+          avatarUrl: this.detail?.profile.avatarUrl || '',
+          identityIconUrl: this.detail?.profile.avatarDetail?.identityIconUrl || '',
+          verified: this.detail?.profile.authStatus === 1 || !!this.detail?.profile.avatarDetail?.identityIconUrl ||
+            this.detail?.profile.userType === 4,
           scrollOffset: this.scrollOffset,
           onShare: () => this.shareUserProfile()
         })

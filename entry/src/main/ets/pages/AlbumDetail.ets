@@ -1,3 +1,5 @@
+import { SongMoreButton } from '../components/SongMoreButton'
+import { HeartLike } from '../components/HeartLike'
 import { SheetSkinFrame } from '../components/SheetSkin'
 import { SkinBackdrop } from '../components/SkinBackdrop'
 import { ResourceComments } from '../components/ResourceComments'
@@ -258,9 +260,7 @@ export struct AlbumDetail {
 
       Button() {
         Row({ space: 4 }) {
-          SymbolGlyph(this.isSub ? $r('sys.symbol.heart_fill') : $r('sys.symbol.heart'))
-            .fontSize(14)
-            .fontColor([this.isSub ? TC.accent() : TC.textPrimary()])
+          HeartLike({ liked: this.isSub, iconSize: 14, iconColor: this.isSub ? TC.accent() : TC.textPrimary() })
           Text(this.isSub ? '已收藏' : '收藏')
             .fontSize(12)
             .fontColor(this.isSub ? TC.accent() : TC.textPrimary())
@@ -476,6 +476,7 @@ export struct AlbumDetail {
                       }
                       .layoutWeight(1)
                       .alignItems(HorizontalAlign.Start)
+                      SongMoreButton({ song: item })
                     }
                     .width('100%')
                     .height(56)

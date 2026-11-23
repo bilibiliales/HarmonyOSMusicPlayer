@@ -1,3 +1,4 @@
+import { SongMoreButton } from '../components/SongMoreButton'
 import {
   ArtistPageParam,
   ArtistToplistArtist,
@@ -566,7 +567,7 @@ struct Recommend {
                 }
                 .layoutWeight(1)
                 .alignItems(HorizontalAlign.Start)
-                SymbolGlyph($r('sys.symbol.play_circle_fill')).fontSize(23).fontColor([TC.textQuaternary()])
+                SongMoreButton({ song: item })
               }
               .width(310)
               .height(68)
@@ -617,7 +618,7 @@ struct Recommend {
                         Text(song.author).width('100%').fontSize(9).fontColor(TC.textQuaternary()).maxLines(1)
                           .textOverflow({ overflow: TextOverflow.Ellipsis })
                       }.layoutWeight(1).alignItems(HorizontalAlign.Start)
-                      SymbolGlyph($r('sys.symbol.play_circle_fill')).fontSize(18).fontColor([TC.textSecondary()])
+                      SongMoreButton({ song: song, iconSize: 18 })
                     }.width(184).height(41).onClick(() => this.playRanking(ranking, index))
                   })
                 } else {

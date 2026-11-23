@@ -1,3 +1,4 @@
+import { HeartLike } from '../components/HeartLike'
 import { SkinBackdrop } from '../components/SkinBackdrop'
 import {
   SatiMoreResponse,
@@ -317,8 +318,7 @@ export struct SatiPage {
         Image(resizeImageUrl(item.pic, 340, 340)).width('100%').aspectRatio(1)
           .sourceSize({ width: 340, height: 340 }).borderRadius(17).objectFit(ImageFit.Cover)
         Stack() {
-          SymbolGlyph(this.isSubscribed(item) ? $r('sys.symbol.heart_fill') : $r('sys.symbol.heart'))
-            .fontSize(18).fontColor([this.isSubscribed(item) ? TC.accent() : TC.textOnAccent()])
+          HeartLike({ liked: this.isSubscribed(item), iconSize: 18, iconColor: this.isSubscribed(item) ? TC.accent() : TC.textOnAccent() })
         }.width(34).height(34).borderRadius(17).backgroundColor('rgba(0,0,0,0.48)').margin(7)
           .onClick(() => this.toggleSubscription(item))
         Stack({ alignContent: Alignment.Center }) {

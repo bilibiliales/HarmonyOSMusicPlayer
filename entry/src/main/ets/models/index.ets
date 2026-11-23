@@ -1,6 +1,7 @@
 export * from './music'
 export * from './api'
 export * from './home'
+export * from './vipSign'
 export * from './style'
 export * from './radio'
 export * from './digitalAlbum'

@@ -52,6 +52,12 @@ class MediaSessionRuntime implements MediaSessionApi {
     this.session.on('playNext', handlers.onNext)
     this.session.on('playPrevious', handlers.onPrevious)
     this.session.on('seek', (time: number) => handlers.onSeek(time))
+    this.session.on('toggleFavorite', (assetId: string) => handlers.onToggleFavorite?.(assetId))
+    // 注册原生播放顺序控件，系统媒体播控据此显示左侧的循环/随机按钮。
+    this.session.on('setLoopMode', (_mode: avSession.LoopMode) => handlers.onCycleLoopMode?.())
+    try {
+      this.session.on('setTargetLoopMode', (mode: avSession.LoopMode) => handlers.onSetLoopMode?.(MediaSessionRuntime.fromLoopMode(mode)))
+    } catch (_error) {}
   }
 
   async activate(): Promise<void> {
@@ -85,7 +91,7 @@ class MediaSessionRuntime implements MediaSessionApi {
     await this.session.setAVMetadata(value)
   }
 
-  async setPlaybackState(state: number, position: number, loopMode: number): Promise<void> {
+  async setPlaybackState(state: number, position: number, loopMode: number, isFavorite: boolean = false): Promise<void> {
     const value: avSession.AVPlaybackState = {
       state: MediaSessionRuntime.toPlaybackState(state),
       speed: 1,
@@ -93,7 +99,8 @@ class MediaSessionRuntime implements MediaSessionApi {
         elapsedTime: Math.max(0, position),
         updateTime: Date.now()
       },
-      loopMode: MediaSessionRuntime.toLoopMode(loopMode)
+      loopMode: MediaSessionRuntime.toLoopMode(loopMode),
+      isFavorite: isFavorite
     }
     await this.session.setAVPlaybackState(value)
   }
@@ -102,7 +109,7 @@ class MediaSessionRuntime implements MediaSessionApi {
     if (!(await avSession.isDesktopLyricSupported())) {
       throw new Error('当前设备不支持系统桌面歌词')
     }
-    if (enabled && !this.desktopEnabled) {
+    if (!this.desktopEnabled) {
       await this.session.enableDesktopLyric(true)
       this.desktopEnabled = true
     }
@@ -156,6 +163,12 @@ class MediaSessionRuntime implements MediaSessionApi {
     }
     return avSession.LoopMode.LOOP_MODE_LIST
   }
+
+  private static fromLoopMode(mode: avSession.LoopMode): number {
+    if (mode === avSession.LoopMode.LOOP_MODE_SINGLE) { return SessionLoopMode.SINGLE }
+    if (mode === avSession.LoopMode.LOOP_MODE_SHUFFLE) { return SessionLoopMode.SHUFFLE }
+    return SessionLoopMode.LIST
+  }
 }
 
 /** Only called from the dynamically imported, switch-gated runtime. */
@@ -175,9 +188,9 @@ export async function createMediaSession(context: common.Context, handlers: Sess
   } catch (_error) {
     // Older images may not expose background play mode; session still works.
   }
-  if (initial.enabled) {
+  if (AppSettings.backgroundPlaybackEnabled) {
     try {
-      await runtime.configureDesktopLyrics(true, initial.locked)
+      await runtime.configureDesktopLyrics(initial.enabled, initial.locked)
     } catch (error) {
       console.info(`[MediaSessionBridge] initial desktop lyrics failed: ${error instanceof Error ? error.message : 'unknown'}`)
     }

@@ -1,4 +1,5 @@
 import { SheetSkinFrame } from '../components/SheetSkin'
+import { HeartLike } from '../components/HeartLike'
 import { ResourceComments } from '../components/ResourceComments'
 import { CommentResource } from '../models/CommentResource'
 import { CommentService } from '../services/CommentService'
@@ -645,10 +646,14 @@ export struct MvPlayerPage {
 
   @Builder
   private ActionButton(icon: () => Resource, title: () => string, value: () => string,
-    active: () => boolean, action: () => void) {
+    active: () => boolean, action: () => void, heart: boolean = false) {
     Column({ space: 6 }) {
       Stack() {
-        SymbolGlyph(icon()).fontSize(22).fontColor([active() ? '#ef233c' : '#e0e0e4'])
+        if (heart) {
+          HeartLike({ liked: active(), iconSize: 22, iconColor: active() ? '#ef233c' : '#e0e0e4' })
+        } else {
+          SymbolGlyph(icon()).fontSize(22).fontColor([active() ? '#ef233c' : '#e0e0e4'])
+        }
       }.width(42).height(42).borderRadius(21).backgroundColor(TC.surfaceInset())
       Text(title()).fontSize(10).fontColor(TC.textQuaternary())
       if (value()) {
@@ -693,7 +698,7 @@ export struct MvPlayerPage {
             () => this.shareMv())
           this.ActionButton(() => this.liked ? $r('sys.symbol.heart_fill') : $r('sys.symbol.heart'),
             () => this.liked ? '已点赞' : '点赞', () => this.compactCount(this.likedCount), () => this.liked,
-            () => this.toggleLike())
+            () => this.toggleLike(), true)
           this.ActionButton(() => $r('sys.symbol.ellipsis_bubble'), () => '评论',
             () => this.compactCount(this.commentCount), () => false,
             () => this.openComments())

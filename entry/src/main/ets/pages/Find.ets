@@ -43,7 +43,7 @@ struct Find {
   @State failedImages: Set<string> = new Set()
   @State currentSection: number = 0
   @State transitionDirection: number = 1
-  private readonly sectionTitles: string[] = ['发现', '排行榜', '曲风', '电台', '数字专辑', '助眠解压']
+  private readonly sectionTitles: string[] = ['发现', '排行榜', '曲风', '播客', '数字专辑', '助眠解压']
 
   aboutToAppear(): void {
     this.loadData(false)

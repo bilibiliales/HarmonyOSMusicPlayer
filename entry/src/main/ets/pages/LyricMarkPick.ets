@@ -109,13 +109,14 @@ export struct LyricMarkPickPage {
     if (!this.authStore.loggedIn || !/^\d+$/.test(String(this.song().id))) {
       return
     }
-    this.marksLoaded = true
     let marks: LyricMarkVO[] = []
     try {
       marks = await LyricMarkService.bySong(String(this.song().id))
-    } catch (_error) {
+    } catch (error) {
+      this.message = error instanceof Error ? error.message : '摘录加载失败'
       return
     }
+    this.marksLoaded = true
     const next: PickLine[] = []
     for (let i = 0; i < this.lines.length; i++) {
       const line = this.lines[i]
@@ -208,6 +209,9 @@ export struct LyricMarkPickPage {
   }
 
   private toggle(index: number): void {
+    if (this.saving || this.deleting) {
+      return
+    }
     this.lines = this.lines.map((line: PickLine, i: number) => {
       if (i !== index) {
         return line
@@ -232,6 +236,10 @@ export struct LyricMarkPickPage {
       }
     }
     return count
+  }
+
+  private hasChanges(): boolean {
+    return this.lines.some((line: PickLine) => line.picked !== (line.markId > 0))
   }
 
   private deletableIds(): number[] {
@@ -360,12 +368,7 @@ export struct LyricMarkPickPage {
       this.pageStack.pushPathByName('LoginPage', null)
       return
     }
-    if (this.saving) {
-      return
-    }
-    const selected = this.selectedCount()
-    if (selected === 0) {
-      BubbleTip.show(this.getUIContext(), '请先选中要摘录的歌词')
+    if (this.saving || this.deleting) {
       return
     }
     const songId = String(this.song().id)
@@ -408,6 +411,7 @@ export struct LyricMarkPickPage {
       } else {
         BubbleTip.show(this.getUIContext(), `已从歌词本移除 ${removed} 句`)
       }
+      this.pageParam.onSaved?.()
       this.pageStack.pop()
     } catch (error) {
       BubbleTip.show(this.getUIContext(), error instanceof Error ? error.message : '摘录保存失败')
@@ -539,7 +543,7 @@ export struct LyricMarkPickPage {
         Row() {
           SymbolGlyph($r('sys.symbol.chevron_left')).fontSize(24).fontColor([TC.textPrimary()])
             .onClick(() => this.pageStack.pop())
-          Text('摘录歌词').layoutWeight(1).fontSize(17).fontWeight(FontWeight.Bold)
+          Text(this.pageParam.editing ? '编辑歌词本' : '摘录歌词').layoutWeight(1).fontSize(17).fontWeight(FontWeight.Bold)
             .fontColor(TC.textPrimary()).textAlign(TextAlign.Center)
           Row({ space: 4 }) {
             SymbolGlyph($r('sys.symbol.text_alignleft')).fontSize(14).fontColor([TC.textSecondary()])
@@ -565,13 +569,15 @@ export struct LyricMarkPickPage {
           Column({ space: 8 }) {
             this.SongHeader()
             this.LyricWindow()
-            Text('点击歌词选中或取消，已摘录的句子会自动选中')
+            Text('点击歌词加入或移除，选中的歌词将在保存后保留到歌词本')
               .width('100%').fontSize(10).fontColor(TC.textTertiary()).textAlign(TextAlign.Center)
-            Row({ space: 10 }) {
-              this.DeleteTool()
-              this.CopyTool()
-              this.ShareTool()
-            }.width('100%').padding({ top: 2 })
+            if (!this.pageParam.editing) {
+              Row({ space: 10 }) {
+                this.DeleteTool()
+                this.CopyTool()
+                this.ShareTool()
+              }.width('100%').padding({ top: 2 })
+            }
           }
           .width('100%')
           .layoutWeight(1)
@@ -589,14 +595,14 @@ export struct LyricMarkPickPage {
                 } else {
                   SymbolGlyph($r('sys.symbol.square_and_pencil')).fontSize(16).fontColor([TC.textOnAccent()])
                 }
-                Text(this.saving ? '保存中…' : (this.selectedCount() > 0 ? `摘录 ${this.selectedCount()} 句` : '摘录歌词'))
+                Text(this.saving ? '保存中…' : (this.pageParam.editing ? '保存' : '保存摘录'))
                   .fontSize(15).fontColor(TC.textOnAccent())
               }
             }
             .width('100%').height(46)
             .backgroundColor(TC.accent()).borderRadius(23)
-            .opacity(this.selectedCount() > 0 ? 1 : 0.5)
-            .enabled(!this.saving && this.selectedCount() > 0)
+            .opacity(this.hasChanges() ? 1 : 0.5)
+            .enabled(!this.saving && !this.deleting && this.hasChanges())
             .onClick(() => this.save())
           }
           .width('100%')

@@ -38,6 +38,7 @@ export struct SongWiki {
   @Consume('topAvoidHeight') topAvoidHeight: number
   @Consume('playerStore') playerStore: PlayerStore
   song: songItemType = { id: '', name: '', author: '', img: '', url: '' }
+  entryMode: string = 'wiki'
 
   @State loading: boolean = true
   @State message: string = ''
@@ -96,8 +97,24 @@ export struct SongWiki {
       this.musicSheets = []
     }
 
+    if (this.entryMode === 'credits') {
+      const credits = /创作|创作者|演唱|作词|作曲|词曲|编曲|制作|录音|混音|母带|和声|creator|composer|lyricist|producer|performer|vocal|arrang|credit/i
+      this.basicFields = this.basicFields.filter((field: WikiField) => credits.test(field.title + ' ' + field.creativeType))
+      this.relatedSections = this.relatedSections.filter((section: WikiRelatedSection) => credits.test(section.title + ' ' + section.code))
+      this.musicSheets = []
+      this.wikiMetaItems = []
+      this.memoryFirstListen = null
+      this.memoryTotalPlay = null
+    } else if (this.entryMode === 'scores') {
+      this.basicFields = []
+      this.relatedSections = []
+      this.wikiMetaItems = []
+      this.memoryFirstListen = null
+      this.memoryTotalPlay = null
+    }
     if (!this.hasPageContent()) {
-      this.message = wikiError || '这首歌暂时没有可展示的百科内容'
+      this.message = this.entryMode === 'credits' ? '这首歌暂时没有创作者信息' :
+        this.entryMode === 'scores' ? '这首歌暂时没有可用乐谱' : wikiError || '这首歌暂时没有可展示的百科内容'
     } else if (wikiError.length > 0) {
       this.actionMessage = wikiError
     }
@@ -1126,7 +1143,7 @@ export struct SongWiki {
             .fontSize(24)
             .fontColor([TC.textPrimary()])
             .onClick(() => this.pageStack.pop())
-          Text('歌曲百科')
+          Text(this.entryMode === 'credits' ? '创作者' : this.entryMode === 'scores' ? '乐谱' : '歌曲百科')
             .layoutWeight(1)
             .fontSize(18)
             .fontWeight(FontWeight.Bold)
@@ -1207,7 +1224,7 @@ export struct SongWiki {
 
               if (this.basicFields.length > 0) {
                 Column({ space: 11 }) {
-                  this.SectionTitle('音乐百科', '仅展示非空信息')
+                  this.SectionTitle(this.entryMode === 'credits' ? '创作者' : '音乐百科', '仅展示非空信息')
                   ForEach(this.basicFields, (field: WikiField) => {
                     this.BasicFieldCard(field)
                   })

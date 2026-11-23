@@ -1,3 +1,4 @@
+import { HeartLike } from './HeartLike'
 import { SheetSkinFrame } from './SheetSkin'
 import { AlbumPageParam, EventDetailPageParam, OperationResponse, UserEventItem, UserProfilePageParam } from '../models/api'
 import { songItemType } from '../models/music'
@@ -23,6 +24,7 @@ export struct EventCard {
   @Prop item: UserEventItem = EventPresentation.empty()
   @State sharing: boolean = false
   @State liking: boolean = false
+  @State deleting: boolean = false
   onChanged: (item: UserEventItem, deleted: boolean) => void = () => {}
   @State commentsVisible: boolean = false
 
@@ -133,6 +135,45 @@ export struct EventCard {
       threadId: this.item.info.threadId || 'A_EV_2_' + this.item.id + '_' + this.item.user.userId }
   }
 
+  private owned(): boolean {
+    return this.authStore.loggedIn && this.item.user.userId.toString() === this.authStore.userId
+  }
+
+  private moreOptions(): MenuElement[] {
+    const options: MenuElement[] = [{ value: '分享', action: () => this.sharing = true }]
+    if (this.owned()) {
+      options.push({ value: '删除', action: () => this.confirmDelete() })
+    }
+    return options
+  }
+
+  private confirmDelete(): void {
+    if (!this.owned() || this.deleting) { return }
+    this.getUIContext().showAlertDialog({
+      title: '删除动态', message: '确定删除这条动态？删除后无法恢复。',
+      primaryButton: { value: '取消', action: () => {} },
+      secondaryButton: { value: '删除', fontColor: TC.accent(), action: () => { this.deleteEvent() } }
+    })
+  }
+
+  private async deleteEvent(): Promise<void> {
+    if (!this.owned() || this.deleting) { return }
+    const item = this.item
+    this.deleting = true
+    try {
+      const response = await ApiClient.get<OperationResponse>('/event/del', [
+        { key: 'evId', value: item.id.toString() }
+      ])
+      if (response.code !== 200) { throw new Error(response.message || '动态删除失败') }
+      this.onChanged(item, true)
+      BubbleTip.show(this.getUIContext(), '动态已删除')
+    } catch (error) {
+      BubbleTip.show(this.getUIContext(), error instanceof Error ? error.message : '动态删除失败')
+    } finally {
+      this.deleting = false
+    }
+  }
+
   @Builder
   private skin_Comments() {
     SheetSkinFrame() {
@@ -165,7 +206,7 @@ export struct EventCard {
           Text(EventPresentation.time(this.item.showTime || this.item.eventTime || 0)).fontSize(10).fontColor(TC.textQuaternary())
         }.layoutWeight(1).alignItems(HorizontalAlign.Start).onClick(() => this.open())
         SymbolGlyph($r('sys.symbol.ellipsis_circle')).fontSize(20).fontColor([TC.textSecondary()]).padding(8)
-          .onClick(() => this.sharing = true)
+          .accessibilityText('更多').enabled(!this.deleting).bindMenu(this.moreOptions())
       }.width('100%')
       Text(EventPresentation.content(this.item)).width('100%').fontSize(13).lineHeight(20).fontColor(TC.textBody())
         .onClick(() => this.open())
@@ -184,8 +225,7 @@ export struct EventCard {
           Text(String(this.item.info.commentCount || 0)).fontSize(10).fontColor(TC.textTertiary())
         }.onClick(() => this.commentsVisible = true)
         Row({ space: 4 }) {
-          SymbolGlyph(this.item.info.liked ? $r('sys.symbol.heart_fill') : $r('sys.symbol.heart'))
-            .fontSize(16).fontColor([this.item.info.liked ? TC.accent() : TC.textTertiary()])
+          HeartLike({ liked: this.item.info.liked, iconSize: 16, iconColor: this.item.info.liked ? TC.accent() : TC.textTertiary() })
           Text(String(this.item.info.likedCount || 0)).fontSize(10).fontColor(this.item.info.liked ? TC.accent() : TC.textTertiary())
         }.enabled(!this.liking).onClick(() => this.like())
       }.width('100%')

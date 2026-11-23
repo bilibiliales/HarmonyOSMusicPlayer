@@ -1,4 +1,6 @@
 import { SkinBackdrop } from '../components/SkinBackdrop'
+import { SheetSkinFrame } from '../components/SheetSkin'
+import { APP_PERMISSION_EXPLANATIONS, PermissionExplanation } from '../models/permissions'
 import { bundleManager, common } from '@kit.AbilityKit'
 import { PlayMode, QUALITY_OPTIONS, QualityOption } from '../models/music'
 import { ApiClient } from '../services/ApiClient'
@@ -59,6 +61,8 @@ export struct SettingsPage {
   @State streamingPlaybackEnabled: boolean = AppSettings.streamingPlaybackEnabled
   @State scrobbleEnabled: boolean = AppSettings.scrobbleEnabled
   @State effectsEnabled: boolean = AppSettings.effectsEnabled
+  @State permissionSheetVisible: boolean = false
+  @StorageProp('showProfileStatus') showProfileStatus: boolean = true
   @State downloadSaveMode: string = AppSettings.downloadSaveMode
   @State askDownloadSaveMode: boolean = AppSettings.askDownloadSaveMode
   @StorageProp('themeMode') themeMode: string = 'system'
@@ -121,15 +125,16 @@ export struct SettingsPage {
     this.aiBaseUrl = AppSettings.aiBaseUrl
     this.aiApiKey = AppSettings.aiApiKey
     this.aiModel = AppSettings.aiModel
-    this.playerStore.playMode = AppSettings.defaultPlayMode
+    playerController.setMode(AppSettings.defaultPlayMode)
   }
 
-  /** 右上角「更多」菜单：重置后端地址、重置本地设置、清空队列、关于。 */
+  /** 右上角「更多」菜单。 */
   private moreMenu(): MenuElement[] {
     const items: MenuElement[] = [
       { value: '重置后端服务地址', action: () => this.confirmResetServer() },
       { value: '重置本地设置', action: () => this.confirmReset() },
       { value: '清空播放队列', action: () => this.confirmClearQueue() },
+      { value: '应用权限申请说明', action: () => this.permissionSheetVisible = true },
       { value: '关于本应用', action: () => this.showAbout() }
     ]
     return items
@@ -206,16 +211,19 @@ export struct SettingsPage {
 
   private showAbout(): void {
     const version = this.appVersion()
-    const account = this.authStore.loggedIn ? `${this.authStore.nickname}（${this.authStore.userId}）` : '未登录'
+    const account = this.authStore.loggedIn ? `${this.authStore.nickname}` : '未登录'
+    const accountId = this.authStore.loggedIn ? `${this.authStore.userId}` : ''
     const lines: string[] = []
     lines.push(`版本 ${version.length > 0 ? version : '未知'}`)
     lines.push(`后端服务：${ApiClient.baseUrl}`)
     lines.push(`账号：${account}`)
-    lines.push(`在线音质：${this.defaultOnlineQuality}　下载音质：${this.defaultDownloadQuality}`)
+    lines.push(`账号ID：${accountId}`)
+    lines.push(`在线音质：${this.defaultOnlineQuality}`)
+    lines.push(`下载音质：${this.defaultDownloadQuality}`)
     this.getUIContext().showAlertDialog({
       title: '关于本应用',
       message: lines.join('\n'),
-      confirm: { value: '好', action: () => {} }
+      confirm: { value: '确定', action: () => {} }
     })
   }
 
@@ -238,6 +246,31 @@ export struct SettingsPage {
     try {
       await ThemeService.setMode(on ? ThemeMode.DARK : ThemeMode.LIGHT)
     } catch (error) { BubbleTip.show(this.getUIContext(), error instanceof Error ? error.message : '保存失败') }
+  }
+
+  @Builder
+  private PermissionSheet() {
+    SheetSkinFrame() {
+      Column() {
+        Row() {
+          Text('应用权限申请说明').layoutWeight(1).fontSize(17).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary())
+          SymbolGlyph($r('sys.symbol.xmark')).fontSize(20).fontColor([TC.textSecondary()]).width(32).height(32)
+            .onClick(() => this.permissionSheetVisible = false)
+        }.width('100%').height(56).padding({ left: 18, right: 18 })
+        Scroll() {
+          Column({ space: 12 }) {
+            ForEach(APP_PERMISSION_EXPLANATIONS, (permission: PermissionExplanation) => {
+              Column({ space: 8 }) {
+                Text('权限名称：' + permission.name).width('100%').fontSize(12).lineHeight(18).fontWeight(FontWeight.Medium)
+                  .fontColor(TC.textPrimary())
+                Text('权限描述：' + permission.description).width('100%').fontSize(13).lineHeight(20).fontColor(TC.textBody())
+                Text('使用场景和目的：' + permission.purpose).width('100%').fontSize(13).lineHeight(20).fontColor(TC.textSecondary())
+              }.width('100%').padding(14).alignItems(HorizontalAlign.Start).backgroundColor(TC.surfaceInset()).borderRadius(14)
+            }, (permission: PermissionExplanation) => permission.name)
+          }.width('100%').padding({ left: 18, right: 18, bottom: 28 })
+        }.width('100%').layoutWeight(1).scrollBar(BarState.Off)
+      }.width('100%').height('100%')
+    }
   }
 
   @Builder
@@ -265,6 +298,19 @@ export struct SettingsPage {
           .enabled(!this.isFollowSystem())
           .onChange((on: boolean) => this.setDark(on))
       }.width('100%').opacity(this.isFollowSystem() ? 0.45 : 1)
+      Row({ space: 12 }) {
+        Column({ space: 6 }) {
+          Text('显示主页状态').fontSize(14).fontColor(TC.textPrimary())
+          Text('显示自己和其他人的状态，仅对本机生效').fontSize(11).fontColor(TC.textSecondary())
+        }.layoutWeight(1).alignItems(HorizontalAlign.Start)
+        Toggle({ type: ToggleType.Switch, isOn: this.showProfileStatus })
+          .selectedColor(TC.accent())
+          .onChange((visible: boolean) => {
+            AppSettings.saveProfileStatusVisibility(visible).catch((error: Error) => {
+              BubbleTip.show(this.getUIContext(), error.message || '保存失败')
+            })
+          })
+      }.width('100%')
     }.width('100%').padding(18).backgroundColor(TC.surfaceCard()).borderRadius(20)
   }
 
@@ -614,6 +660,9 @@ export struct SettingsPage {
           }.width('100%').padding({ left: 16, right: 16, top: 12, bottom: 32 })
         }.width('100%').layoutWeight(1)
       }.width('100%').height('100%').backgroundColor(TC.pageBackground())
+        .bindSheet(this.permissionSheetVisible, this.PermissionSheet(), { height: '78%',
+          backgroundColor: TC.sheetBackground(), showClose: false, dragBar: true,
+          onDisappear: () => this.permissionSheetVisible = false })
     }.hideTitleBar(true).onShown(() => {
       playerController.refreshDesktopLyrics().catch(() => {})
       this.privacyVisible = true

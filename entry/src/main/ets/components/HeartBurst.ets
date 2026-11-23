@@ -1,4 +1,5 @@
 import { DecoKeys } from '../services/DecorationRuntime'
+import { DecorationMedia } from '../services/DecorationMedia'
 
 class HeartParticle {
   id: number = 0
@@ -18,19 +19,60 @@ class HeartParticle {
 export struct HeartBurst {
   @Prop @Watch('burst') trigger: number = 0
   @StorageProp(DecoKeys.HEART_COLOR) color: string = ''
+  @StorageProp(DecoKeys.HEART_IMAGE) @Watch('imageChanged') texture: string = ''
   @StorageProp(DecoKeys.HEART_COUNT) count: number = 0
   @StorageProp(DecoKeys.HEART_SIZE) heartSize: number = 22
   @StorageProp(DecoKeys.HEART_DURATION) duration: number = 1200
+  @StorageProp(DecoKeys.HEART_MODE) mode: string = 'burst'
+  @StorageProp(DecoKeys.HEART_FADE_IN) fadeIn: number = 300
+  @StorageProp(DecoKeys.HEART_HOLD) hold: number = 1000
+  @StorageProp(DecoKeys.HEART_FADE_OUT) fadeOut: number = 400
   @State private particles: HeartParticle[] = []
   @State private progress: number = 0
+  @State private textureFailed: boolean = false
   private seq: number = 0
   private resetTimer: number = -1
+
+  private aboveTimer: number = -1
+  private showAbove(): void {
+    const particle = new HeartParticle()
+    particle.id = ++this.seq
+    this.particles = [particle]
+    this.progress = 0
+    const seq = this.seq
+    const fadeIn = Math.max(0, Math.min(5000, this.fadeIn))
+    const hold = Math.max(0, Math.min(10000, this.hold))
+    const fadeOut = Math.max(0, Math.min(5000, this.fadeOut))
+    animateTo({ duration: fadeIn, curve: Curve.Linear }, () => this.progress = 1)
+    this.aboveTimer = setTimeout(() => {
+      if (this.seq !== seq) { return }
+      animateTo({ duration: fadeOut, curve: Curve.Linear }, () => this.progress = 2)
+      this.aboveTimer = -1
+    }, fadeIn + hold)
+    this.resetTimer = setTimeout(() => {
+      if (this.seq !== seq) { return }
+      this.particles = []
+      this.progress = 0
+      this.resetTimer = -1
+    }, fadeIn + hold + fadeOut + 80)
+  }
+
+  private imageChanged(): void {
+    this.textureFailed = false
+  }
+
+  aboutToAppear(): void {
+    if (this.trigger > 0) { this.burst() }
+  }
 
   /** trigger 变化时喷一次。 */
   private burst(): void {
     if (this.trigger <= 0 || this.count <= 0) {
       return
     }
+    if (this.aboveTimer !== -1) { clearTimeout(this.aboveTimer); this.aboveTimer = -1 }
+    if (this.resetTimer !== -1) { clearTimeout(this.resetTimer); this.resetTimer = -1 }
+    if (this.mode === 'above') { this.showAbove(); return }
     const list: HeartParticle[] = []
     const total = Math.max(1, Math.min(20, Math.round(this.count)))
     for (let i = 0; i < total; i++) {
@@ -49,26 +91,31 @@ export struct HeartBurst {
     }
     this.particles = list
     this.progress = 0
-    animateTo({ duration: this.duration, curve: Curve.EaseOut }, () => {
+    const burstSeq = this.seq
+    const duration = Math.max(600, Math.min(3000, this.duration))
+    animateTo({ duration: duration / 2, curve: Curve.EaseOut, onFinish: () => {
+      if (this.seq !== burstSeq || this.resetTimer === -1) { return }
+      animateTo({ duration: duration / 2, curve: Curve.EaseIn }, () => {
+        this.progress = 2
+      })
+    } }, () => {
       this.progress = 1
     })
     this.resetTimer = setTimeout(() => {
       this.particles = []
       this.progress = 0
       this.resetTimer = -1
-    }, this.duration + 80)
+    }, duration + 80)
   }
 
   /** 上飘阶段渐显（前 20%），之后缓慢渐隐。 */
   private alphaOf(particle: HeartParticle): number {
-    const p = this.progress
-    if (p < 0.2) {
-      return Math.max(0, p / 0.2)
-    }
-    return Math.max(0, 1 - (p - 0.2) / 0.8)
+    return this.progress <= 1 ? this.progress : Math.max(0, 2 - this.progress)
   }
 
   aboutToDisappear(): void {
+    this.seq++
+    if (this.aboveTimer !== -1) { clearTimeout(this.aboveTimer); this.aboveTimer = -1 }
     if (this.resetTimer !== -1) {
       clearTimeout(this.resetTimer)
       this.resetTimer = -1
@@ -78,13 +125,21 @@ export struct HeartBurst {
   build() {
     Stack() {
       ForEach(this.particles, (particle: HeartParticle) => {
-        SymbolGlyph($r('sys.symbol.heart_fill'))
-          .fontSize(this.heartSize * particle.scale)
-          .fontColor([this.color ? this.color : '#ef233c'])
+        Stack() {
+          if (this.texture && !this.textureFailed) {
+            Image(DecorationMedia.displayUri(this.texture))
+              .width(this.heartSize * particle.scale).height(this.heartSize * particle.scale)
+              .objectFit(ImageFit.Contain)
+              .onError(() => this.textureFailed = true)
+          } else {
+            SymbolGlyph($r('sys.symbol.heart_fill'))
+              .fontSize(this.heartSize * particle.scale)
+              .fontColor([this.color ? this.color : '#ef233c'])
+          }
+        }
           .translate({
-            // 先上飘再回落：正弦曲线，progress 0.5 时到最高点
-            x: particle.dx + particle.drift * this.progress,
-            y: -particle.rise * Math.sin(this.progress * Math.PI)
+            x: this.mode === 'above' ? 0 : particle.dx + particle.drift * this.progress,
+            y: this.mode === 'above' ? -(this.heartSize / 2 + 24) : -particle.rise * (1 - Math.abs(1 - this.progress))
           })
           .rotate({ angle: particle.rotate * this.progress })
           .opacity(this.alphaOf(particle))

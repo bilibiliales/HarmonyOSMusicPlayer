@@ -1,12 +1,15 @@
+import { SongMoreButton } from '../components/SongMoreButton'
 import { SkinBackdrop } from '../components/SkinBackdrop'
-import { DailySongsResponse, HappySignInfo, mapApiSong, songItemType } from '../models'
+import { DailySongsResponse, VipSignInfo, mapApiSong, songItemType } from '../models'
 import { ApiClient } from '../services/ApiClient'
 import { playerController } from '../services/PlayerController'
 import { TC } from '../services/ThemeColors'
 import { DetailTopBar } from '../components/DetailTopBar'
 import { NoMoreFooter } from '../components/NoMoreFooter'
 import { SheetSkinFrame } from '../components/SheetSkin'
-import { HappySignDialog } from '../components/HappySignDialog'
+import { VipSignDialog } from '../components/VipSignDialog'
+import { AuthStore } from '../stores/AuthStore'
+import { PlayerStore } from '../stores/PlayerStore'
 import { DailyExtraService } from '../services/DailyExtraService'
 import { BubbleTip } from '../services/BubbleTip'
 import { resizeImageUrl } from '../services/ImageUrl'
@@ -16,6 +19,8 @@ export struct DailyRecommendPage {
   @StorageProp('skinVersion') skinVersionObs: number = 0
   @Consume('pageStack') pageStack: NavPathStack
   @Consume('topAvoidHeight') topAvoidHeight: number
+  @Consume('authStore') authStore: AuthStore
+  @Consume('playerStore') playerStore: PlayerStore
   @State songs: songItemType[] = []
   @State loading: boolean = true
   @State message: string = ''
@@ -36,11 +41,22 @@ export struct DailyRecommendPage {
   private todaySongs: songItemType[] = []
 
   // 今日乐签：真正的自定义弹窗，打开时才构建 controller 以带上最新数据
-  @State private signInfo: HappySignInfo = new HappySignInfo()
+  @State private signInfo: VipSignInfo = new VipSignInfo()
+  @State private signLoading: boolean = false
   private signController?: CustomDialogController
+  private signRequest: number = 0
+  private active: boolean = true
 
   aboutToAppear(): void {
+    this.active = true
+    this.signLoading = false
     this.loadSongs()
+  }
+
+  aboutToDisappear(): void {
+    this.active = false
+    this.signRequest++
+    this.signController?.close()
   }
 
   private async loadSongs(): Promise<void> {
@@ -114,19 +130,31 @@ export struct DailyRecommendPage {
   }
 
   /** 今日乐签：先取内容，再用自定义弹窗展示。 */
-  private async openHappySign(): Promise<void> {
+  private async openVipSign(): Promise<void> {
+    if (this.signLoading) { return }
+    const request = ++this.signRequest
+    const owner = this.authStore.userId
+    const cookie = ApiClient.cookie
+    this.signLoading = true
     try {
-      const info = await DailyExtraService.happySign()
+      const info = await DailyExtraService.vipSign()
+      if (!this.active || request !== this.signRequest || owner !== this.authStore.userId || cookie !== ApiClient.cookie) { return }
       this.signInfo = info
       this.signController = new CustomDialogController({
-        builder: HappySignDialog({ info: info }),
+        builder: VipSignDialog({ info: info, playerStore: this.playerStore, authStore: this.authStore,
+          onLogin: () => this.pageStack.pushPathByName('LoginPage', null),
+          onOpenSong: (song: songItemType) => this.pageStack.pushPathByName('SongWikiPage', song) }),
         autoCancel: true,
         customStyle: true,
         alignment: DialogAlignment.Center
       })
       this.signController.open()
     } catch (error) {
-      BubbleTip.show(this.getUIContext(), error instanceof Error ? error.message : '今日乐签加载失败')
+      if (this.active && request === this.signRequest) {
+        BubbleTip.show(this.getUIContext(), error instanceof Error ? error.message : '今日乐签加载失败')
+      }
+    } finally {
+      if (request === this.signRequest) { this.signLoading = false }
     }
   }
 
@@ -183,7 +211,7 @@ export struct DailyRecommendPage {
   }
 
   @Builder
-  private TopActionButton(symbol: Resource, action: () => void) {
+  private TopActionButton(symbol: Resource, action: () => void, label: string, enabled: boolean = true) {
     Row() {
       SymbolGlyph(symbol).fontSize(18).fontColor([TC.textOnMedia()])
     }
@@ -192,6 +220,7 @@ export struct DailyRecommendPage {
     .borderRadius(18)
     .backgroundColor('rgba(0,0,0,0.35)')
     .justifyContent(FlexAlign.Center)
+    .accessibilityText(label).enabled(enabled).opacity(enabled ? 1 : 0.5)
     .onClick(() => action())
   }
 
@@ -341,7 +370,7 @@ export struct DailyRecommendPage {
                         .width('100%')
                       }
                       .layoutWeight(1).alignItems(HorizontalAlign.Start)
-                      SymbolGlyph($r('sys.symbol.play_circle_fill')).fontSize(23).fontColor([TC.textSecondary()])
+                      SongMoreButton({ song: item })
                     }
                     .height(68).padding({ left: 12, right: 16 }).onClick(() => this.playAt(index))
                   }
@@ -373,8 +402,8 @@ export struct DailyRecommendPage {
           shareEnabled: false
         }) {
           Row({ space: 8 }) {
-            this.TopActionButton($r('sys.symbol.clock'), () => this.openHistory())
-            this.TopActionButton($r('sys.symbol.hand_draw'), () => this.openHappySign())
+            this.TopActionButton($r('sys.symbol.clock'), () => this.openHistory(), '历史日推')
+            this.TopActionButton($r('sys.symbol.hand_draw'), () => this.openVipSign(), '今日乐签', !this.signLoading)
           }
         }
         // 冻结后由浮层接管

@@ -1,7 +1,7 @@
+import { common } from '@kit.AbilityKit'
+import { LyricExportService } from '../services/LyricExportService'
 import { SkinBackdrop } from '../components/SkinBackdrop'
-import { ShareSheet } from '../components/ShareSheet'
 import { LyricMarkEditorParam, LyricMarkVO } from '../models/lyricmark'
-import { SharePageParam } from '../models/api'
 import { songItemType } from '../models/music'
 import { LyricMarkService } from '../services/LyricMarkService'
 import { playerController } from '../services/PlayerController'
@@ -32,8 +32,6 @@ export struct LyricBookPage {
   @State hasMore: boolean = false
   @State message: string = ''
   @State viewWidth: number = 0
-  @State shareVisible: boolean = false
-  @State shareParam: SharePageParam = { type: 'song', id: '', name: '', img: '' }
   private cursor: number = 0
   private requestSeq: number = 0
   private wasLoggedIn: boolean = false
@@ -178,22 +176,38 @@ export struct LyricBookPage {
     }
   }
 
-  private openShare(mark: LyricMarkVO): void {
-    const song = this.songOf(mark)
-    this.shareParam = { type: 'song', id: song.id, name: song.name, img: song.img, author: song.author }
-    this.shareVisible = true
+  private shareOptions(mark: LyricMarkVO): MenuElement[] {
+    return [
+      { value: '下载歌词', action: () => { this.exportLyrics(mark, 'download') } },
+      { value: '复制歌词', action: () => { this.exportLyrics(mark, 'copy') } },
+      { value: '分享歌词', action: () => { this.exportLyrics(mark, 'share') } }
+    ]
+  }
+
+  private async exportLyrics(mark: LyricMarkVO, action: string): Promise<void> {
+    try {
+      const context = this.getUIContext().getHostContext() as common.UIAbilityContext
+      if (action === 'copy') {
+        await LyricExportService.copy(mark)
+        BubbleTip.show(this.getUIContext(), '歌词已复制')
+      } else if (action === 'download') {
+        if (await LyricExportService.download(context, mark)) {
+          BubbleTip.show(this.getUIContext(), '歌词已保存')
+        }
+      } else {
+        await LyricExportService.share(context, mark)
+      }
+    } catch (error) {
+      BubbleTip.show(this.getUIContext(), error instanceof Error ? error.message : '歌词导出失败')
+    }
   }
 
   private openEditor(mark: LyricMarkVO): void {
     const param: LyricMarkEditorParam = {
       mark: mark,
-      onSaved: (updated: LyricMarkVO) => this.applySaved(updated)
+      onSaved: () => { this.refresh() }
     }
     this.pageStack.pushPathByName('LyricMarkEditorPage', param)
-  }
-
-  private applySaved(updated: LyricMarkVO): void {
-    this.marks = this.marks.map((item: LyricMarkVO) => item.markId === updated.markId ? updated : item)
   }
 
   private confirmRemove(mark: LyricMarkVO): void {
@@ -223,7 +237,7 @@ export struct LyricBookPage {
   private CardActions(mark: LyricMarkVO) {
     Row({ space: 0 }) {
       SymbolGlyph($r('sys.symbol.share')).fontSize(15).fontColor([TC.textTertiary()])
-        .padding(7).onClick(() => this.openShare(mark))
+        .padding(7).accessibilityText('分享歌词').bindMenu(this.shareOptions(mark))
       SymbolGlyph($r('sys.symbol.square_and_pencil')).fontSize(15).fontColor([TC.textTertiary()])
         .padding(7).onClick(() => this.openEditor(mark))
       SymbolGlyph($r('sys.symbol.trash')).fontSize(15).fontColor([TC.textTertiary()])
@@ -291,15 +305,6 @@ export struct LyricBookPage {
       this.PlayerRow(mark)
     }
     .width('100%').padding(14).backgroundColor(TC.surfaceCard()).borderRadius(16)
-  }
-
-  @Builder
-  private ShareOptions() {
-    ShareSheet({
-      shareParam: this.shareParam,
-      visible: true,
-      onClose: () => this.shareVisible = false
-    })
   }
 
   @Builder
@@ -387,10 +392,7 @@ export struct LyricBookPage {
           this.viewWidth = width
         }
       })
-      .bindContentCover(this.shareVisible, this.ShareOptions(), {
-        modalTransition: ModalTransition.NONE, backgroundColor: Color.Transparent,
-        onDisappear: () => this.shareVisible = false
-      })
+
     }.hideTitleBar(true).onShown(() => {
       // 从登录页返回时补一次加载
       if (this.authStore.loggedIn && !this.wasLoggedIn) {

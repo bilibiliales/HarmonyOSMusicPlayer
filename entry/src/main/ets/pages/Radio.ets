@@ -8,6 +8,8 @@ import { RadioPlayback } from '../services/RadioPlayback'
 import { BubbleTip } from '../services/BubbleTip'
 import { RadioStationCard, RadioProgramRow } from '../components/RadioCards'
 import { TC } from '../services/ThemeColors'
+import { PodcastLibraryParam } from '../models/podcast'
+import { SecondaryTabContent, SecondaryTabMotion } from '../components/SecondaryTabContent'
 
 @Component
 export struct RadioPage {
@@ -22,6 +24,7 @@ export struct RadioPage {
   @State category: number = 0
   @State categoryName: string = '全部分类'
   @State mode: string = 'recommend'
+  @State motionDirection: number = -1
   @State loading: boolean = false
   @State refreshing: boolean = false
   @State more: boolean = true
@@ -83,16 +86,20 @@ export struct RadioPage {
 
   private chooseMode(mode: string): void {
     if (mode === this.mode) { return }
-    this.mode = mode
+    this.motionDirection = SecondaryTabMotion.direction(this.mode, mode, ['recommend', 'hot', 'new', 'programs'])
+    this.getUIContext().animateTo({ duration: SecondaryTabMotion.DURATION, curve: Curve.EaseOut }, () => this.mode = mode)
     this.query = ''
     this.loadList(true)
   }
 
   private chooseCategory(id: number, name: string): void {
     this.categoryVisible = false
-    this.category = id
-    this.categoryName = name
-    if (this.mode === 'new' || this.mode === 'programs') { this.mode = 'recommend' }
+    this.motionDirection = id > this.category ? -1 : 1
+    this.getUIContext().animateTo({ duration: SecondaryTabMotion.DURATION, curve: Curve.EaseOut }, () => {
+      this.category = id
+      this.categoryName = name
+      if (this.mode === 'new' || this.mode === 'programs') { this.mode = 'recommend' }
+    })
     this.query = ''
     this.loadList(true)
   }
@@ -100,6 +107,11 @@ export struct RadioPage {
   private openStation(id: number, name: string = '', cover: string = ''): void {
     const param: RadioPageParam = { id: String(id), name: name, cover: cover }
     this.pageStack.pushPathByName('RadioDetailPage', param)
+  }
+
+  private openLibrary(section: string): void {
+    const param: PodcastLibraryParam = { section: section }
+    this.pageStack.pushPathByName('PodcastLibraryPage', param)
   }
 
   private async play(programs: ProgramItem[], index: number = 0): Promise<void> {
@@ -155,9 +167,17 @@ export struct RadioPage {
     if (!this.embedded) {
       Row({ space: 12 }) {
         SymbolGlyph($r('sys.symbol.chevron_left')).fontSize(24).fontColor([TC.textPrimary()]).onClick(() => this.pageStack.pop())
-        Text('电台').fontSize(23).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary())
+        Text('播客').fontSize(23).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary())
       }.width('100%').height(56 + this.topAvoidHeight).padding({ left: 17, top: this.topAvoidHeight })
     }
+    Row({ space: 10 }) {
+      ForEach(['recent', 'subscribed', 'created'], (section: string) => {
+        Text(section === 'recent' ? '最近收听' : section === 'subscribed' ? '已订阅' : '我的播客')
+          .fontSize(13).fontColor(TC.textBody()).layoutWeight(1).textAlign(TextAlign.Center)
+          .padding({ top: 13, bottom: 13 }).backgroundColor(TC.surfaceCard()).borderRadius(14)
+          .onClick(() => this.openLibrary(section))
+      }, (section: string) => section)
+    }.width('100%').padding({ left: 17, right: 17, top: 12 })
     Row({ space: 12 }) {
       Column({ space: 5 }) {
         Text('音乐电台').fontSize(18).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary())
@@ -196,6 +216,15 @@ export struct RadioPage {
 
   @Builder
   private Content() {
+    Column() {
+    SecondaryTabContent({ value: `${this.mode}:${this.category}`, motionDirection: this.motionDirection, fill: true }) {
+      this.RadioFeed()
+    }
+    }.width('100%').height('100%')
+  }
+
+  @Builder
+  private RadioFeed() {
     Refresh({ refreshing: this.refreshing }) {
       List() {
         ListItem() { Column() { this.Header(); this.RecommendedPrograms() }.width('100%') }

@@ -18,6 +18,10 @@ export struct DetailTopBar {
   @Consume('topAvoidHeight') topAvoidHeight: number
 
   @Prop title: string = ''
+  @Prop avatarUrl: string = ''
+  @Prop identityIconUrl: string = ''
+  @Prop verified: boolean = false
+  @Prop rootPage: boolean = false
   /** 页面滚动偏移（vp），来自宿主 Scroll/List。 */
   @Prop scrollOffset: number = 0
   @Prop shareEnabled: boolean = true
@@ -37,6 +41,7 @@ export struct DetailTopBar {
   onSearchToggle: () => void = () => {}
   onSearchTextChange: (value: string) => void = () => {}
   onTitleClick: () => void = () => {}
+  onMenuClick: () => void = () => {}
 
   @Builder
   private emptyTrailing() {
@@ -93,7 +98,8 @@ export struct DetailTopBar {
       Column() {
         Column().width('100%').height(this.topAvoidHeight)
         Row({ space: 8 }) {
-          this.CircleButton($r('sys.symbol.chevron_left'), 22, () => this.pageStack.pop())
+          this.CircleButton(this.rootPage ? $r('sys.symbol.line_3_horizontal') : $r('sys.symbol.chevron_left'),
+            this.rootPage ? 19 : 22, () => { if (this.rootPage) { this.onMenuClick() } else { this.pageStack.pop() } })
 
           if (this.searchMode) {
             TextInput({ text: this.searchText, placeholder: this.searchPlaceholder })
@@ -117,6 +123,9 @@ export struct DetailTopBar {
                   .textOverflow({ overflow: TextOverflow.Ellipsis })
               }
               Row({ space: 6 }) {
+                if (this.avatarUrl) {
+                  Image(this.avatarUrl.replace(/^http:/, 'https:')).width(26).height(26).borderRadius(13).objectFit(ImageFit.Cover)
+                }
                 Text(this.title)
                   .layoutWeight(1)
                   .fontSize(16)
@@ -125,6 +134,13 @@ export struct DetailTopBar {
                   .textAlign(TextAlign.Center)
                   .maxLines(1)
                   .textOverflow({ overflow: TextOverflow.Ellipsis })
+                if (this.verified) {
+                  if (this.identityIconUrl) {
+                    Image(this.identityIconUrl.replace(/^http:/, 'https:')).width(18).height(18).objectFit(ImageFit.Contain)
+                  } else {
+                    SymbolGlyph($r('sys.symbol.checkmark_circle_fill')).fontSize(17).fontColor([TC.accent()])
+                  }
+                }
                 if (this.titleDropdown) {
                   SymbolGlyph($r('sys.symbol.chevron_down')).fontSize(12).fontColor([TC.textBody()])
                 }
@@ -136,6 +152,7 @@ export struct DetailTopBar {
             .opacity(this.progress())
             .translate({ y: (1 - this.progress()) * 12 })
             .animation({ duration: 200, curve: Curve.EaseOut })
+            .hitTestBehavior(this.progress() > 0 ? HitTestMode.Default : HitTestMode.None)
             .onClick(() => this.onTitleClick())
           } else {
             Column().layoutWeight(1)
@@ -160,5 +177,6 @@ export struct DetailTopBar {
     }
     .width('100%')
     .height(this.topAvoidHeight + 54)
+    .hitTestBehavior(HitTestMode.Transparent)
   }
 }

@@ -1,3 +1,5 @@
+import { SongMoreButton } from '../components/SongMoreButton'
+import { HeartLike } from '../components/HeartLike'
 import { SheetSkinFrame } from '../components/SheetSkin'
 import { SkinBackdrop } from '../components/SkinBackdrop'
 import { CommentService } from '../services/CommentService'
@@ -372,7 +374,7 @@ export struct PlaylistDetail {
     await playerController.setQueue(list, index, true)
     // 私人漫游：队列放到最后一首自动续歌，实现无限漫游
     if (this.playlist.specialType === 'fm') {
-      playerController.setQueueFiller(() => PrivateFmService.refill())
+      playerController.setQueueFiller((isActive: () => boolean) => PrivateFmService.refill(isActive))
     }
     this.pageStack.pushPathByName('PlayPage', null)
   }
@@ -660,8 +662,7 @@ export struct PlaylistDetail {
       if (!this.playlist.specialType) {
         Button() {
           Row({ space: 4 }) {
-            SymbolGlyph(this.subscribed ? $r('sys.symbol.heart_fill') : $r('sys.symbol.heart'))
-              .fontSize(14).fontColor([this.subscribed ? TC.accent() : TC.textSecondary()])
+            HeartLike({ liked: this.subscribed, iconSize: 14, iconColor: this.subscribed ? TC.accent() : TC.textSecondary() })
             Text(this.formatCount(this.collectCount)).fontSize(10)
               .fontColor(this.subscribed ? TC.accent() : TC.textSecondary())
           }
@@ -855,10 +856,8 @@ export struct PlaylistDetail {
                         Text(`${item.playCount || 0}`).fontSize(12).fontColor(TC.textTertiary())
                       }
                     }
-                    if (this.isOwner()) {
-                      SymbolGlyph($r('sys.symbol.ellipsis_circle')).fontSize(19).fontColor([TC.textQuaternary()])
-                      .onClick(() => this.openSongMenu(item))
-                    }
+                    SongMoreButton({ song: item, canRemove: this.isOwner(),
+                      onRemove: () => this.openSongMenu(item) })
                   }
                   .height(62).padding({ left: 14, right: 16 })
                 }

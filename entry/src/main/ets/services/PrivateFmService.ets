@@ -94,10 +94,10 @@ export class PrivateFmService {
   }
 
   /**
-   * 队列放完时再取一批：过滤掉队列里已有的歌，最多取三轮。
+   * 开始播放最后一首时提前取一批：过滤已有的歌，最多取三轮。
    * 返回追加数量，0 表示这次没拿到新歌（播放器会退回从头循环）。
    */
-  static async refill(): Promise<number> {
+  static async refill(isActive: () => boolean = () => true): Promise<number> {
     const known: Set<string> = new Set()
     const queue = playerController.queueSnapshot()
     for (let i = 0; i < queue.length; i++) {
@@ -111,14 +111,17 @@ export class PrivateFmService {
       } catch (_error) {
         break
       }
+      if (!isActive()) {
+        return 0
+      }
       for (let i = 0; i < batch.length; i++) {
         const song = batch[i]
-        if (song.id.length > 0 && !known.has(song.id)) {
+        if (fresh.length < 3 && song.id.length > 0 && !known.has(song.id)) {
           known.add(song.id)
           fresh.push(song)
         }
       }
     }
-    return fresh.length > 0 ? playerController.appendToQueue(fresh) : 0
+    return isActive() && fresh.length > 0 ? playerController.appendToQueue(fresh) : 0
   }
 }

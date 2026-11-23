@@ -8,6 +8,8 @@ import { ProgramItem } from '../models/home'
 import { RadioPageParam } from '../models/radio'
 import { RadioService } from '../services/RadioService'
 import { RadioPlayback } from '../services/RadioPlayback'
+import { PodcastService } from '../services/PodcastService'
+import { AuthStore } from '../stores/AuthStore'
 import { BubbleTip } from '../services/BubbleTip'
 import { RadioProgramRow } from '../components/RadioCards'
 import { TC } from '../services/ThemeColors'
@@ -17,10 +19,13 @@ export struct RadioDetailPage {
   @StorageProp('skinVersion') skinVersionObs: number = 0
   @Consume('pageStack') pageStack: NavPathStack
   @Consume('topAvoidHeight') topAvoidHeight: number
+  @Consume('authStore') @Watch('subscriptionAuthChanged') authStore: AuthStore
   pageParam: RadioPageParam = { id: '' }
   @State commentsVisible: boolean = false
   @State commentCount: number = 0
   @State station?: DjRadioItem = undefined
+  @State subscribed: boolean = false
+  @State subscribing: boolean = false
   @State programs: ProgramItem[] = []
   @State loading: boolean = false
   @State more: boolean = true
@@ -30,19 +35,29 @@ export struct RadioDetailPage {
   @State message: string = ''
   @State detailMessage: string = ''
   private token: number = 0
+  private detailToken: number = 0
   private alive: boolean = true
   private listOffset: number = 0
 
   aboutToAppear(): void { this.loadDetail(); this.loadPrograms(true); this.loadCommentSummary() }
-  aboutToDisappear(): void { this.alive = false; this.token++ }
+  aboutToDisappear(): void { this.alive = false; this.token++; this.detailToken++ }
+
+  private subscriptionAuthChanged(): void { if (this.alive) { this.loadDetail() } }
 
   private async loadDetail(): Promise<void> {
+    const token = ++this.detailToken
+    const owner = this.authStore.userId
     this.detailMessage = ''
     try {
       const station = await RadioService.detail(this.pageParam.id)
-      if (this.alive) { this.station = station }
+      if (this.alive && token === this.detailToken && owner === this.authStore.userId) {
+        this.station = station
+        this.subscribed = !!station.subed
+      }
     } catch (error) {
-      if (this.alive) { this.detailMessage = error instanceof Error ? error.message : '详情加载失败' }
+      if (this.alive && token === this.detailToken && owner === this.authStore.userId) {
+        this.detailMessage = error instanceof Error ? error.message : '详情加载失败'
+      }
     }
   }
 
@@ -80,6 +95,22 @@ export struct RadioDetailPage {
     this.pageStack.pushPathByName('RadioProgramPage', param)
   }
 
+  private async toggleSubscription(): Promise<void> {
+    if (!this.authStore.loggedIn) { this.pageStack.pushPathByName('LoginPage', null); return }
+    if (this.subscribing || !this.station) { return }
+    const owner = this.authStore.userId
+    const subscribed = !this.subscribed
+    this.subscribing = true
+    try {
+      await PodcastService.subscribe(this.pageParam.id, subscribed)
+      if (this.alive && owner === this.authStore.userId && this.authStore.loggedIn) {
+        this.subscribed = subscribed
+        if (this.station) { this.station.subed = subscribed; this.station.subCount = Math.max(0, this.station.subCount + (subscribed ? 1 : -1)) }
+      }
+    } catch (error) { BubbleTip.show(this.getUIContext(), error instanceof Error ? error.message : '订阅失败') }
+    finally { this.subscribing = false }
+  }
+
   @Builder
   private Header() {
     Row({ space: 16 }) {
@@ -91,6 +122,10 @@ export struct RadioDetailPage {
           .fontSize(11).fontColor(TC.textTertiary())
       }.layoutWeight(1).alignItems(HorizontalAlign.Start)
     }.width('100%').padding({ left: 17, right: 17, top: 20, bottom: 18 })
+    Button(this.subscribing ? '正在更新…' : this.subscribed ? '已订阅 · 取消订阅' : '订阅播客')
+      .fontSize(13).fontColor(this.subscribed ? TC.textBody() : TC.textOnAccent())
+      .backgroundColor(this.subscribed ? TC.surfaceRaised() : TC.accent())
+      .enabled(!this.subscribing && !!this.station).margin({ left: 17, bottom: 12 }).onClick(() => this.toggleSubscription())
     if (this.detailMessage) {
       Text(this.detailMessage + ' · 点击重试').fontSize(12).fontColor(TC.accentSoft()).padding(17).onClick(() => this.loadDetail())
     }
@@ -155,7 +190,7 @@ export struct RadioDetailPage {
       Column() {
         Row({ space: 14 }) {
           SymbolGlyph($r('sys.symbol.chevron_left')).fontSize(24).fontColor([TC.textPrimary()]).onClick(() => this.pageStack.pop())
-          Text('电台详情').fontSize(18).fontColor(TC.textPrimary())
+          Text('播客详情').fontSize(18).fontColor(TC.textPrimary())
         }.width('100%').height(56 + this.topAvoidHeight).padding({ left: 17, top: this.topAvoidHeight })
         List() {
           ListItem() { Column() { this.Header() }.width('100%') }

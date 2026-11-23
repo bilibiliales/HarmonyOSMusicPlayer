@@ -14,6 +14,7 @@ import {
 } from '../models/api'
 import { ApiClient } from '../services/ApiClient'
 import { AuthStore } from '../stores/AuthStore'
+import { SecondaryTabContent, SecondaryTabMotion } from '../components/SecondaryTabContent'
 import { TC } from '../services/ThemeColors'
 
 interface PrivateMessageBody {
@@ -61,6 +62,7 @@ export struct MessageCenterPage {
   @Consume('topAvoidHeight') topAvoidHeight: number
   @Consume('authStore') authStore: AuthStore
 
+  @State tabDirection: number = -1
   @State currentTab: string = 'private'
   @State conversations: MsgPrivateConversation[] = []
   @State commentMessages: MsgCommentNotification[] = []
@@ -80,7 +82,11 @@ export struct MessageCenterPage {
   }
 
   private switchTab(tab: string): void {
-    this.currentTab = tab
+    if (this.currentTab === tab) { return }
+    this.tabDirection = SecondaryTabMotion.direction(this.currentTab, tab, ["private","comments","notices"])
+    this.getUIContext().animateTo({ duration: SecondaryTabMotion.DURATION, curve: Curve.EaseOut }, () => {
+      this.currentTab = tab
+    })
     this.more = true
     this.message = ''
     if ((tab === 'private' && this.conversations.length === 0) ||
@@ -426,6 +432,8 @@ export struct MessageCenterPage {
         .width('100%').height(56).padding({ left: 16, right: 16 })
         this.TabsHeader()
 
+        Column() {
+        SecondaryTabContent({ value: this.currentTab, motionDirection: this.tabDirection, fill: true }) {
         if (!this.authStore.loggedIn) {
           Column({ space: 13 }) {
             SymbolGlyph($r('sys.symbol.envelope_fill')).fontSize(42).fontColor([TC.textQuaternary()])
@@ -456,6 +464,8 @@ export struct MessageCenterPage {
             Text(this.message || '暂无通知').layoutWeight(1).fontSize(13).fontColor(TC.textTertiary())
           }
         }
+        }
+        }.width('100%').layoutWeight(1)
       }
       .width('100%').height('100%').backgroundColor(TC.pageBackground())
     }

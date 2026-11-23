@@ -76,11 +76,13 @@ export interface LyricMarkDraft {
 
 export interface LyricMarkEditorParam {
   mark: LyricMarkVO
-  /** 保存成功后把最新内容回传给列表页。 */
-  onSaved: (mark: LyricMarkVO) => void
+  /** 保存成功后刷新列表，包含新增和移除的歌词行。 */
+  onSaved: () => void
 }
 
 /** 播放页长按歌词进入的「挑歌句」页面。 */
 export interface LyricMarkPickParam {
   song: songItemType
+  editing?: boolean
+  onSaved?: () => void
 }

@@ -3,6 +3,15 @@ import { EventUpdates } from '../services/EventUpdates'
 import { DecorationMedia } from '../services/DecorationMedia'
 import { EventPresentation } from '../services/EventPresentation'
 import { EventCard } from '../components/EventCard'
+import { EventWaterfall } from '../components/EventWaterfall'
+import { UserStatusBadge } from '../components/UserStatusBadge'
+import { DetailTopBar } from '../components/DetailTopBar'
+import { common } from '@kit.AbilityKit'
+import { ShareLink, SystemShareService } from '../services/SystemShareService'
+import { BubbleTip } from '../services/BubbleTip'
+import { SharePageParam } from '../models/api'
+import { PodcastLibrary } from '../components/PodcastLibrary'
+import { SecondaryTabContent, SecondaryTabMotion } from '../components/SecondaryTabContent'
 import { ListeningPlaylistService } from '../services/ListeningPlaylistService'
 import { playlistType, songItemType } from '../models'
 import {
@@ -103,7 +112,11 @@ export struct Mine {
   }
 
   @State currentTab: string = 'music'
+  @State tabDirection: number = -1
+  @State musicDirection: number = -1
+  @State podcastRefreshKey: number = 0
   @State viewMode: string = 'list'
+  @State eventViewMode: string = 'list'
   @State playlists: playlistType[] = []
   @State createdPlaylists: playlistType[] = []
   @State subscribedPlaylists: playlistType[] = []
@@ -142,6 +155,12 @@ export struct Mine {
   @State vipSvip: boolean = false
   @State vipLevel: number = 0
   @State totalListenTime: number = 0
+  @State profileIdentityIcon: string = ''
+  @State profileVerified: boolean = false
+  @State scrollOffset: number = 0
+  @State tabsPinned: boolean = false
+  @State statusRefreshRevision: number = 0
+  private scroller: Scroller = new Scroller()
 
   // `Mine` is kept alive by `Tabs`, so its appear callback is not guaranteed
   // to run when the login destination is popped or the sidebar logs out.
@@ -287,6 +306,8 @@ export struct Mine {
     this.vipSvip = false
     this.vipLevel = 0
     this.totalListenTime = 0
+    this.profileIdentityIcon = ''
+    this.profileVerified = false
     this.loadedUserId = ''
   }
 
@@ -306,6 +327,8 @@ export struct Mine {
       ], timestamp))
       if (detailResp.code === 200 && detailResp.profile) {
         const profile = detailResp.profile
+        this.profileIdentityIcon = profile.avatarDetail?.identityIconUrl || ''
+        this.profileVerified = profile.authStatus === 1 || !!this.profileIdentityIcon || profile.userType === 4
         this.authStore.applyProfile(profile)
         this.userProfile = {
           nickName: profile.nickname,
@@ -386,6 +409,8 @@ export struct Mine {
         const statusResp = await ApiClient.postJson<LoginStatusResponse>('/login/status', statusParams)
         const profile = statusResp.data?.profile
         if (profile) {
+          this.profileIdentityIcon = profile.avatarDetail?.identityIconUrl || ''
+          this.profileVerified = profile.authStatus === 1 || !!this.profileIdentityIcon || profile.userType === 4
           this.authStore.applyProfile(profile)
           this.userProfile = {
             nickName: profile.nickname,
@@ -751,14 +776,12 @@ export struct Mine {
 
   private async pullRefresh(): Promise<void> {
     const timestamp = Date.now().toString()
+    this.statusRefreshRevision++
     this.loadedUserId = ''
     await this.loadUserData(timestamp, this.currentTab === 'music' && this.musicCategory === 'recent')
     const requests: Promise<void>[] = [this.loadVipInfo(timestamp)]
     if (this.currentTab === 'podcast') {
-      this.djOffset = 0
-      this.djHasMore = true
-      this.djRadios = []
-      requests.push(this.loadDjRadios(timestamp))
+      this.podcastRefreshKey++
     } else if (this.currentTab === 'moment') {
       this.eventsLasttime = -1
       this.eventsHasMore = true
@@ -778,14 +801,15 @@ export struct Mine {
   }
 
   build() {
-    Stack({ alignContent: Alignment.BottomEnd }) {
-      Column() {
-        this.HeaderSection()
-        this.StatsSection()
-        this.SubTabBar()
+    Stack({ alignContent: Alignment.TopStart }) {
         Refresh({ refreshing: $$this.isRefreshing }) {
-          Scroll() {
+          Scroll(this.scroller) {
             Column() {
+              this.HeaderSection()
+              this.StatsSection()
+              Column() { this.SubTabBar() }
+                .width('100%').visibility(this.tabsPinned ? Visibility.Hidden : Visibility.Visible)
+              SecondaryTabContent({ value: this.currentTab, motionDirection: this.tabDirection }) {
               if (this.currentTab === 'music') {
                 this.MusicContent()
               } else if (this.currentTab === 'podcast') {
@@ -793,12 +817,22 @@ export struct Mine {
               } else {
                 this.MomentContent()
               }
-            }
+              }
+            }.width('100%').constraintSize({ minHeight: '100%' })
           }
-          .layoutWeight(1)
-          .scrollBar(BarState.Off)
+          .width('100%').height('100%').scrollBar(BarState.Off)
+          .onDidScroll(() => {
+            const y = Math.max(0, this.scroller.currentOffset().yOffset)
+            const pinned = y >= 274
+            if (pinned !== this.tabsPinned) { this.tabsPinned = pinned }
+            const barOffset = Math.min(170, y)
+            if (barOffset !== this.scrollOffset) { this.scrollOffset = barOffset }
+          })
+          .onReachEnd(() => {
+            if (this.currentTab === 'moment' && this.userEvents.length > 0) { this.loadUserEvents() }
+          })
         }
-        .layoutWeight(1)
+        .width('100%').height('100%')
         .onRefreshing(() => {
           this.pullRefresh().then(() => {
             this.isRefreshing = false
@@ -806,16 +840,26 @@ export struct Mine {
             this.isRefreshing = false
           })
         })
+      if (this.tabsPinned) {
+        Column() { this.SubTabBar() }
+          .width('100%').height(44).backgroundColor(Color.Transparent).backdropBlur(30)
+          .position({ x: 0, y: this.topAvoidHeight + 54 }).zIndex(4)
       }
-      .width('100%').height('100%')
+      Column() {
+        DetailTopBar({ title: this.userProfile.nickName, avatarUrl: this.userProfile.avatar,
+          verified: this.profileVerified, identityIconUrl: this.profileIdentityIcon,
+          rootPage: true, shareEnabled: false, scrollOffset: this.scrollOffset,
+          onMenuClick: () => this.onMenuClick() }) { this.ProfileEditButton() }
+      }.width('100%').height(this.topAvoidHeight + 54).position({ x: 0, y: 0 }).zIndex(5)
+        .hitTestBehavior(HitTestMode.Transparent)
 
       if (this.currentTab === 'moment' && this.authStore.loggedIn) {
         Stack() {
           SymbolGlyph($r('sys.symbol.plus_circle_fill')).fontSize(31).fontColor([TC.textOnAccent()])
         }
-        .width(58).height(58).borderRadius(29).backgroundColor(TC.accent())
+        .width(48).height(48).borderRadius(24).backgroundColor(TC.accent())
         .shadow({ radius: 18, color: 'rgba(239,35,60,0.38)', offsetY: 7 })
-        .margin({ right: 20, bottom: 84 }).onClick(() => this.openPublishEvent())
+        .position({ right: 20, bottom: 84 }).zIndex(6).onClick(() => this.openPublishEvent())
       }
     }
     .width('100%')
@@ -837,6 +881,18 @@ export struct Mine {
       dragBar: true,
       onDisappear: () => this.importSheetVisible = false
     })
+  }
+
+  @Builder
+  private ProfileEditButton() {
+    if (this.authStore.loggedIn) {
+      Row() {
+        SymbolGlyph($r('sys.symbol.square_and_pencil')).fontSize(19).fontColor([TC.textOnMedia()])
+      }.width(36).height(36).borderRadius(18).backgroundColor('rgba(0,0,0,0.35)')
+        .justifyContent(FlexAlign.Center).onClick(() => this.openProfileEditor())
+    } else {
+      Column().width(36).height(36)
+    }
   }
 
   @Builder
@@ -909,6 +965,15 @@ export struct Mine {
             .fontColor(TC.textPrimary())
             .fontSize(20)
             .fontWeight(FontWeight.Bold)
+            .maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis }).constraintSize({ maxWidth: '72%' })
+
+          if (this.profileVerified) {
+            if (this.profileIdentityIcon) {
+              Image(this.profileIdentityIcon).width(20).height(20).objectFit(ImageFit.Contain)
+            } else {
+              SymbolGlyph($r('sys.symbol.checkmark_circle_fill')).fontSize(19).fontColor([TC.accent()])
+            }
+          }
 
           if (this.vipActive) {
             Row({ space: 3 }) {
@@ -968,27 +1033,15 @@ export struct Mine {
       }
       .width('100%')
       .alignItems(HorizontalAlign.Center)
-      .padding({ top: this.topAvoidHeight + 32, bottom: 16 })
-
-      if (this.authStore.loggedIn) {
-        Stack() {
-          SymbolGlyph($r('sys.symbol.square_and_pencil')).fontSize(19).fontColor([TC.textOnMedia()])
-        }
-        .width(36).height(36).borderRadius(18).backgroundColor('rgba(0,0,0,0.35)')
-        .position({ right: 18, top: this.topAvoidHeight + 28 }).onClick(() => this.openProfileEditor())
-      }
-
-      // 左上角菜单：展开侧边栏（常白图标 + 半透明圆底，浅色模式同样清晰）
-      Stack() {
-        SymbolGlyph($r('sys.symbol.line_3_horizontal')).fontSize(19).fontColor([TC.textOnMedia()])
-      }
-      .width(36).height(36).borderRadius(18).backgroundColor('rgba(0,0,0,0.35)')
-      .position({ left: 18, top: this.topAvoidHeight + 28 })
-      .onClick(() => this.onMenuClick())
+      .padding({ top: this.topAvoidHeight + 64, bottom: 16 })
+      Row() {
+        UserStatusBadge({ uid: this.authStore.userId, refreshRevision: this.statusRefreshRevision })
+      }.width('100%').height(54).justifyContent(FlexAlign.Center).padding({ left: 64, right: 64 })
+        .position({ x: 0, y: this.topAvoidHeight })
     }
     .width('100%')
-    .height(this.topAvoidHeight + 220)
-    .constraintSize({ minHeight: this.topAvoidHeight + 220 })
+    .height(this.topAvoidHeight + 280)
+    .constraintSize({ minHeight: this.topAvoidHeight + 280 })
     .flexShrink(0)
     .onClick(() => {
       if (!this.authStore.loggedIn) {
@@ -1087,11 +1140,9 @@ export struct Mine {
           .alignItems(HorizontalAlign.Center)
           .padding({ top: 8, bottom: 8 })
           .onClick(() => {
-            this.currentTab = item.name
+            this.switchTab(item.name)
             if (item.name === 'music' && this.musicCategory === 'recent') {
               this.loadRecentData()
-            } else if (item.name === 'podcast' && this.djRadios.length === 0) {
-              this.loadDjRadios()
             } else if (item.name === 'moment' && this.userEvents.length === 0) {
               this.loadUserEvents()
             }
@@ -1103,6 +1154,22 @@ export struct Mine {
     }
     .width('100%')
     .height(44)
+  }
+
+  private switchTab(tab: string): void {
+    if (this.currentTab === tab) { return }
+    this.tabDirection = SecondaryTabMotion.direction(this.currentTab, tab, ['music', 'podcast', 'moment'])
+    this.getUIContext().animateTo({ duration: SecondaryTabMotion.DURATION, curve: Curve.EaseOut }, () => {
+      this.currentTab = tab
+    })
+  }
+
+  private switchMusicCategory(category: string): void {
+    if (this.musicCategory === category) { return }
+    this.musicDirection = SecondaryTabMotion.direction(this.musicCategory, category, ['recent', 'created', 'subscribed', 'albums'])
+    this.getUIContext().animateTo({ duration: SecondaryTabMotion.DURATION, curve: Curve.EaseOut }, () => {
+      this.musicCategory = category
+    })
   }
 
   @Builder
@@ -1380,7 +1447,7 @@ export struct Mine {
           .backgroundColor(this.musicCategory === 'recent' ? TC.surfaceRaised() : Color.Transparent)
           .borderRadius(14)
           .onClick(() => {
-            this.musicCategory = 'recent'
+            this.switchMusicCategory('recent')
             this.loadRecentData()
           })
         Text(`创建 ${this.createdPlaylists.length}`)
@@ -1392,7 +1459,7 @@ export struct Mine {
           .padding({ top: 5, bottom: 5 })
           .backgroundColor(this.musicCategory === 'created' ? TC.surfaceRaised() : Color.Transparent)
           .borderRadius(18)
-          .onClick(() => this.musicCategory = 'created')
+          .onClick(() => this.switchMusicCategory('created'))
         Text(`收藏 ${this.subscribedPlaylists.length}`)
           .layoutWeight(1)
           .fontSize(12)
@@ -1402,7 +1469,7 @@ export struct Mine {
           .padding({ top: 5, bottom: 5 })
           .backgroundColor(this.musicCategory === 'subscribed' ? TC.surfaceRaised() : Color.Transparent)
           .borderRadius(18)
-          .onClick(() => this.musicCategory = 'subscribed')
+          .onClick(() => this.switchMusicCategory('subscribed'))
         Text(`专辑 ${this.subscribedAlbums.length}`)
           .layoutWeight(1)
           .fontSize(12)
@@ -1413,7 +1480,7 @@ export struct Mine {
           .backgroundColor(this.musicCategory === 'albums' ? TC.surfaceRaised() : Color.Transparent)
           .borderRadius(18)
           .onClick(() => {
-            this.musicCategory = 'albums'
+            this.switchMusicCategory('albums')
             if (this.subscribedAlbums.length === 0) {
               this.loadSubscribedAlbums()
             }
@@ -1422,6 +1489,7 @@ export struct Mine {
       .width('60%')
       .padding({ left: 14, right: 14, top: 10, bottom: 8 })
 
+      SecondaryTabContent({ value: this.musicCategory, motionDirection: this.musicDirection }) {
       if (this.musicCategory === 'recent') {
         this.RecentContent()
       } else {
@@ -1459,9 +1527,10 @@ export struct Mine {
           this.BottomButtons()
         }
       }
+      }
     }
     .width('100%')
-    .padding({ bottom: 24 })
+    .padding({ bottom: 145 })
   }
 
   @Builder
@@ -1503,6 +1572,7 @@ export struct Mine {
           SymbolGlyph($r('sys.symbol.ellipsis_circle'))
             .fontSize(18)
             .fontColor([TC.textQuaternary()])
+            .bindMenu(this.playlistMore(item))
         }
         .width('100%')
         .height(72)
@@ -1583,6 +1653,7 @@ export struct Mine {
             }
             .layoutWeight(1).alignItems(HorizontalAlign.Start)
             SymbolGlyph($r('sys.symbol.ellipsis_circle')).fontSize(18).fontColor([TC.textQuaternary()])
+              .bindMenu(this.albumMore(item))
           }
           .height(72).padding({ left: 16, right: 16 })
           .onClick(() => this.navigateToAlbum(item))
@@ -1781,69 +1852,23 @@ export struct Mine {
 
   @Builder
   PodcastContent() {
-    Column() {
-      if (!this.authStore.loggedIn) {
-        Column({ space: 10 }) {
-          SymbolGlyph($r('sys.symbol.person_crop_circle_fill'))
-            .fontSize(40).fontColor([TC.textQuaternary()])
-          Text('登录后查看订阅电台').fontSize(13).fontColor(TC.textTertiary())
-          Button('去登录').fontSize(12).fontColor(TC.textOnAccent()).backgroundColor(TC.accent())
-            .borderRadius(20).onClick(() => this.pageStack.pushPathByName('LoginPage', null))
-        }
-        .width('100%').height(200).justifyContent(FlexAlign.Center)
-      } else if (this.djLoading && this.djRadios.length === 0) {
-        LoadingProgress().width(46).color(TC.accent())
-          .margin({ top: 60 })
-      } else if (this.djRadios.length === 0) {
-        Column({ space: 10 }) {
-          SymbolGlyph($r('sys.symbol.podcast')).fontSize(40).fontColor([TC.textQuaternary()])
-          Text('还没有订阅电台').fontSize(13).fontColor(TC.textTertiary())
-        }
-        .width('100%').height(200).justifyContent(FlexAlign.Center)
-      } else {
-        ForEach(this.djRadios, (item: DjRadioItem) => {
-          Row({ space: 12 }) {
-            Image(item.picUrl).width(56).height(56).borderRadius(12).objectFit(ImageFit.Cover)
-            Column({ space: 4 }) {
-              Text(item.name).fontSize(14).fontColor(TC.textBody()).maxLines(1)
-                .textOverflow({ overflow: TextOverflow.Ellipsis })
-              Text(item.desc || `${item.programCount}期节目 · ${item.subCount}人订阅`)
-                .fontSize(11).fontColor(TC.textTertiary()).maxLines(1)
-                .textOverflow({ overflow: TextOverflow.Ellipsis })
-            }
-            .layoutWeight(1).alignItems(HorizontalAlign.Start)
-            SymbolGlyph($r('sys.symbol.ellipsis_circle')).fontSize(18).fontColor([TC.textQuaternary()])
-          }
-          .width('100%').height(72).padding({ left: 16, right: 16 }).onClick(() => {
-            const param: RadioPageParam = { id: String(item.id), name: item.name, cover: item.picUrl }
-            this.pageStack.pushPathByName('RadioDetailPage', param)
-          })
-        })
-        if (this.djHasMore) {
-          Text('加载更多').width('100%').height(44).fontSize(12).fontColor(TC.textTertiary())
-            .textAlign(TextAlign.Center).onClick(() => this.loadDjRadios())
-        }
-      }
-
-      Row({ space: 12 }) {
-        Stack() {
-          SymbolGlyph($r('sys.symbol.plus_circle')).fontSize(28).fontColor([TC.textTertiary()])
-        }
-        .width(56).height(56).borderRadius(8).backgroundColor(TC.surfaceRaised()).alignContent(Alignment.Center)
-        Column() {
-          Text('创建播客').fontSize(14).fontColor(TC.textBody())
-          Text('在网易云音乐创建你的电台').fontSize(11).fontColor(TC.textTertiary())
-        }
-        .layoutWeight(1).alignItems(HorizontalAlign.Start).justifyContent(FlexAlign.Center)
-      }
-      .width('100%').height(72).padding({ left: 16, right: 16 }).margin({ top: 8 })
-    }
-    .width('100%').padding({ bottom: 24 })
+    PodcastLibrary({ refreshKey: this.podcastRefreshKey })
+      .width('100%').padding({ bottom: 145 })
   }
 
   @Builder
   MomentContent() {
     Column() {
+      if (this.authStore.loggedIn) {
+        Row() {
+          Text('我的动态').fontSize(14).fontColor(TC.textPrimary()).fontWeight(FontWeight.Medium)
+          Blank()
+          SymbolGlyph(this.eventViewMode === 'list' ? $r('sys.symbol.square_grid_2x2') : $r('sys.symbol.list_bullet'))
+            .fontSize(20).fontColor([TC.textTertiary()])
+            .accessibilityText(this.eventViewMode === 'list' ? '切换为瀑布流' : '切换为列表')
+            .onClick(() => this.eventViewMode = this.eventViewMode === 'list' ? 'waterfall' : 'list')
+        }.width('100%').height(40)
+      }
       if (!this.authStore.loggedIn) {
         Column({ space: 10 }) {
           SymbolGlyph($r('sys.symbol.person_crop_circle_fill'))
@@ -1863,11 +1888,16 @@ export struct Mine {
         }
         .width('100%').height(200).justifyContent(FlexAlign.Center)
       } else {
-        ForEach(this.userEvents.filter((event: UserEventItem) => event.id > 0), (item: UserEventItem) => {
-          EventCard({ item: item,
+        if (this.eventViewMode === 'waterfall') {
+          EventWaterfall({ items: this.userEvents.filter((event: UserEventItem) => event.id > 0),
             onChanged: (event: UserEventItem, deleted: boolean) => this.applyEventChange(event, deleted) })
-            .margin({ bottom: 8 })
-        }, (item: UserEventItem) => item.id.toString())
+        } else {
+          ForEach(this.userEvents.filter((event: UserEventItem) => event.id > 0), (item: UserEventItem) => {
+            EventCard({ item: item,
+              onChanged: (event: UserEventItem, deleted: boolean) => this.applyEventChange(event, deleted) })
+              .margin({ bottom: 8 })
+          }, (item: UserEventItem) => item.id.toString())
+        }
         if (this.eventsHasMore) {
           Text('加载更多').width('100%').height(44).fontSize(12).fontColor(TC.textTertiary())
             .textAlign(TextAlign.Center).onClick(() => this.loadUserEvents())
@@ -1892,6 +1922,46 @@ export struct Mine {
       this.loadUserData()
     }
     this.pageStack.pushPathByName('PlaylistDetailPage', playlist)
+  }
+
+  private playlistMore(item: playlistType): MenuElement[] {
+    const options: MenuElement[] = [{ value: '打开歌单', action: () => this.navigateToPlaylist(item) }]
+    if (!item.specialType && /^\d+$/.test(item.id)) {
+      options.push({ value: '分享', action: () => { this.shareResource({ type: 'playlist', id: item.id,
+        name: item.name, img: item.cover, author: item.creator }) } })
+    }
+    return options
+  }
+
+  private albumMore(item: SubscribedAlbum): MenuElement[] {
+    return [
+      { value: '打开专辑', action: () => this.navigateToAlbum(item) },
+      { value: '分享', action: () => { this.shareResource({ type: 'album', id: String(item.id),
+        name: item.name, img: item.picUrl, author: item.artists.map((artist) => artist.name).join(' / ') }) } }
+    ]
+  }
+
+  private radioMore(item: DjRadioItem): MenuElement[] {
+    return [
+      { value: '打开播客', action: () => this.pageStack.pushPathByName('RadioDetailPage',
+        { id: String(item.id), name: item.name, cover: item.picUrl } as RadioPageParam) },
+      { value: '分享', action: () => { this.shareLink({
+        url: `https://music.163.com/djradio?id=${encodeURIComponent(String(item.id))}`,
+        title: item.name, description: '分享播客', label: '播客', image: item.picUrl }) } }
+    ]
+  }
+
+  private async shareResource(param: SharePageParam): Promise<void> {
+    await this.shareLink(SystemShareService.musicLink(param))
+  }
+
+  private async shareLink(link: ShareLink): Promise<void> {
+    try {
+      const context = this.getUIContext().getHostContext() as common.UIAbilityContext
+      await SystemShareService.showLink(context, link)
+    } catch (error) {
+      BubbleTip.show(this.getUIContext(), error instanceof Error ? error.message : '分享失败')
+    }
   }
 
   navigateToAlbum(album: SubscribedAlbum) {

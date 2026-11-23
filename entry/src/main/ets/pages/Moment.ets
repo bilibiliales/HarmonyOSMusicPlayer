@@ -1,3 +1,4 @@
+import { HeartLike } from '../components/HeartLike'
 import { BubbleTip } from '../services/BubbleTip'
 import { EventUpdates } from '../services/EventUpdates'
 import { EventPresentation } from '../services/EventPresentation'
@@ -24,6 +25,7 @@ import { playerController } from '../services/PlayerController'
 import { resizeImageUrl } from '../services/ImageUrl'
 import { AuthStore } from '../stores/AuthStore'
 import { PlayerStore } from '../stores/PlayerStore'
+import { SecondaryTabContent, SecondaryTabMotion } from '../components/SecondaryTabContent'
 import { TC } from '../services/ThemeColors'
 import { Responsive } from '../services/Responsive'
 
@@ -35,6 +37,8 @@ struct Moment {
   @Consume('playerStore') playerStore: PlayerStore
   @State events: UserEventItem[] = []
   @State discoverEvents: UserEventItem[] = []
+  private heartStamps: Map<number, number> = new Map()
+  @State tabDirection: number = -1
   @State currentTab: string = 'following'
   @State loading: boolean = false
   @State discoverLoading: boolean = false
@@ -57,7 +61,11 @@ struct Moment {
   }
 
   private switchTab(tab: string): void {
-    this.currentTab = tab
+    if (this.currentTab === tab) { return }
+    this.tabDirection = SecondaryTabMotion.direction(this.currentTab, tab, ["following","discover"])
+    this.getUIContext().animateTo({ duration: SecondaryTabMotion.DURATION, curve: Curve.EaseOut }, () => {
+      this.currentTab = tab
+    })
     if (tab === 'following' && this.authStore.loggedIn && this.events.length === 0) {
       this.loadEvents()
     } else if (tab === 'discover' && this.discoverEvents.length === 0) {
@@ -409,6 +417,7 @@ struct Moment {
         const updated = EventPresentation.copy(item)
         updated.info.liked = nextLiked
         updated.info.likedCount = Math.max(0, (item.info.likedCount || 0) + (nextLiked ? 1 : -1))
+        this.heartStamps.set(item.id, nextLiked ? Date.now() : 0)
         this.applyEventChange(updated, false)
         BubbleTip.show(this.getUIContext(), nextLiked ? '点赞成功' : '已取消点赞')
       }
@@ -463,8 +472,9 @@ struct Moment {
         Text(item.user.nickname).layoutWeight(1).fontSize(10).fontColor(TC.textSecondary()).maxLines(1)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
         Row({ space: 3 }) {
-          SymbolGlyph(item.info.liked ? $r('sys.symbol.heart_fill') : $r('sys.symbol.heart'))
-            .fontSize(14).fontColor([item.info.liked ? TC.accent() : TC.textTertiary()])
+          HeartLike({ liked: item.info.liked || false, iconSize: 14,
+            iconColor: item.info.liked ? TC.accent() : TC.textTertiary(), useStamp: true,
+            burstStamp: this.heartStamps.get(item.id) || 0 })
           Text(`${item.info.likedCount || 0}`).fontSize(9)
             .fontColor(item.info.liked ? TC.accent() : TC.textTertiary())
         }
@@ -496,6 +506,7 @@ struct Moment {
 
       Refresh({ refreshing: $$this.isRefreshing }) {
         Column() {
+        SecondaryTabContent({ value: this.currentTab, motionDirection: this.tabDirection, fill: true }) {
           if (this.currentTab === 'following') {
             if (!this.authStore.loggedIn) {
               Column({ space: 12 }) {
@@ -565,7 +576,8 @@ struct Moment {
               .padding({ left: 10, right: 10, top: 10 }).onReachEnd(() => this.loadDiscoverEvents())
             }
           }
-        }.width('100%')
+        }
+        }.width('100%').height('100%')
       }
       .layoutWeight(1)
       .onRefreshing(() => this.refreshCurrentTab())

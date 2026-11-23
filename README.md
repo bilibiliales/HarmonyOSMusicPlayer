@@ -1,16 +1,15 @@
 # HarmonyOS Music Player
 
-基于 HarmonyOS Stage 模型的在线音乐播放器客户端，使用 ArkTS + ArkUI 构建，数据源为网易云音乐 NodeJS API Enhanced。
-
+使用 ArkTS 和 ArkUI 开发的 HarmonyOS 音乐客户端，采用 Stage 应用模型。数据源为网易云音乐 NodeJS API Enhanced。
 ## 项目信息
 
-| 项目      | 值 |
-|---------|-----|
-| 包名      | com.hmos.cloudmusic |
-| 版本      | 1.0.0 |
-| 目标 SDK  | 6.1.1(24) (HarmonyOS) |
+| 项目 | 当前配置 |
+| --- | --- |
+| 应用包名 | `com.hmos.cloudmusic` |
+| 应用版本 | `1.0.0` |
+| 主模块 | `entry` |
+| 目标 SDK | HarmonyOS `6.1.1(24)` |
 | 支持设备    | phone, tablet |
-| 主模块     | entry |
 | 主 Ability | EntryAbility |
 | 项目使用语言  | ArkTS |
 
@@ -41,240 +40,93 @@
 
 ## 功能模块
 
-### 音乐发现与推荐
-- 发现页：轮播 Banner、个性化内容区块
-- 推荐页：每日推荐歌单/歌曲、私人 FM、新歌、榜单、歌手榜
-- 排行榜：官方榜、精选榜、歌手榜
-- 曲风：曲风偏好、曲风详情与分类资源
-- 播客/电台：播客 Banner、节目推荐与排行
-- 场景音乐 (Sati)：沉浸式场景标签与资源
-- 数字专辑：新碟、畅销与风格分类
+| 模块 | 当前功能 |
+| --- | --- |
+| 推荐与发现 | 每日推荐、私人漫游、心动模式、排行榜、新歌、曲风和场景音乐；浏览推荐歌单、专辑和歌手。 |
+| 搜索 | 搜索歌曲、歌单、专辑、歌手、用户、播客等内容，保存本机搜索历史，并从结果进入对应详情页。 |
+| 音乐播放 | 在线和本地音频播放、音质选择、播放进度控制、顺序播放、单曲循环、随机播放、睡眠定时、最近播放记录。开启流式加载时按需读取音频，关闭后使用整曲内存加载。 |
+| 播放队列 | 下一首播放、移除、清空，通过右侧手柄拖动排序；多选后批量移除、下载或收藏到歌单。私人漫游在开始播放队尾歌曲时提前补歌，仅支持顺序播放和单曲循环。 |
+| 歌曲详情与歌词 | 封面、歌手、专辑、评论、歌词、百科、乐谱和铃声入口；支持逐行歌词、逐字歌词及翻译等接口返回内容。歌词本通过点击歌词行进行摘录，可下载、复制和分享歌词。 |
+| 个人音乐库 | “我的”页按音乐、播客、笔记分类，浏览创建和收藏的歌单、收藏专辑、最近播放和听歌排行；支持歌单编辑、歌曲管理与内容导入。 |
+| 用户与歌手 | 用户主页、歌手主页、关注和粉丝列表、个人资料编辑、会员信息、等级、徽章中心和个人状态。自己的主页与其他用户主页顶部显示状态，支持查看接口提供的同状态推荐用户。 |
+| 动态与消息 | 关注动态、发现动态、发布、转发、点赞、评论和分享；自己的动态可删除。个人和歌手动态支持列表 / 瀑布流切换，瀑布流预览图片、音乐封面、转发内容和纯文字。消息中心与私信支持查看会话和分享音乐内容。 |
+| 播客与 MV | 播客分类、订阅列表、节目详情和播放；选择音频文件并上传声音到播客。MV 支持详情、播放、评论、点赞和分享。 |
+| 本地、下载与云盘 | 通过系统文件选择器导入本地音频，读取元数据和封面、匹配线上歌曲信息、编辑本地资料；下载歌曲到选定位置，浏览和管理音乐云盘内容。 |
+| 装扮与外观 | 跟随系统 / 深浅色主题、皮肤与主题色、背景、头像框、会员标识、红心效果等本地装扮。红心特效可使用自定义图片或动图；主页状态显示可在本机设置中关闭。 |
+| 系统与辅助功能 | 后台播放、系统媒体播控、实况窗、桌面歌词、投播入口和桌面音乐卡片。大卡片支持切换播放顺序、上一首、播放 / 暂停、下一首和喜欢，并同步歌曲封面与播放状态。另提供麦克风 / 文件听歌识曲、听歌统计、设备管理、云贝及 AI 歌词创作。 |
 
-### 搜索
-- 默认关键词、热搜榜、搜索联想
-- 多类型搜索：单曲、歌词、专辑、歌手、歌单、用户、MV、视频、播客
+## 设计说明
 
-### 播放器
-- 基于 AVPlayer 的真实音频播放
-- **流式播放（默认开启，可在设置中关闭）**：按 HTTP Range 分段按需取数，只保留有界窗口，100MB+ FLAC 不再整曲载入内存；关闭后回退为「整曲下载到内存再播放」的旧策略（兼容无法消费流式 `dataSrc` 的旧设备 / 虚拟机）
-- 全局共享播放队列 (PlayerStore)
-- 播放模式：顺序播放、列表循环、单曲循环、随机播放
-- 音质切换：标准 / 较高 / 极高 / 无损 / Hi-Res
-- 播放详情页：唱片动画、歌词滚动（原词 + 翻译 + 逐字歌词）、评论、收藏到歌单、下载、分享
-- 悬浮迷你播放器 (FloatingMusicCard)
+### 页面与交互
 
-### 后台播放与系统集成
-- **开关关闭时绝不加载 AVSession Kit**：系统媒体会话相关代码全部隔离在按需动态加载的 `MediaSessionBridge.ets` 中；播放控制器只依赖无 Kit 的中立契约，开关关闭时连 `avSession.*` 枚举都不会被求值
-- AVSession 系统媒体会话：锁屏控制、通知栏播放器（仅后台播放开关打开时创建）
-- Live View 实况窗状态同步
-- 桌面音乐卡片 (MusicCardAbility)：显示当前歌曲，支持播放/暂停/切歌
-- PlaybackControlBridge：接收桌面卡片与外部 Want 控制指令
-- 后台音频模式 (audioPlayback) + KEEP_BACKGROUND_RUNNING 权限
+应用以推荐、发现、动态和我的为主导航，详情页通过 `Navigation` 和 `NavPathStack` 管理。歌单、歌手和用户主页使用统一的顶部栏：头图展开时隐藏标题，滚动时标题渐显并上移，二级菜单吸附在带透明模糊背景的顶部区域。用户标题可附带小头像和认证标识，歌手顶部可直接关注或取消关注。
 
-### 歌单管理
-- 歌单详情：歌曲列表、评论、收藏统计
-- 创建/编辑歌单：名称、简介、封面上传
-- 歌曲管理：搜索添加、移除、排序
-- 歌单导入任务
+歌曲更多操作使用半模态面板，顶部展示封面、歌名和歌手，操作以图标加单行文字排列。动态的分享和删除使用系统气泡菜单，评论、分享、状态用户列表及权限说明使用独立面板。
 
-### 专辑与歌手
-- 专辑详情、收藏、评论
-- 歌手页：热门歌曲、专辑、MV、详情、相似歌手
-- MV 播放器：视频播放、评论、点赞、分享、缓存下载
+笔记瀑布流使用系统 `WaterFlow` / `FlowItem` 排列内容卡片。预览与列表详情分别渲染：窄列显示封面或文字、简短标题、作者和点赞；点击后进入动态详情。转发内容读取源动态预览，纯文字预览使用白底黑字。
 
-### 用户与社交
-- 登录：手机号密码、短信验证码、二维码扫码；未注册号自动补全
-- 个人中心：用户资料、会员信息、等级、听歌统计、创建/收藏歌单、收藏专辑、喜欢的歌曲、订阅电台、个人动态
-- 用户主页、关注/粉丝列表、关系管理
-- 动态流：关注动态、热门话题、点赞、评论、转发
-- 消息中心：私信、评论通知、系统通知
-- 私聊：文字、歌曲、专辑、歌单消息
-- 资料编辑：昵称、签名、性别、生日、地区、头像上传
+### 状态与外观
 
-### 其他
-- 歌曲百科：幕后信息、记忆坐标、相关歌曲/歌单、乐谱预览
-- AI 歌词辅助：调用外部 AI 接口进行歌词润色/续写
-- 系统分享 (ShareKit)
-- 设置：API 地址、播放模式、音质、AI 接口配置
+`AuthStore` 保存当前账号状态，`PlayerStore` 保存歌曲、队列、播放位置和播放模式，通过 `@Provide` / `@Consume` 共享给页面和组件。播放操作统一交给 `PlayerController`，使应用内控件、系统播控和桌面卡片使用同一播放状态。
 
-## 项目架构
+界面颜色通过 `ThemeColors` 统一读取，装扮和主题变化会通知组件刷新。主页状态的显示开关保存在本机偏好中，不修改服务端个人状态；状态查询与推荐请求携带时间戳，主页刷新时重新读取。
 
-```
+### 播放与系统集成
+
+`PlayerController` 管理 `AVPlayer`、音源切换、音质和队列，使用请求标记避免快速切歌时加载过期音源。流式音源按 Range 分段读取，并使用有上限的块缓存；不启用流式加载时使用内存音源。
+
+后台播放开启后通过动态加载的 `MediaSessionBridge` 创建媒体会话，向系统同步歌曲、封面、歌词、播放位置和循环方式，接收播放、暂停、切歌、拖动进度及播放顺序控制。实况窗和桌面歌词通过系统能力提供，具体布局由系统决定。
+
+桌面卡片使用歌曲封面铺满背景，系统负责外缘圆角。卡片通过 `message` 和 `call` 把操作交给 `EntryAbility`，请求标记用于合并重复消息；点击卡片主体可通过 `router` 打开应用。`MusicWidgetService` 将播放状态和本地封面同步到已添加的卡片，网络封面加载不阻塞播放状态更新。
+
+### 数据与文件
+
+`ApiClient` 封装网络请求、Cookie、上传和可配置服务地址。业务服务分别处理歌曲、评论、播客、动态、资料、云盘和分享。登录状态、设置、播放模式等使用 Preferences，较大的队列、本地音乐索引、歌词摘录与装扮资料使用应用文件存储。
+
+本地音频由用户通过系统文件选择器授权访问，后续读取使用持久化的文件授权；下载与导出遵循系统选择器返回的位置。系统分享使用 ShareKit，音乐私信通过音乐服务接口发送。
+
+## 项目结构
+
+```text
+AppScope/                         应用标识、版本和资源
+entry/src/main/module.json5       模块、权限、后台播放和扩展能力配置
 entry/src/main/ets/
-├── entryability/        # EntryAbility 应用入口
-├── entrybackupability/  # EntryBackupAbility 备份扩展
-├── musiccard/           # MusicCardAbility 桌面卡片
-│   ├── MusicCardAbility.ets
-│   └── MusicCard.ets
-├── pages/               # 页面 (30+ 页面)
-│   ├── Index.ets        # 主入口：NavPathStack + 页签 + 侧边栏 + 悬浮播放器
-│   ├── Find.ets         # 发现
-│   ├── Recommend.ets    # 推荐
-│   ├── Play.ets         # 播放详情
-│   ├── Search.ets       # 搜索
-│   ├── Login.ets        # 登录
-│   ├── Mine.ets         # 我的
-│   └── ...
-├── components/          # 复用组件
-│   ├── Sidebar.ets      # 侧边栏
-│   ├── FloatingMusicCard.ets  # 悬浮迷你播放器
-│   ├── ShareSheet.ets   # 系统分享与私信联系人选择
-│   └── playerNav.ets    # 播放页导航
-├── services/            # 服务层
-│   ├── ApiClient.ets    # 统一 HTTP 请求封装
-│   ├── PlayerController.ets  # AVPlayer 播放控制单例
-│   ├── AppSettings.ets  # Preferences 持久化 & 卡片同步
-│   ├── LiveViewController.ets  # 实况窗
-│   ├── PlaybackControlBridge.ets  # 系统播放 Want 处理
-│   ├── ImageUrl.ets     # 图片尺寸参数
-│   ├── VipService.ets   # 会员信息转换
-│   └── BubbleTip.ets    # 轻量提示
-├── stores/              # 状态层
-│   ├── AuthStore.ets    # 登录与用户状态
-│   └── PlayerStore.ets  # 播放队列与状态
-├── models/              # 数据模型
-│   ├── api.ets          # 接口响应类型 (用户/登录/搜索/歌单/评论/歌词/百科/消息/动态等)
-│   ├── music.ets        # 歌曲/播放模式/音质模型
-│   ├── home.ets         # 首页区块模型
-│   ├── style.ets        # 曲风模型
-│   ├── radio.ets        # 播客模型
-│   ├── sati.ets         # 场景音乐模型
-│   ├── digitalAlbum.ets # 数字专辑模型
-│   └── index.ets        # 统一导出
-└── constants/           # 常量与静态数据
-    ├── index.ets
-    └── MusicConstants.ets
+  entryability/                  应用生命周期、系统 Want 与卡片消息
+  pages/                         主导航、详情、设置和业务页面
+  components/                    播放器、面板、顶部栏、动态与歌词组件
+  services/                      播放、网络、文件、装扮和系统能力
+  stores/                        账号与播放状态
+  models/                        接口、业务和权限说明数据模型
+  musiccard/                     桌面卡片界面与 FormExtensionAbility
+entry/src/main/resources/        图片、主题色、字符串、页面与卡片配置
 ```
 
-### 分层结构
+## 构建与使用
 
-```
-HarmonyOS 系统能力层 (AVPlayer / AVSession / NetworkKit / FormKit / ShareKit)
-        ↓
-应用入口与导航层 (EntryAbility → Index → NavPathStack)
-        ↓
-页面与组件层 (pages/ + components/)
-        ↓
-状态与服务层 (AuthStore / PlayerStore / PlayerController / ApiClient / AppSettings)
-        ↓
-网易云音乐 NodeJS API Enhanced (第三方数据源)
-```
+1. 使用带 HarmonyOS SDK `6.1.1(24)` 的 DevEco Studio 打开项目并同步依赖。
+2. 在签名配置中使用自己的证书和调试 Profile，连接设备或启动兼容的模拟器。
+3. 构建并运行 `entry` 模块。默认产品为 `default`，应用包名为 `com.hmos.cloudmusic`。
+4. 如需更换音乐服务，在侧边栏 → 设置 → 服务地址中填写兼容网易云音乐 API Enhanced 的后端地址。后端与客户端分别部署。
+5. 登录后可同步个人资料、歌单、关注、消息等账号内容；本地音频通过“本地与下载”导入。AI 歌词功能需在设置中配置兼容的模型服务地址、API Key 和模型名称。
 
-### 关键设计
-
-- **导航**：全部页面使用 `Navigation` + `NavPathStack` + `navDestination`，统一由 Index 页面的 PageMap 注册，不使用 router
-- **网络**：`ApiClient` 统一封装 GET / JSON POST / 表单 POST / 文件上传，Cookie 自动附加，每次请求后销毁 HttpRequest
-- **播放**：`PlayerController` 单例管理 AVPlayer，通过 playRequestToken 防止快速切歌串歌，音质解析走 `SongQualityService`
-- **流式音源**：`StreamingAudio` 的 `StreamingAudioSource` 用 4MB Range 窗口 + 16MB LRU 块缓存为 `AVPlayer.dataSrc` 供数；起播仅预取 2MB 头部与 256KB 尾部，跳转时按需拉取对应区间。`StreamingDownload` 把下载分块直接写入最终文件，不再产生临时文件与整文件复制。设置里 **流式加载播放** 开关关闭时，`PlayerController` 改用 `MemoryAudioSource`/`MemoryAudioLoad` 把整曲载入内存后再交给 `AVPlayer`，作为兼容性回退。
-- **媒体会话按需加载**：`MediaSessionContract.ets` 是不含任何媒体 Kit 的中立契约（数值常量 + 接口 + 唯一准入判断 `shouldLoadMediaSession`）；`PlayerController` 静态只依赖它。唯一静态导入 `@kit.AVSessionKit` 的 `MediaSessionBridge.ets` 通过 `await import('./MediaSessionBridge')` 加载，且该调用只存在于 `createSystemSession()`，后者只在 `mediaSessionAllowed()` 为真时由 `ensureSystemSession()` 调用。常量路径为编译期可解析的动态导入，无需 `runtimeOnly` 配置
-- **状态**：`@Provide` / `@Consume` 跨组件共享 AuthStore 和 PlayerStore
-- **持久化**：Preferences 保存 API 地址、Cookie、用户资料、播放队列、进度、模式和音质；AppSettings 负责读写与同步桌面卡片
-
-## 环境准备
-
-### 开发工具
-- DevEco Studio (HarmonyOS SDK 6.1.1(24))
-- ArkTS + ArkUI
-
-### 后端 API
 本项目使用 [网易云音乐 NodeJS API Enhanced](https://github.com/neteasecloudmusicapienhanced/api-enhanced) 作为数据源，需自行部署：
 
-```bash
-git clone https://github.com/Binaryify/NeteaseCloudMusicApi.git
-cd NeteaseCloudMusicApi
-npm install
-node app.js
-```
 
-默认端口 `3000`。
+## 权限说明
 
-### 网络地址配置
+以下清单对应 [entry/src/main/module.json5](entry/src/main/module.json5) 的实际声明。应用内可在设置页右上角“更多” → “应用权限申请说明”查看。
 
-| 运行环境 | API 地址 |
-|----------|----------|
-| 预览器 | `http://127.0.0.1:3000` |
-| 模拟器 | `http://10.0.2.2:3000` |
-| 真机 | `http://<电脑局域网IP>:3000` |
+| 权限名称 | 权限描述 | 使用场景和目的 |
+| --- | --- | --- |
+| `ohos.permission.INTERNET` | 访问互联网。 | 请求音乐服务中的歌曲、歌词、封面、搜索和账号数据，播放在线音频、下载音乐及上传播客声音。 |
+| `ohos.permission.GET_NETWORK_INFO` | 读取当前网络连接状态。 | 在播放页判断网络是否可用，决定本地歌曲能否使用在线歌词和其他网络功能。 |
+| `ohos.permission.KEEP_BACKGROUND_RUNNING` | 在符合系统规则的场景下继续后台运行。 | 开启后台播放后，在后台或锁屏时继续播放音频，并响应系统媒体播控操作。 |
+| `ohos.permission.MICROPHONE` | 使用麦克风采集声音。 | 用户启动麦克风听歌识曲时申请，用短时录音生成音频指纹并查询歌曲，录音结束后停止采集。 |
+| `ohos.permission.FILE_ACCESS_PERSIST` | 持久化用户已授权的文件访问权限。 | 保存系统文件选择器导入的本地音频读取授权，应用重启后仍可访问和播放这些文件。 |
 
-启动应用后，在侧边栏 → 设置中修改 API 服务地址。
+## 功能边界
 
-## 构建与运行
-
-1. 使用 DevEco Studio 打开项目
-2. 连接设备或启动模拟器
-3. 构建并运行 entry 模块
-
-```bash
-# 命令行构建
-hvigorw assembleHap
-```
-
-### 流式加载验证
-
-播放/下载地址接口返回的 CDN 已实测支持流式读取：`Accept-Ranges: bytes`、`Content-Length`，
-以及对首部/中部/尾部区间的 `206 Partial Content`（HTTP 与 HTTPS、带 `Referer` 均通过）。
-因此播放改为按需分段，下载改为分块直写磁盘。
-
-```bash
-# 联网实测接口 + 本地 120MB+ 虚拟 FLAC 回归（Node 22，需要 curl 才能跑联网部分）
-node entry/src/test/StreamingAudio.regression.cjs
-
-# 离线环境可跳过联网部分
-SKIP_LIVE=1 node entry/src/test/StreamingAudio.regression.cjs
-```
-
-回归覆盖：起播预取量、顺序读取与任意跳转的字节正确性、常驻内存上界、取消语义、
-以及下载探测头只取 64 字节与直写文件的完整性。
-
-### 流式开关与回退验证
-
-```bash
-# 内存回退源字节级往返 + 静态接线扫描（设置开关→AppSettings→PlayerController 分支）
-node entry/src/test/StreamingToggle.regression.cjs
-```
-
-覆盖：恢复后的 `MemoryAudioSource` 顺序/跳转/EOF/非法参数/相对读字节全对；
-以及 `streamingPlaybackEnabled`（默认 true）从设置 UI 经 `AppSettings.saveStreamingPlayback`
-一路到 `PlayerController` 在 `StreamingAudioSource` / `MemoryAudioLoad` 之间分支的完整闭环。
-
-### 后台播放开关隔离性验证
-
-```bash
-node entry/src/test/AvSessionIsolation.regression.cjs
-```
-
-三层验证：① 扫描全部源码，证明全工程只有 `MediaSessionBridge.ets` 静态导入 AVSession Kit，
-且从所有冷启动入口做静态依赖 BFS 均不可达该模块；② 执行真实中立契约的
-`shouldLoadMediaSession` 真值表；③ 抽取 `PlayerController.ets` 里真实的
-`mediaSessionAllowed` / `createSystemSession` / `ensureSystemSession` 三个方法，
-用探针模块替换桥接模块后实际运行，观测「模块是否被加载」：
-开关关闭、偏好未读完、已释放三种状态下加载次数均为 0，开关打开为 1，
-加载途中关开关会销毁已创建的会话且不再对外提供。
-
-## 权限声明
-
-| 权限 | 用途 |
-|------|------|
-| `ohos.permission.INTERNET` | 网络请求 |
-| `ohos.permission.KEEP_BACKGROUND_RUNNING` | 后台音频播放 |
-
-## 已知限制
-
-- 本项目为客户端前端，**未自建**后端服务、数据库或管理后台；所有业务数据来自网易云音乐第三方 API，部分功能由于接口缺失导致无法实现
-- AI 写歌功能为客户端辅助界面，调用用户配置的外部 LLM AI 接口，未实现多模态与音乐生成
-- 部分功能（会员购买、商城、票务、创作者中心）仅保留界面入口，依赖网易云官方页面
-- 下载文件保存在应用沙箱目录，导出到公共目录需要额外 FilePicker 授权
-- 部分高音质/付费/版权歌曲实际播放效果受账号权限与版权限制
-
-## 技术栈
-
-- **语言**：ArkTS
-- **UI 框架**：ArkUI (声明式)
-- **应用模型**：Stage 模型
-- **网络**：NetworkKit (http)
-- **媒体**：MediaKit (AVPlayer)
-- **媒体会话**：AVSessionKit
-- **数据持久化**：Preferences (ArkData)
-- **桌面卡片**：FormKit
-- **分享**：ShareKit
-- **测试**：Hypium + Hamock
+- 在线业务依赖所配置后端提供的接口，歌曲音质、下载、付费内容与账号权限、版权有关。
+- 徽章和状态由音乐服务返回。`/user/social/status/rcmd` 只提供登录用户的同状态推荐，不支持指定其他人的状态或分页；每次刷新重新请求。
+- 系统媒体播控、实况窗、桌面歌词、投播和卡片更新依赖设备及系统支持。
+- AI 功能生成和润色歌词、标题与创作说明，当前不生成可播放的音频；系统内部音频录制识曲尚未开放。

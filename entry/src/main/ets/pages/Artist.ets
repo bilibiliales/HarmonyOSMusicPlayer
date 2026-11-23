@@ -1,3 +1,4 @@
+import { SongMoreButton } from '../components/SongMoreButton'
 import { SkinBackdrop } from '../components/SkinBackdrop'
 import {
   AlbumPageParam,
@@ -27,10 +28,12 @@ import { playerController } from '../services/PlayerController'
 import { resizeImageUrl } from '../services/ImageUrl'
 import { EventPresentation } from '../services/EventPresentation'
 import { EventUpdates } from '../services/EventUpdates'
+import { SecondaryTabContent, SecondaryTabMotion } from '../components/SecondaryTabContent'
 import { TC } from '../services/ThemeColors'
 import { DetailTopBar } from '../components/DetailTopBar'
 import { ShareSheet } from '../components/ShareSheet'
 import { EventCard } from '../components/EventCard'
+import { EventWaterfall } from '../components/EventWaterfall'
 import { NoMoreFooter } from '../components/NoMoreFooter'
 import { RelationshipPageParam } from './RelationshipList'
 import { ImagePreviewPageParam } from './ImagePreviewPage'
@@ -57,6 +60,7 @@ export struct ArtistPage {
   @State loading: boolean = true
   @State message: string = ''
   @State bioExpanded: boolean = false
+  @State tabDirection: number = -1
   @State currentTab: string = 'music'
   @State allAlbumsLoading: boolean = false
   @State allAlbumsMore: boolean = true
@@ -70,11 +74,13 @@ export struct ArtistPage {
   @State followed: boolean = false
   @State followBusy: boolean = false
   @State events: UserEventItem[] = []
+  @State eventViewMode: string = 'list'
   @State eventsMore: boolean = true
   @State eventsLoading: boolean = false
   private eventsLastTime: number = -1
   @State shareSheetVisible: boolean = false
   @State scrollOffset: number = 0
+  @State tabsPinned: boolean = false
   private scroller: Scroller = new Scroller()
   private stopEventUpdates?: () => void
 
@@ -227,7 +233,11 @@ export struct ArtistPage {
   }
 
   private switchTab(tab: string): void {
-    this.currentTab = tab
+    if (this.currentTab === tab) { return }
+    this.tabDirection = SecondaryTabMotion.direction(this.currentTab, tab, ["music","albums","events"])
+    this.getUIContext().animateTo({ duration: SecondaryTabMotion.DURATION, curve: Curve.EaseOut }, () => {
+      this.currentTab = tab
+    })
     if (tab === 'albums' && this.allAlbums.length === 0) {
       this.loadAllAlbums(true)
     }
@@ -554,14 +564,7 @@ export struct ArtistPage {
           .onClick(() => this.openFans())
 
           // 收藏歌手：已收藏时显示「已关注」，再点可取消（不涉及互相关注）
-          Text(this.followed ? '已关注' : '关注')
-            .fontSize(12)
-            .fontWeight(FontWeight.Medium)
-            .fontColor(this.followed ? TC.textPrimary() : TC.textOnAccent())
-            .padding({ left: 18, right: 18, top: 6, bottom: 6 })
-            .backgroundColor(this.followed ? 'rgba(255,255,255,0.18)' : TC.accent())
-            .borderRadius(15)
-            .onClick(() => this.toggleArtistFollow())
+          this.FollowButton()
         }
         if ((this.artistDetail.alias || []).length > 0) {
           Text((this.artistDetail.alias || []).join(' / ')).width('82%').fontSize(11).fontColor(TC.textSecondary())
@@ -571,6 +574,24 @@ export struct ArtistPage {
       .width('100%').padding({ bottom: 18 })
     }
     .width('100%').height(280 + this.topAvoidHeight + 54)
+  }
+
+  @Builder
+  private FollowButton() {
+    Text(this.followed ? '已关注' : '关注')
+      .fontSize(12).fontWeight(FontWeight.Medium)
+      .fontColor(this.followed ? TC.textPrimary() : TC.textOnAccent())
+      .padding({ left: 16, right: 16, top: 6, bottom: 6 })
+      .backgroundColor(this.followed ? 'rgba(255,255,255,0.18)' : TC.accent())
+      .borderRadius(15).enabled(!this.followBusy).onClick(() => this.toggleArtistFollow())
+  }
+
+  @Builder
+  private TopFollowButton() {
+    Row() { this.FollowButton() }
+      .opacity(Math.min(1, this.scrollOffset / 160)).translate({ y: (1 - Math.min(1, this.scrollOffset / 160)) * 12 })
+      .animation({ duration: 200, curve: Curve.EaseOut })
+      .hitTestBehavior(this.scrollOffset > 0 ? HitTestMode.Default : HitTestMode.None)
   }
 
   @Builder
@@ -599,7 +620,7 @@ export struct ArtistPage {
             Text(song.album || song.author).fontSize(11).fontColor(TC.textTertiary()).maxLines(1)
           }
           .layoutWeight(1).alignItems(HorizontalAlign.Start)
-          SymbolGlyph($r('sys.symbol.play_circle')).fontSize(21).fontColor([TC.textTertiary()])
+          SongMoreButton({ song: song })
         }
         .height(62).padding({ left: 12, right: 16 }).onClick(() => this.playSong(index))
       }, (song: songItemType) => song.id)
@@ -664,6 +685,14 @@ export struct ArtistPage {
   @Builder
   private EventsTab() {
     Column({ space: 12 }) {
+      Row() {
+        Text('动态').fontSize(14).fontColor(TC.textPrimary()).fontWeight(FontWeight.Medium)
+        Blank()
+        SymbolGlyph(this.eventViewMode === 'list' ? $r('sys.symbol.square_grid_2x2') : $r('sys.symbol.list_bullet'))
+          .fontSize(20).fontColor([TC.textTertiary()])
+          .accessibilityText(this.eventViewMode === 'list' ? '切换为瀑布流' : '切换为列表')
+          .onClick(() => this.eventViewMode = this.eventViewMode === 'list' ? 'waterfall' : 'list')
+      }.width('100%').height(40)
       if (this.events.length === 0 && this.eventsLoading) {
         LoadingProgress().width(38).height(38).color(TC.accent()).margin({ top: 80 })
       } else if (this.events.length === 0) {
@@ -671,12 +700,15 @@ export struct ArtistPage {
           .width('100%').height(180).fontSize(13).fontColor(TC.textTertiary())
           .textAlign(TextAlign.Center)
       }
-      ForEach(this.events, (item: UserEventItem) => {
-        EventCard({
-          item: item,
-          onChanged: (event: UserEventItem, deleted: boolean) => this.applyEventChange(event, deleted)
-        })
-      }, (item: UserEventItem) => item.id.toString())
+      if (this.eventViewMode === 'waterfall') {
+        EventWaterfall({ items: this.events,
+          onChanged: (event: UserEventItem, deleted: boolean) => this.applyEventChange(event, deleted) })
+      } else {
+        ForEach(this.events, (item: UserEventItem) => {
+          EventCard({ item: item,
+            onChanged: (event: UserEventItem, deleted: boolean) => this.applyEventChange(event, deleted) })
+        }, (item: UserEventItem) => item.id.toString())
+      }
       if (this.events.length > 0) {
         Row() {
           if (this.eventsLoading) {
@@ -859,7 +891,9 @@ export struct ArtistPage {
               if (this.loading) {
                 LoadingProgress().width(46).height(46).color(TC.accent()).margin({ top: 36 })
               } else {
-              this.ArtistNavigation()
+              Column() { this.ArtistNavigation() }
+                .width('100%').visibility(this.tabsPinned ? Visibility.Hidden : Visibility.Visible)
+              SecondaryTabContent({ value: this.currentTab, motionDirection: this.tabDirection }) {
               if (this.currentTab === 'music') {
                 if (this.topSongs.length > 0) {
                   this.SectionHeader('热门歌曲', `${this.topSongs.length} 首`)
@@ -886,6 +920,7 @@ export struct ArtistPage {
               } else {
                 this.EventsTab()
               }
+              }
               NoMoreFooter()
               }
             }
@@ -894,6 +929,8 @@ export struct ArtistPage {
           .width('100%').height('100%').scrollBar(BarState.Off)
           .onDidScroll(() => {
             const y = this.scroller.currentOffset().yOffset
+            const pinned = y >= 280
+            if (pinned !== this.tabsPinned) { this.tabsPinned = pinned }
             // 顶栏只用到 0~160 这段做渐显，钳住后长列表滚动时不再逐帧刷新页面
             const barOffset = y > 170 ? 170 : y
             if (barOffset !== this.scrollOffset) {
@@ -908,11 +945,16 @@ export struct ArtistPage {
             }
           })
 
+        if (this.tabsPinned) {
+          Column() { this.ArtistNavigation() }
+            .width('100%').height(52).backgroundColor(Color.Transparent).backdropBlur(30)
+            .position({ x: 0, y: this.topAvoidHeight + 54 }).zIndex(4)
+        }
         DetailTopBar({
           title: this.displayName(),
           scrollOffset: this.scrollOffset,
           onShare: () => this.shareSheetVisible = true
-        })
+        }) { this.TopFollowButton() }
         if (this.shareSheetVisible) {
           ShareSheet({
             shareParam: this.shareParam(),

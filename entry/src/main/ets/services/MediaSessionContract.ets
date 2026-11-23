@@ -72,6 +72,9 @@ export interface SessionHandlers {
   onNext: () => void
   onPrevious: () => void
   onSeek: (time: number) => void
+  onToggleFavorite?: (assetId: string) => void
+  onCycleLoopMode?: () => void
+  onSetLoopMode?: (mode: number) => void
   onDesktopLyricVisibilityChanged: (visible: boolean) => void
   onDesktopLyricStateChanged: (locked: boolean) => void
 }
@@ -82,7 +85,7 @@ export interface MediaSessionApi {
   activate(): Promise<void>
   destroy(): Promise<void>
   setMetadata(metadata: SessionMetadata): Promise<void>
-  setPlaybackState(state: number, position: number, loopMode: number): Promise<void>
+  setPlaybackState(state: number, position: number, loopMode: number, isFavorite?: boolean): Promise<void>
   configureDesktopLyrics(enabled: boolean, locked: boolean): Promise<void>
   refreshDesktopLyrics(): Promise<SessionDesktopLyricStatus>
   readLyricMetadata(): Promise<SessionLyricReadback>
