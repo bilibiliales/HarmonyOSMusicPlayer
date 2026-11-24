@@ -11,6 +11,13 @@ export interface PodcastStation {
   subtitle: string
   subscribed?: boolean
   list?: VoiceList
+  /** 播客简介，详情页展开用。 */
+  desc?: string
+  subCount?: number
+  programCount?: number
+  /** 主播昵称与用户 id，用于跳转用户主页。 */
+  author?: string
+  authorId?: string
 }
 
 export interface PodcastStationPage { items: PodcastStation[]; more: boolean }

@@ -21,9 +21,12 @@ export class PodcastService {
   }
 
   static station(item: DjRadioItem, fallback: string = ''): PodcastStation {
+    const author = item.dj?.nickname || item.creator?.nickname || ''
     return { id: String(item.id || fallback), name: item.name || '播客', cover: item.picUrl || '',
-      subtitle: `${item.programCount || 0} 个声音 · ${item.dj?.nickname || item.creator?.nickname || RadioService.count(item.subCount) + ' 人订阅'}`,
-      subscribed: item.subed }
+      subtitle: `${item.programCount || 0} 个声音 · ${author || RadioService.count(item.subCount) + ' 人订阅'}`,
+      subscribed: item.subed,
+      desc: item.desc || '', subCount: item.subCount || 0, programCount: item.programCount || 0,
+      author: author, authorId: String(item.dj?.userId || item.creator?.userId || '') }
   }
 
   static async recent(): Promise<PodcastStationPage> {

@@ -1,5 +1,7 @@
 import { SkinBackdrop } from '../components/SkinBackdrop'
 import { SheetSkinFrame } from '../components/SheetSkin'
+import { ShareSheet } from '../components/ShareSheet'
+import { SharePageParam } from '../models/api'
 import { SecondaryTabContent, SecondaryTabMotion } from '../components/SecondaryTabContent'
 import { PodcastVoice, PodcastVoicesParam } from '../models/podcast'
 import { AuthStore } from '../stores/AuthStore'
@@ -31,6 +33,8 @@ export struct PodcastVoicesPage {
   @State details?: PodcastVoice = undefined
   @State detailsLoading: boolean = false
   @State detailsMessage: string = ''
+  @State sharing: boolean = false
+  @State shareParam: SharePageParam = { type: 'program', id: '', name: '', img: '' }
   private listOffset: number = 0
   private requestId: number = 0
   private detailRequestId: number = 0
@@ -105,8 +109,19 @@ export struct PodcastVoicesPage {
     finally { this.sorting = false }
   }
 
+  private shareVoice(voice: PodcastVoice): void {
+    const id = PodcastService.voiceId(voice)
+    if (!id) { return }
+    this.shareParam = { type: 'program', id: id, name: PodcastService.voiceName(voice),
+      img: voice.coverUrl || this.pageParam.list.coverUrl || '',
+      author: this.pageParam.list.voiceListName }
+    this.sharing = true
+  }
+
   private options(voice: PodcastVoice): MenuElement[] {
-    return [{ value: '声音详情', action: () => { this.showDetails(voice) } },
+    return [{ value: '播放节目', action: () => { this.play(voice) } },
+      { value: '查看详情', action: () => { this.showDetails(voice) } },
+      { value: '分享', action: () => { this.shareVoice(voice) } },
       { value: '移到播客第一位', action: () => { this.moveToTop(voice) } }]
   }
 
@@ -129,6 +144,11 @@ export struct PodcastVoicesPage {
         Button('关闭').fontColor(TC.textBody()).backgroundColor(TC.surfaceRaised()).onClick(() => this.detailsVisible = false)
       }.width('100%').height('100%').padding(22)
     }
+  }
+
+  @Builder
+  private ShareOptions() {
+    ShareSheet({ shareParam: this.shareParam, visible: true, onClose: () => this.sharing = false })
   }
 
   @Builder
@@ -199,6 +219,10 @@ export struct PodcastVoicesPage {
       }.width('100%').height('100%').backgroundColor(TC.pageBackground())
         .bindSheet(this.detailsVisible, this.DetailsSheet(), { height: '55%', showClose: false,
           backgroundColor: TC.sheetBackground(), onDisappear: () => { this.detailsVisible = false; this.detailRequestId++ } })
+        .bindContentCover(this.sharing, this.ShareOptions(), {
+          modalTransition: ModalTransition.NONE, backgroundColor: Color.Transparent,
+          onDisappear: () => this.sharing = false
+        })
     }.hideTitleBar(true).onShown(() => this.load(true))
   }
 }

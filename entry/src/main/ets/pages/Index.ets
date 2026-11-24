@@ -55,6 +55,7 @@ import { StylePage } from './Style'
 import { StyleDetailPage } from './StyleDetail'
 import { RadioPage } from './Radio'
 import { RadioDetailPage, RadioProgramPage } from './RadioDetail'
+import { RadioProgramsPage } from './RadioPrograms'
 import { DifmPage } from './Difm'
 import { RadioPageParam } from '../models/radio'
 import { DigitalAlbumPage } from './DigitalAlbum'
@@ -428,6 +429,8 @@ struct HomeIndex {
       RadioDetailPage({ pageParam: param as RadioPageParam })
     } else if (name === 'RadioProgramPage') {
       RadioProgramPage({ pageParam: param as RadioPageParam })
+    } else if (name === 'RadioProgramsPage') {
+      RadioProgramsPage()
     } else if (name === 'DifmPage') {
       DifmPage()
     } else if (name === 'RadioPage') {

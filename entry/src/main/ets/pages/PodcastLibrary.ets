@@ -10,6 +10,7 @@ export struct PodcastLibraryPage {
   @StorageProp('skinVersion') skinVersionObs: number = 0
   pageParam: PodcastLibraryParam = {}
   @State refreshKey: number = 0
+  @State refreshing: boolean = false
 
   build() {
     NavDestination() {
@@ -17,12 +18,19 @@ export struct PodcastLibraryPage {
       Column() {
         Row({ space: 14 }) {
           SymbolGlyph($r('sys.symbol.chevron_left')).fontSize(24).fontColor([TC.textPrimary()]).onClick(() => this.pageStack.pop())
-          Text('我的播客库').fontSize(20).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary())
+          Text('我的播客').fontSize(20).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary())
         }.width('100%').height(56 + this.topAvoidHeight).padding({ left: 17, top: this.topAvoidHeight })
-        Scroll() {
-          PodcastLibrary({ initialSection: this.pageParam.section || 'recent', refreshKey: this.refreshKey })
-            .width('100%').padding({ bottom: 40 })
-        }.width('100%').layoutWeight(1).scrollBar(BarState.Off)
+        Refresh({ refreshing: $$this.refreshing }) {
+          Scroll() {
+            PodcastLibrary({ initialSection: this.pageParam.section || 'all', refreshKey: this.refreshKey })
+              .width('100%').padding({ bottom: 40 })
+          }.width('100%').height('100%').scrollBar(BarState.Off)
+        }
+        .layoutWeight(1)
+        .onRefreshing(() => {
+          this.refreshKey++
+          setTimeout(() => { this.refreshing = false }, 800)
+        })
       }.width('100%').height('100%').backgroundColor(TC.pageBackground())
     }.hideTitleBar(true).onShown(() => this.refreshKey++)
   }

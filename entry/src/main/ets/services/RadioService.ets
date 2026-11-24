@@ -35,8 +35,8 @@ export class RadioService {
     return { items: items, more: mode !== 'recommend' && (result.hasMore ?? items.length >= RadioService.PAGE_SIZE) }
   }
 
-  static async recommendedPrograms(): Promise<ProgramItem[]> {
-    const result = await ApiClient.get<RadioProgramsResponse>('/program/recommend', [{ key: 'limit', value: '6' }])
+  static async recommendedPrograms(limit: number = 6): Promise<ProgramItem[]> {
+    const result = await ApiClient.get<RadioProgramsResponse>('/program/recommend', [{ key: 'limit', value: String(limit) }])
     if (result.code !== 200) { throw new Error('精选节目加载失败') }
     return result.programs || []
   }

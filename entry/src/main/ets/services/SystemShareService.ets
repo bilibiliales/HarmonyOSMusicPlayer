@@ -81,7 +81,8 @@ export class SystemShareService {
   static musicLink(param: SharePageParam): ShareLink {
     const type = param.type
     const label = type === 'song' ? '歌曲' : type === 'playlist' ? '歌单' : type === 'event' ? '动态' :
-      type === 'artist' ? '歌手' : type === 'user' ? '用户' : '专辑'
+      type === 'artist' ? '歌手' : type === 'user' ? '用户' : type === 'djradio' ? '播客' :
+      type === 'program' ? '节目' : '专辑'
     const url = type === 'user'
       ? `https://music.163.com/user/home?id=${encodeURIComponent(param.id)}`
       : `https://music.163.com/${type}?id=${encodeURIComponent(param.id)}` +

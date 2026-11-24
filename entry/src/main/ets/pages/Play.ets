@@ -1526,7 +1526,7 @@ export struct Play {
             .fontSize(15)
             .fontWeight(FontWeight.Bold)
             .fontColor(this.psText())
-          Text(this.lyricUserScrolling ? '已暂停跟随 · 点击歌词可跳转' :
+          Text(this.lyricUserScrolling ? '已暂停跟随 · 点击歌词跳转' :
             (this.hasPreciseLyrics() ? '逐字歌词 · 点击歌词返回唱片' : '点击歌词返回唱片'))
             .fontSize(9)
             .fontColor(this.lyricUserScrolling ? TC.accentSoft() : this.psDim())

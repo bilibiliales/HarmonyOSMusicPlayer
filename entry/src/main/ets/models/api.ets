@@ -1670,7 +1670,7 @@ export interface EventLikeResponse {
 }
 
 export interface SharePageParam {
-  type: 'song' | 'playlist' | 'album' | 'event' | 'artist' | 'user'
+  type: 'song' | 'playlist' | 'album' | 'event' | 'artist' | 'user' | 'djradio' | 'program'
   id: string
   name: string
   img: string

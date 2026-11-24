@@ -53,3 +53,49 @@ export struct RadioProgramRow {
     }.width('100%').padding({ left: 17, right: 12, top: 9, bottom: 9 })
   }
 }
+
+/**
+ * 播客声音 / 节目列表行：点封面与标题播放，右侧菜单是
+ * 播放节目 / 查看详情 / 分享 三项，不再让「更多」直接跳详情。
+ */
+@Component
+export struct ProgramMenuRow {
+  @StorageProp('skinVersion') skinVersionObs: number = 0
+  @Prop program: ProgramItem
+  @Prop index: number = 0
+  onPlay: () => void = () => {}
+  onDetail: () => void = () => {}
+  onShare: () => void = () => {}
+
+  private menu(): MenuElement[] {
+    return [
+      { value: '播放节目', action: () => this.onPlay() },
+      { value: '查看详情', action: () => this.onDetail() },
+      { value: '分享', action: () => this.onShare() }
+    ]
+  }
+
+  build() {
+    Row({ space: 11 }) {
+      if (this.index > 0) {
+        Text(String(this.index)).width(26).fontSize(12).fontColor(TC.textTertiary()).textAlign(TextAlign.Center)
+      }
+      Image(resizeImageUrl(RadioService.cover(this.program), 150, 150)).width(56).height(56)
+        .objectFit(ImageFit.Cover).borderRadius(10).backgroundColor(TC.surfaceInset()).onClick(this.onPlay)
+      Column({ space: 4 }) {
+        Text(this.program.name).fontSize(14).fontColor(TC.textBody()).maxLines(2)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+        Text(`${RadioService.author(this.program)} · ${RadioService.duration(this.program.duration)}`)
+          .fontSize(10).fontColor(TC.textSecondary()).maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
+        Text(`${RadioService.count(this.program.listenerCount)} 次收听`).fontSize(10).fontColor(TC.textQuaternary())
+      }
+      .layoutWeight(1)
+      .alignItems(HorizontalAlign.Start)
+      .onClick(this.onPlay)
+      SymbolGlyph($r('sys.symbol.ellipsis_circle')).fontSize(20).fontColor([TC.textTertiary()])
+        .width(34).height(44).bindMenu(this.menu())
+    }
+    .width('100%')
+    .padding({ left: 8, right: 12, top: 8, bottom: 8 })
+  }
+}

@@ -8,7 +8,6 @@ import { RadioPlayback } from '../services/RadioPlayback'
 import { BubbleTip } from '../services/BubbleTip'
 import { RadioStationCard, RadioProgramRow } from '../components/RadioCards'
 import { TC } from '../services/ThemeColors'
-import { PodcastLibraryParam } from '../models/podcast'
 import { SecondaryTabContent, SecondaryTabMotion } from '../components/SecondaryTabContent'
 
 @Component
@@ -18,7 +17,6 @@ export struct RadioPage {
   @Consume('topAvoidHeight') topAvoidHeight: number
   embedded: boolean = false
   @State categories: RadioCategory[] = []
-  @State recommendations: ProgramItem[] = []
   @State stations: DjRadioItem[] = []
   @State ranked: ProgramItem[] = []
   @State category: number = 0
@@ -47,9 +45,6 @@ export struct RadioPage {
       RadioService.categories().then((items: RadioCategory[]) => {
         if (generation === this.homeToken) { this.categories = items }
       }).catch(() => { if (generation === this.homeToken) { this.homeMessage = '分类加载失败，可下拉重试' } }),
-      RadioService.recommendedPrograms().then((items: ProgramItem[]) => {
-        if (generation === this.homeToken) { this.recommendations = items }
-      }).catch(() => { if (generation === this.homeToken) { this.recommendations = [] } }),
       this.loadList(true)
     ])
   }
@@ -109,11 +104,6 @@ export struct RadioPage {
     this.pageStack.pushPathByName('RadioDetailPage', param)
   }
 
-  private openLibrary(section: string): void {
-    const param: PodcastLibraryParam = { section: section }
-    this.pageStack.pushPathByName('PodcastLibraryPage', param)
-  }
-
   private async play(programs: ProgramItem[], index: number = 0): Promise<void> {
     if (this.playing) { return }
     this.playing = true
@@ -163,6 +153,26 @@ export struct RadioPage {
   }
 
   @Builder
+  private EntryCard(icon: Resource, title: string, subtitle: string, action: () => void) {
+    Column({ space: 6 }) {
+      Row() {
+        SymbolGlyph(icon).fontSize(22).fontColor([TC.accentSoft()])
+        Blank()
+        SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(12).fontColor([TC.textTertiary()])
+      }.width('100%')
+      Text(title).width('100%').fontSize(16).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary())
+      Text(subtitle).width('100%').fontSize(10).fontColor(TC.textQuaternary()).maxLines(1)
+        .textOverflow({ overflow: TextOverflow.Ellipsis })
+    }
+    .layoutWeight(1)
+    .padding(14)
+    .borderRadius(18)
+    .backgroundColor(TC.surfaceCard())
+    .alignItems(HorizontalAlign.Start)
+    .onClick(action)
+  }
+
+  @Builder
   private Header() {
     if (!this.embedded) {
       Row({ space: 12 }) {
@@ -170,23 +180,12 @@ export struct RadioPage {
         Text('播客').fontSize(23).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary())
       }.width('100%').height(56 + this.topAvoidHeight).padding({ left: 17, top: this.topAvoidHeight })
     }
-    Row({ space: 10 }) {
-      ForEach(['recent', 'subscribed', 'created'], (section: string) => {
-        Text(section === 'recent' ? '最近收听' : section === 'subscribed' ? '已订阅' : '我的播客')
-          .fontSize(13).fontColor(TC.textBody()).layoutWeight(1).textAlign(TextAlign.Center)
-          .padding({ top: 13, bottom: 13 }).backgroundColor(TC.surfaceCard()).borderRadius(14)
-          .onClick(() => this.openLibrary(section))
-      }, (section: string) => section)
-    }.width('100%').padding({ left: 17, right: 17, top: 12 })
     Row({ space: 12 }) {
-      Column({ space: 5 }) {
-        Text('音乐电台').fontSize(18).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary())
-        Text('DIFM · 电音 / 古典 / 爵士').fontSize(12).fontColor(TC.textQuaternary())
-      }.layoutWeight(1).alignItems(HorizontalAlign.Start)
-      SymbolGlyph($r('sys.symbol.podcast')).fontSize(28).fontColor([TC.accentSoft()])
-      SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(13).fontColor([TC.textSecondary()])
-    }.width('92%').padding(18).borderRadius(18).backgroundColor(TC.surfaceCard()).margin({ top: 12, bottom: 16 })
-      .onClick(() => this.pageStack.pushPathByName('DifmPage', null))
+      this.EntryCard($r('sys.symbol.podcast'), '音乐电台', 'DIFM · 电音 / 古典 / 爵士',
+        () => this.pageStack.pushPathByName('DifmPage', null))
+      this.EntryCard($r('sys.symbol.mic_fill'), '精选节目', '编辑精选 · 每期都值得一听',
+        () => this.pageStack.pushPathByName('RadioProgramsPage', null))
+    }.width('92%').margin({ top: 12, bottom: 16 })
     Scroll() {
       Row({ space: 22 }) {
         Text(this.categoryName + ' ▾').fontSize(13).fontColor(TC.accentSoft()).onClick(() => this.categoryVisible = true)
@@ -197,21 +196,6 @@ export struct RadioPage {
       }.padding({ left: 17, right: 17, top: 8, bottom: 8 })
     }.width('100%').scrollable(ScrollDirection.Horizontal).scrollBar(BarState.Off)
     if (this.homeMessage) { Text(this.homeMessage).fontSize(11).fontColor(TC.textSecondary()).padding(12) }
-  }
-
-  @Builder
-  private RecommendedPrograms() {
-    if (this.category === 0 && this.mode === 'recommend' && this.recommendations.length > 0) {
-      Row() {
-        Text('精选节目').fontSize(19).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary()).layoutWeight(1)
-        Text(this.playing ? '准备播放…' : '播放全部').fontSize(12).fontColor(TC.accentSoft())
-          .enabled(!this.playing).onClick(() => this.play(this.recommendations))
-      }.width('100%').padding({ left: 17, right: 17, top: 18, bottom: 8 })
-      ForEach(this.recommendations, (program: ProgramItem, index: number) => {
-        RadioProgramRow({ program: program, onPlay: () => this.play(this.recommendations, index),
-          onDetails: () => this.openProgram(program) })
-      }, (program: ProgramItem) => String(program.id))
-    }
   }
 
   @Builder
@@ -227,7 +211,7 @@ export struct RadioPage {
   private RadioFeed() {
     Refresh({ refreshing: this.refreshing }) {
       List() {
-        ListItem() { Column() { this.Header(); this.RecommendedPrograms() }.width('100%') }
+        ListItem() { Column() { this.Header() }.width('100%') }
         ListItem() {
           Row({ space: 24 }) {
             ForEach(this.category > 0 ? ['recommend', 'hot'] : ['recommend', 'hot', 'new', 'programs'], (mode: string) => {
