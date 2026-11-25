@@ -29,10 +29,21 @@ import { UserProfilePage } from './UserProfile'
 import { PrivateChatPage } from './PrivateChat'
 import { MessageCenterPage } from './MessageCenter'
 import { AiSongStudioPage } from './AiSongStudio'
+import { LyricBookPage } from './LyricBook'
+import { LyricMarkEditorPage } from './LyricMarkEditor'
+import { LyricMarkPickPage } from './LyricMarkPick'
+import { LyricMarkEditorParam, LyricMarkPickParam } from '../models/lyricmark'
 import { ArtistPage } from './Artist'
 import { EventDetailPage } from './EventDetail'
 import { AlbumDetail } from './AlbumDetail'
 import { NewSongListPage } from './NewSongList'
+import { VoiceUploadPage } from './VoiceUpload'
+import { PodcastLibraryPage } from './PodcastLibrary'
+import { PodcastVoicesPage } from './PodcastVoices'
+import { PodcastLibraryParam, PodcastVoicesParam } from '../models/podcast'
+import { ProfileFeaturesPage } from './ProfileFeatures'
+import { MusicCardActionBridge } from '../services/MusicCardActionBridge'
+import { VoiceUploadParam } from '../services/VoiceUploadService'
 import { DailyRecommendPage } from './DailyRecommend'
 import { MvPlayerPage } from './MvPlayer'
 import { PublishEventPage, PublishEventPageParam } from './PublishEvent'
@@ -44,6 +55,7 @@ import { StylePage } from './Style'
 import { StyleDetailPage } from './StyleDetail'
 import { RadioPage } from './Radio'
 import { RadioDetailPage, RadioProgramPage } from './RadioDetail'
+import { RadioProgramsPage } from './RadioPrograms'
 import { DifmPage } from './Difm'
 import { RadioPageParam } from '../models/radio'
 import { DigitalAlbumPage } from './DigitalAlbum'
@@ -94,6 +106,9 @@ struct HomeIndex {
   @StorageLink('shortcutAction') shortcutAction: string = ''
   private shortcutHandledSeq: number = -1
   private shortcutReady: boolean = false
+  @StorageLink('musicCardSeq') @Watch('consumeMusicCard') musicCardSeq: number = 0
+  private musicCardHandledSeq: number = -1
+  private musicCardBusy: boolean = false
   @Provide('pageStack') pageStack: NavPathStack = new NavPathStack()
   @Provide('authStore') authStore: AuthStore = new AuthStore()
   @Provide('playerStore') playerStore: PlayerStore = new PlayerStore()
@@ -160,6 +175,7 @@ struct HomeIndex {
     await AppSettings.loadPlayerState(this.playerStore)
     playerController.bind(this.playerStore, this.getUIContext())
     await AppSettings.loadAuth(this.authStore)
+    MusicCardActionBridge.bind(this.playerStore, this.authStore)
     if (this.authStore.loggedIn) {
       this.authStore.refreshAccount()
     }
@@ -170,12 +186,28 @@ struct HomeIndex {
     }
     // 快捷方式冷启动：onCreate 已写入 action，等控制器绑定完成后在这里执行
     this.shortcutReady = true
+    this.consumeMusicCard()
     this.consumeShortcut()
   }
 
   /** 热启动时系统再次以快捷方式拉起应用。 */
   onShortcut(): void {
     this.consumeShortcut()
+  }
+
+  private async consumeMusicCard(): Promise<void> {
+    if (!this.shortcutReady || this.musicCardBusy || this.musicCardSeq <= 0 ||
+      this.musicCardSeq === this.musicCardHandledSeq) { return }
+    this.musicCardHandledSeq = this.musicCardSeq
+    const action = AppStorage.get<string>('musicCardAction') || ''
+    const songId = AppStorage.get<string>('musicCardSongId') || ''
+    this.musicCardBusy = true
+    try {
+      if (action === 'like' && !this.authStore.loggedIn) { this.pageStack.pushPathByName('LoginPage', null); return }
+      await MusicCardActionBridge.handle(action, songId, this.playerStore, this.authStore)
+    } catch (error) {
+      BubbleTip.show(this.getUIContext(), error instanceof Error ? error.message : '卡片操作失败')
+    } finally { this.musicCardBusy = false; this.consumeMusicCard() }
   }
 
   private consumeShortcut(): void {
@@ -323,6 +355,16 @@ struct HomeIndex {
       Login()
     } else if (name === 'SongWikiPage') {
       SongWiki({ song: param as songItemType })
+    } else if (name === 'SongCreditsPage' || name === 'SongScoresPage') {
+      SongWiki({ song: param as songItemType, entryMode: name === 'SongCreditsPage' ? 'credits' : 'scores' })
+    } else if (name === 'VoiceUploadPage') {
+      VoiceUploadPage({ pageParam: (param || {}) as VoiceUploadParam })
+    } else if (name === 'PodcastLibraryPage') {
+      PodcastLibraryPage({ pageParam: (param || {}) as PodcastLibraryParam })
+    } else if (name === 'PodcastVoicesPage') {
+      PodcastVoicesPage({ pageParam: param as PodcastVoicesParam })
+    } else if (name === 'MedalCenterPage' || name === 'SocialStatusPage') {
+      ProfileFeaturesPage({ mode: name === 'MedalCenterPage' ? 'medals' : 'status' })
     } else if (name === 'SearchPage') {
       SearchPage()
     } else if (name === 'SettingsPage') {
@@ -349,6 +391,12 @@ struct HomeIndex {
       MessageCenterPage()
     } else if (name === 'AiSongStudioPage') {
       AiSongStudioPage()
+    } else if (name === 'LyricBookPage') {
+      LyricBookPage()
+    } else if (name === 'LyricMarkEditorPage') {
+      LyricMarkEditorPage({ pageParam: param as LyricMarkEditorParam })
+    } else if (name === 'LyricMarkPickPage') {
+      LyricMarkPickPage({ pageParam: param as LyricMarkPickParam })
     } else if (name === 'ArtistPage') {
       ArtistPage({ pageParam: param as ArtistPageParam })
     } else if (name === 'ArtistSongsPage') {
@@ -381,6 +429,8 @@ struct HomeIndex {
       RadioDetailPage({ pageParam: param as RadioPageParam })
     } else if (name === 'RadioProgramPage') {
       RadioProgramPage({ pageParam: param as RadioPageParam })
+    } else if (name === 'RadioProgramsPage') {
+      RadioProgramsPage()
     } else if (name === 'DifmPage') {
       DifmPage()
     } else if (name === 'RadioPage') {

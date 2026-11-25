@@ -222,7 +222,7 @@ export struct ProfileEditorPage {
           Button(this.saving ? '保存中' : '保存').height(36).fontSize(12).fontColor(TC.textPrimary())
             .backgroundColor(this.nickname.trim() && !this.saving ? TC.accent() : TC.surfaceRaised()).borderRadius(18)
             .enabled(this.nickname.trim().length > 0 && !this.saving).onClick(() => this.save())
-        }.width('100%').height(58).padding({ left: 16, right: 16 })
+        }.width('100%').height(58).padding({ left: 16, right: 16 }).backdropBlur(30)
 
         Scroll() {
           Column({ space: 19 }) {
@@ -309,6 +309,19 @@ export struct ProfileEditorPage {
               }.width('100%')
             }.width('100%').padding(16).backgroundColor(TC.surfaceCard()).borderRadius(16)
               .onClick(() => this.pageStack.pushPathByName('FanClubListPage', null))
+
+            Row({ space: 12 }) {
+              SymbolGlyph($r('sys.symbol.medal')).fontSize(22).fontColor([TC.accent()])
+              Text('徽章中心').layoutWeight(1).fontSize(14).fontColor(TC.textPrimary())
+              SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(18).fontColor([TC.textQuaternary()])
+            }.width('100%').padding(16).backgroundColor(TC.surfaceCard()).borderRadius(16)
+              .onClick(() => this.pageStack.pushPathByName('MedalCenterPage', null))
+            Row({ space: 12 }) {
+              SymbolGlyph($r('sys.symbol.face_smiling')).fontSize(22).fontColor([TC.accent()])
+              Text('我的状态').layoutWeight(1).fontSize(14).fontColor(TC.textPrimary())
+              SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(18).fontColor([TC.textQuaternary()])
+            }.width('100%').padding(16).backgroundColor(TC.surfaceCard()).borderRadius(16)
+              .onClick(() => this.pageStack.pushPathByName('SocialStatusPage', null))
 
             // 省份选择弹窗
             if (this.showProvinceSelector) {

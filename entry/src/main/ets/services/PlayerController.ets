@@ -4,6 +4,7 @@ import { fileIo } from '@kit.CoreFileKit'
 import { LocalLibrary } from './LocalLibrary'
 import { audio } from '@kit.AudioKit'
 import { ApiClient } from './ApiClient'
+import { OperationResponse } from '../models/api'
 import { UIContext } from '@kit.ArkUI'
 import { common } from '@kit.AbilityKit'
 import { media } from '@kit.MediaKit'
@@ -14,6 +15,7 @@ import {
 import { PlayMode, songItemType } from '../models/music'
 import { PlayerStore } from '../stores/PlayerStore'
 import { AppSettings } from './AppSettings'
+import { MusicWidgetService, MusicWidgetState } from './MusicWidgetService'
 import { LiveViewController } from './LiveViewController'
 import { PlaybackAction, PlaybackControlBridge } from './PlaybackControlBridge'
 import { ListeningScrobble } from './ListeningScrobble'
@@ -63,6 +65,15 @@ export class PlayerController {
   private released: boolean = false
   private scrobble: ListeningScrobble = new ListeningScrobble()
 
+  /**
+   * 续歌钩子：私人漫游在开始播放最后一首时提前取一批。
+   * 返回追加的歌曲数，0 表示没取到（退回原来的从头循环）。
+   * 只在 `setQueue` 时挂载/清空，普通歌单不会误触发。
+   */
+  private queueFiller?: (isActive: () => boolean) => Promise<number>
+  /** 提前补歌与队尾切歌共享请求，避免重复获取。 */
+  private refillRequest?: Promise<number>
+
   // The streaming source must outlive the load call: AVPlayer keeps calling its
   // descriptor callback while the song is playing. Cancelled on song switch / teardown.
   private audioStream?: StreamingAudioSource
@@ -79,6 +90,23 @@ export class PlayerController {
   }
 
   private foreground: boolean = true
+  private favoriteChanging: boolean = false
+
+  async toggleFavorite(assetId: string): Promise<void> {
+    if (this.favoriteChanging || !this.store || !this.store.currentSong.id) { return }
+    if (!ApiClient.cookie) { throw new Error('请先登录后喜欢歌曲') }
+    const song = this.store.currentSong
+    if (assetId && assetId !== song.id) { return }
+    this.favoriteChanging = true
+    try {
+      const liked = !song.liked
+      const response = await ApiClient.get<OperationResponse>('/like', [
+        { key: 'id', value: song.id }, { key: 'like', value: String(liked) }
+      ])
+      if (response.code !== 200) { throw new Error(response.message || '喜欢操作失败') }
+      this.updateLiked(song.id, liked)
+    } finally { this.favoriteChanging = false }
+  }
   private switchingBackground: boolean = false
 
   onAppForeground(): void { this.foreground = true }
@@ -155,6 +183,7 @@ export class PlayerController {
 
   bind(store: PlayerStore, uiContext?: UIContext): void {
     this.store = store
+    LiveViewController.setPlaybackMode(store.playMode)
     this.uiContext = uiContext
     this.released = false
     this.subscribeSystemControls()
@@ -211,6 +240,18 @@ export class PlayerController {
     this.externalControlInProgress = true
     try {
       const player = this.player
+      if (action === 'favorite') {
+        await this.toggleFavorite(this.store.currentSong.id)
+        return
+      }
+      if (action === 'desktopLyrics') {
+        await this.setDesktopLyrics(!AppSettings.desktopLyricsEnabled, AppSettings.desktopLyricsLocked)
+        return
+      }
+      if (action === 'mode') {
+        this.cycleMode()
+        return
+      }
       if (action === 'pause') {
         if (player && this.sourceSongId === this.store.currentSong.id && player.state === 'playing') {
           await player.pause()
@@ -294,12 +335,24 @@ export class PlayerController {
       onNext: () => { if (active()) { this.next() } },
       onPrevious: () => { if (active()) { this.previous() } },
       onSeek: (time: number) => { if (active()) { this.seek(time) } },
+      onToggleFavorite: (assetId: string) => {
+        if (active()) { this.toggleFavorite(assetId).catch((error: Error) => this.log('SYSTEM_FAVORITE_FAILED', error.message)) }
+      },
+      onCycleLoopMode: () => { if (active()) { this.cycleMode() } },
+      onSetLoopMode: (mode: number) => {
+        if (active()) {
+          this.setMode(mode === SessionLoopMode.SINGLE ? PlayMode.SINGLE :
+            mode === SessionLoopMode.SHUFFLE ? PlayMode.SHUFFLE : PlayMode.LOOP)
+        }
+      },
       onDesktopLyricVisibilityChanged: (visible: boolean) => {
         if (!active()) { return }
+        this.desktopSessionEnabled = visible
         if (this.store) { this.store.desktopLyricsVisible = visible }
         if (!this.desktopChanging && !this.desktopConfiguring) {
           AppSettings.desktopLyricsEnabled = visible
           AppSettings.saveFeature('desktop_lyrics_enabled', visible).catch(() => {})
+          if (this.store) { LiveViewController.sync(this.store.currentSong, this.store.isPlaying, this.store.position, this.store.duration).catch(() => {}) }
         }
       },
       onDesktopLyricStateChanged: (locked: boolean) => {
@@ -419,6 +472,9 @@ export class PlayerController {
         this.syncSystemMetadata(this.store.currentSong)
         await this.syncSystemPlayback(this.store.isPlaying ? SessionPlaybackState.PLAY :
           SessionPlaybackState.PAUSE, this.store.position)
+      }
+      if (this.store?.currentSong.id) {
+        LiveViewController.sync(this.store.currentSong, this.store.isPlaying, this.store.position, this.store.duration).catch(() => {})
       }
     } finally {
       try { await this.refreshDesktopLyrics() } catch (_error) {}
@@ -554,7 +610,7 @@ export class PlayerController {
         return
       }
       const elapsedTime = Math.max(0, position !== undefined ? position : (this.store?.position || 0))
-      await session.setPlaybackState(state, elapsedTime, this.sessionLoopMode())
+      await session.setPlaybackState(state, elapsedTime, this.sessionLoopMode(), this.store?.currentSong.liked || false)
     } catch (error) {
       this.log('MEDIA_SESSION_STATE_FAILED', error instanceof Error ? error.message : 'unknown error')
     }
@@ -736,6 +792,7 @@ export class PlayerController {
       }
       player.loop = false
       this.store.isPlaying = true
+      this.prefetchQueueTail()
       this.scrobble.update(Math.max(0, player.currentTime), true)
       this.store.isLoading = false
       this.syncSystemPlayback(SessionPlaybackState.PLAY)
@@ -788,6 +845,14 @@ export class PlayerController {
   private persistState(): void {
     if (!this.store) {
       return
+    }
+    LiveViewController.setPlaybackMode(this.store.playMode)
+    if (AppSettings.context) {
+      const song = this.store.currentSong
+      const state: MusicWidgetState = this.store.queue.length ? { songName: song.name, artist: song.author, songId: song.id,
+        isPlaying: this.store.isPlaying, liked: song.liked || false, playMode: this.store.playMode,
+        cover: song.img || song.remoteImg || '' } : MusicWidgetService.empty()
+      MusicWidgetService.publish(AppSettings.context, state).catch(() => {})
     }
     AppSettings.savePlayerState(this.store).catch(() => {
     })
@@ -1008,6 +1073,10 @@ export class PlayerController {
     if (!this.store) {
       return
     }
+    // 换队列时先摘掉续歌钩子，避免上个场景（私人漫游）继续给新队列续歌
+    this.queueFiller = undefined
+    this.store.isRoaming = false
+    this.refillRequest = undefined
     if (queue.length === 0) {
       await this.clearQueue()
       return
@@ -1018,6 +1087,71 @@ export class PlayerController {
     this.store.setQueue(queue, safeIndex, preservePlayback)
     this.persistState()
     await this.playAt(this.store.currentIndex, autoPlay)
+  }
+
+  /** 挂载后若已经在播放最后一首，立即开始补歌。 */
+  setQueueFiller(filler?: (isActive: () => boolean) => Promise<number>): void {
+    this.queueFiller = filler
+    if (this.store) {
+      this.store.isRoaming = !!filler
+      if (filler && this.store.playMode === PlayMode.SHUFFLE) { this.store.playMode = PlayMode.LOOP }
+      this.persistState()
+    }
+    this.refillRequest = undefined
+    this.prefetchQueueTail()
+  }
+
+  private prefetchQueueTail(): void {
+    if (this.queueFiller && this.store?.isPlaying &&
+      this.store.currentIndex === this.store.queue.length - 1) {
+      this.requestQueueRefill().catch(() => {})
+    }
+  }
+
+  private requestQueueRefill(): Promise<number> {
+    if (this.refillRequest) {
+      return this.refillRequest
+    }
+    const filler = this.queueFiller
+    if (!filler) {
+      return Promise.resolve(0)
+    }
+    const request = filler(() => this.queueFiller === filler)
+    this.refillRequest = request
+    request.finally(() => {
+      if (this.refillRequest === request) {
+        this.refillRequest = undefined
+      }
+    }).catch(() => {})
+    return request
+  }
+
+  /** 当前队列快照（续歌去重、页面展示用）。 */
+  queueSnapshot(): songItemType[] {
+    return this.store ? this.store.queue.slice() : []
+  }
+
+  /** 喜欢状态在应用与桌面卡片之间保持一致。 */
+  updateLiked(songId: string, liked: boolean): void {
+    if (!this.store) { return }
+    this.store.queue.forEach((song: songItemType) => { if (song.id === songId) { song.liked = liked } })
+    if (this.store.currentSong.id === songId) {
+      this.store.currentSong.liked = liked
+      this.persistState()
+      this.syncSystemPlayback(this.store.isPlaying ? SessionPlaybackState.PLAY : SessionPlaybackState.PAUSE)
+      LiveViewController.sync(this.store.currentSong, this.store.isPlaying, this.store.position, this.store.duration).catch(() => {})
+    }
+  }
+
+  /** 往队尾追加歌曲，不改当前播放位置；返回实际追加数量。 */
+  appendToQueue(songs: songItemType[]): number {
+    if (!this.store || songs.length === 0) {
+      return 0
+    }
+    const queue = this.store.queue.concat(songs)
+    this.store.setQueue(queue, this.store.currentIndex, true)
+    this.persistState()
+    return songs.length
   }
 
   async insertNext(songs: songItemType[]): Promise<void> {
@@ -1067,7 +1201,7 @@ export class PlayerController {
       return
     }
     let index = this.store.currentIndex <= 0 ? this.store.queue.length - 1 : this.store.currentIndex - 1
-    if (this.store.playMode === PlayMode.SHUFFLE && this.store.queue.length > 1) {
+    if (!this.queueFiller && this.store.playMode === PlayMode.SHUFFLE && this.store.queue.length > 1) {
       index = this.randomIndex()
     }
     await this.playAt(index, true)
@@ -1089,12 +1223,41 @@ export class PlayerController {
       return
     }
     let index = this.store.currentIndex + 1
-    if (this.store.playMode === PlayMode.SHUFFLE && this.store.queue.length > 1) {
+    if (!this.queueFiller && this.store.playMode === PlayMode.SHUFFLE && this.store.queue.length > 1) {
       index = this.randomIndex()
     } else if (index >= this.store.queue.length) {
+      // 私人漫游：手动点下一首到队尾时也续歌，而不是回到第一首
+      if (this.queueFiller) {
+        await this.advancePastEnd()
+        return
+      }
       index = 0
     }
     await this.playAt(index, true)
+  }
+
+  /**
+   * 播到队列末尾：挂了续歌钩子（私人漫游）就先取一批追加，再从下一首继续；
+   * 钩子缺失或没取到歌时退回原来的「从头循环」。
+   */
+  private async advancePastEnd(): Promise<void> {
+    const token = this.playRequestToken
+    const filler = this.queueFiller
+    if (!filler) {
+      await this.playAt(0, true)
+      return
+    }
+    try {
+      const added = await this.requestQueueRefill()
+      if (added > 0 && token === this.playRequestToken && this.queueFiller === filler && this.store) {
+        await this.playAt(this.store.currentIndex + 1, true)
+        return
+      }
+    } catch (_error) {
+    }
+    if (token === this.playRequestToken && this.queueFiller === filler && this.store) {
+      await this.playAt(0, true)
+    }
   }
 
   private handleCompleted(): void {
@@ -1113,7 +1276,8 @@ export class PlayerController {
       return
     }
     if (this.store.currentIndex >= this.store.queue.length - 1) {
-      this.playAt(0, true)
+      // 私人漫游等无限队列在这里续歌，其余场景保持从头循环
+      this.advancePastEnd()
     } else {
       this.playAt(this.store.currentIndex + 1, true)
     }
@@ -1136,13 +1300,14 @@ export class PlayerController {
     if (!this.store) {
       return
     }
-    if (this.store.playMode === PlayMode.LOOP) {
-      this.store.playMode = PlayMode.SINGLE
-    } else if (this.store.playMode === PlayMode.SINGLE) {
-      this.store.playMode = PlayMode.SHUFFLE
-    } else {
-      this.store.playMode = PlayMode.LOOP
-    }
+    const next = this.store.playMode === PlayMode.LOOP ? PlayMode.SINGLE :
+      this.store.playMode === PlayMode.SINGLE && !this.queueFiller ? PlayMode.SHUFFLE : PlayMode.LOOP
+    this.setMode(next)
+  }
+
+  setMode(mode: PlayMode): void {
+    if (!this.store) { return }
+    this.store.playMode = this.queueFiller && mode === PlayMode.SHUFFLE ? PlayMode.LOOP : mode
     this.persistState()
     this.syncSystemPlayback(this.store.isPlaying ? SessionPlaybackState.PLAY :
       SessionPlaybackState.PAUSE)
@@ -1165,18 +1330,39 @@ export class PlayerController {
   }
 
   async removeAt(index: number): Promise<void> {
-    if (!this.store || index < 0 || index >= this.store.queue.length) {
-      return
-    }
-    const removingCurrent = this.store.removeAt(index)
+    await this.removeMany([index])
+  }
+
+  moveQueueItem(from: number, to: number): boolean {
+    if (!this.store || from < 0 || to < 0 || from >= this.store.queue.length || to >= this.store.queue.length) { return false }
+    if (from === to) { return true }
+    const queue = this.store.queue.slice()
+    const moved = queue.splice(from, 1)[0]
+    queue.splice(to, 0, moved)
+    let current = this.store.currentIndex
+    if (current === from) { current = to }
+    else if (from < current && to >= current) { current-- }
+    else if (from > current && to <= current) { current++ }
+    this.store.setQueue(queue, current, true)
     this.persistState()
-    if (this.store.queue.length === 0) {
-      await this.stopAndClearSource()
-      return
-    }
-    if (removingCurrent) {
-      await this.playAt(this.store.currentIndex, true)
-    }
+    this.prefetchQueueTail()
+    return true
+  }
+
+  async removeMany(indices: number[]): Promise<void> {
+    if (!this.store) { return }
+    const selected = new Set(indices.filter((index: number) => index >= 0 && index < this.store!.queue.length))
+    if (!selected.size) { return }
+    const current = this.store.currentIndex
+    const playing = this.store.isPlaying
+    const queue = this.store.queue.filter((_song: songItemType, index: number) => !selected.has(index))
+    if (!queue.length) { await this.clearQueue(); return }
+    const nextIndex = Math.min(current - indices.filter((index: number) => index < current && selected.has(index))
+      .filter((index: number, position: number, list: number[]) => list.indexOf(index) === position).length, queue.length - 1)
+    this.store.setQueue(queue, Math.max(0, nextIndex), !selected.has(current))
+    this.persistState()
+    if (selected.has(current)) { await this.playAt(this.store.currentIndex, playing) }
+    if (this.queueFiller && this.store.queue.length === 1) { this.requestQueueRefill().catch(() => {}) }
   }
 
   private async stopAndClearSource(): Promise<void> {
@@ -1218,6 +1404,9 @@ export class PlayerController {
     if (!this.store) {
       return
     }
+    this.queueFiller = undefined
+    this.refillRequest = undefined
+    this.store.isRoaming = false
     this.store.clearQueue()
     await this.stopAndClearSource()
     this.persistState()

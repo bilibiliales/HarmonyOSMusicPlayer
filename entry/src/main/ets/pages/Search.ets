@@ -1,4 +1,5 @@
 import { SkinBackdrop } from '../components/SkinBackdrop'
+import { SongMoreButton } from '../components/SongMoreButton'
 import {
   AlbumPageParam,
   ApiAlbum,
@@ -29,6 +30,7 @@ import { ApiClient } from '../services/ApiClient'
 import { playerController } from '../services/PlayerController'
 import { SearchHistory } from '../services/SearchHistory'
 import { common } from '@kit.AbilityKit'
+import { SecondaryTabContent, SecondaryTabMotion } from '../components/SecondaryTabContent'
 import { TC } from '../services/ThemeColors'
 
 @Component
@@ -37,6 +39,7 @@ export struct SearchPage {
   @Consume('pageStack') pageStack: NavPathStack
   @Consume('topAvoidHeight') topAvoidHeight: number
   @State keyword: string = ''
+  @State tabDirection: number = -1
   @State activeType: number = 1018
   @State sections: SearchSection[] = []
   @State songQueue: songItemType[] = []
@@ -358,7 +361,9 @@ export struct SearchPage {
     if (this.activeType === type) {
       return
     }
-    this.activeType = type
+    const order = this.searchTabs.map((item: SearchTabItem) => String(item.type))
+    this.tabDirection = SecondaryTabMotion.direction(String(this.activeType), String(type), order)
+    this.getUIContext().animateTo({ duration: SecondaryTabMotion.DURATION, curve: Curve.EaseOut }, () => this.activeType = type)
     if (this.keyword.trim()) {
       this.search()
     }
@@ -711,7 +716,9 @@ export struct SearchPage {
       }
       .layoutWeight(1).alignItems(HorizontalAlign.Start)
       if (item.songIndex >= 0) {
-        SymbolGlyph($r('sys.symbol.play_circle')).fontSize(23).fontColor([TC.textSecondary()])
+        if (item.songIndex < this.songQueue.length) {
+          SongMoreButton({ song: this.songQueue[item.songIndex] })
+        }
       } else if (item.playlist || item.uid) {
         SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(15).fontColor([TC.textQuaternary()])
       }
@@ -890,8 +897,11 @@ export struct SearchPage {
                     .textOverflow({ overflow: TextOverflow.Ellipsis })
                 }
                 .layoutWeight(1).alignItems(HorizontalAlign.Start)
-                SymbolGlyph(item.songIndex >= 0 ? $r('sys.symbol.play_circle') : $r('sys.symbol.chevron_right'))
-                  .fontSize(20).fontColor([TC.textTertiary()])
+                if (item.songIndex >= 0 && item.songIndex < this.suggestionSongQueue.length) {
+                  SongMoreButton({ song: this.suggestionSongQueue[item.songIndex] })
+                } else {
+                  SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(20).fontColor([TC.textTertiary()])
+                }
               }
               .height(66).padding({ left: 14, right: 16 }).onClick(() => this.openSuggestion(item))
             }
@@ -956,6 +966,8 @@ export struct SearchPage {
           .scrollable(ScrollDirection.Horizontal).scrollBar(BarState.Off).width('100%').height(44)
         }
 
+        Column() {
+        SecondaryTabContent({ value: String(this.activeType), motionDirection: this.tabDirection, fill: true }) {
         if (this.keyword.trim().length === 0 && this.searchedKeyword.length === 0) {
           this.SearchDiscovery()
         } else if (this.searchedKeyword.length === 0) {
@@ -988,6 +1000,8 @@ export struct SearchPage {
           }
           .layoutWeight(1)
         }
+        }
+        }.width('100%').layoutWeight(1)
       }
       .width('100%').height('100%').backgroundColor(TC.pageBackground())
     }

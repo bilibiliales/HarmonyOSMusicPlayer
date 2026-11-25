@@ -8,12 +8,60 @@ import { DecorationStore } from '../services/DecorationStore';
 import { playerController } from '../services/PlayerController';
 import { PlaybackControlBridge } from '../services/PlaybackControlBridge';
 import { ShortcutBridge } from '../services/ShortcutBridge';
+import { MusicCardActionBridge } from '../services/MusicCardActionBridge';
+import { MusicCardCommand, MusicCardProtocol, MusicCardReply } from '../services/MusicCardProtocol';
+import { commonEventManager } from '@kit.BasicServicesKit';
+import { PlayerStore } from '../stores/PlayerStore';
+import { AuthStore } from '../stores/AuthStore';
 import { NearbyShareSession, SystemShareService } from '../services/SystemShareService';
 
 const DOMAIN = 0x0000;
 
 export default class EntryAbility extends UIAbility {
   private mainWindow?: window.Window;
+  private cardSubscriber?: commonEventManager.CommonEventSubscriber;
+  private cardRuntime?: Promise<void>;
+
+  private async prepareCardRuntime(): Promise<void> {
+    if (MusicCardActionBridge.ready()) { return; }
+    await AppSettings.load(this.context);
+    const auth = new AuthStore();
+    await AppSettings.loadAuth(auth);
+    const store = new PlayerStore();
+    await AppSettings.loadPlayerState(store);
+    if (!MusicCardActionBridge.ready()) {
+      playerController.bind(store);
+      MusicCardActionBridge.bind(store, auth);
+    }
+  }
+
+  private async executeCardCommand(command: MusicCardCommand): Promise<void> {
+    if (!MusicCardActionBridge.ready()) {
+      if (!this.cardRuntime) { this.cardRuntime = this.prepareCardRuntime(); }
+      try { await this.cardRuntime; } catch (error) {
+        this.cardRuntime = undefined;
+        throw new Error(error instanceof Error ? error.message : '卡片播放器初始化失败');
+      }
+    }
+    await MusicCardActionBridge.execute(command.musicCardAction, command.musicCardSongId, command.requestId);
+  }
+
+  private registerCardControls(): void {
+    this.callee.on(MusicCardProtocol.METHOD, (data) => {
+      const command = MusicCardProtocol.parse(data.readString());
+      if (command) { this.executeCardCommand(command).catch((error: Error) => hilog.warn(DOMAIN, 'card', '%{public}s', error.message)); }
+      return new MusicCardReply();
+    });
+    commonEventManager.createSubscriber({ events: [MusicCardProtocol.EVENT], publisherBundleName: MusicCardProtocol.BUNDLE_NAME })
+      .then((subscriber: commonEventManager.CommonEventSubscriber) => {
+        this.cardSubscriber = subscriber;
+        commonEventManager.subscribe(subscriber, (error, event) => {
+          if (error?.code) { return; }
+          const command = MusicCardProtocol.parse(event.data || '');
+          if (command) { this.executeCardCommand(command).catch((failure: Error) => hilog.warn(DOMAIN, 'card', '%{public}s', failure.message)); }
+        });
+      }).catch((error: Error) => hilog.warn(DOMAIN, 'card', '%{public}s', error.message));
+  }
 
   /** 沉浸式布局下，状态栏/导航条图标颜色跟随当前有效主题（深底白图标、浅底深图标）。 */
   private updateSystemBar(isDark: boolean): void {
@@ -33,6 +81,12 @@ export default class EntryAbility extends UIAbility {
       PlaybackControlBridge.dispatch('play');
     } else if (want.action === PlaybackControlBridge.CONTROL_ACTION && action === 'pause') {
       PlaybackControlBridge.dispatch('pause');
+    } else if (want.action === PlaybackControlBridge.CONTROL_ACTION && action === 'favorite') {
+      PlaybackControlBridge.dispatch('favorite');
+    } else if (want.action === PlaybackControlBridge.CONTROL_ACTION && action === 'desktopLyrics') {
+      PlaybackControlBridge.dispatch('desktopLyrics');
+    } else if (want.action === PlaybackControlBridge.CONTROL_ACTION && action === 'mode') {
+      PlaybackControlBridge.dispatch('mode');
     }
   }
 
@@ -41,6 +95,14 @@ export default class EntryAbility extends UIAbility {
     const raw = want.parameters?.[ShortcutBridge.ACTION_KEY];
     if (typeof raw !== 'string') { return; }
     ShortcutBridge.publish(raw);
+  }
+
+  private handleMusicCardWant(want: Want): void {
+    const action = want.parameters?.musicCardAction;
+    const songId = want.parameters?.musicCardSongId;
+    if (typeof action === 'string') {
+      MusicCardActionBridge.publish(action, typeof songId === 'string' ? songId : '');
+    }
   }
 
   /** 应用被系统的「打开方式 / FileOpen」拉起时，把音频 URI 交给界面层播放。 */
@@ -73,13 +135,18 @@ export default class EntryAbility extends UIAbility {
     DecorationStore.init(this.context);
     AppSettings.context = this.context;
     SystemShareService.bindAbility(this.context);
+    this.registerCardControls();
     this.handlePlaybackWant(want);
     this.handleOpenAudioWant(want);
     this.handleShortcutWant(want);
+    this.handleMusicCardWant(want);
     hilog.info(DOMAIN, 'testTag', '%{public}s', 'Ability onCreate');
   }
 
   onDestroy(): void {
+    MusicCardActionBridge.unbind();
+    this.callee.off(MusicCardProtocol.METHOD);
+    if (this.cardSubscriber) { commonEventManager.unsubscribe(this.cardSubscriber, () => {}); }
     SystemShareService.unbindAbility();
     playerController.release().catch((error: Error) => console.error(error.message));
     hilog.info(DOMAIN, 'testTag', '%{public}s', 'Ability onDestroy');
@@ -118,6 +185,7 @@ export default class EntryAbility extends UIAbility {
     this.handlePlaybackWant(want);
     this.handleOpenAudioWant(want);
     this.handleShortcutWant(want);
+    this.handleMusicCardWant(want);
   }
 
   onConfigurationUpdate(newConfig: Configuration): void {

@@ -86,7 +86,7 @@ export class DecoKind {
     if (kind === DecoKind.DOCK) { return '底部图标、文字与底板' }
     if (kind === DecoKind.SIDEBAR) { return '侧边栏背景图与文字样式' }
     if (kind === DecoKind.HOME_BG) { return '个人主页头图与模糊度' }
-    if (kind === DecoKind.HEART) { return '点赞时上飘的红心颜色与数量' }
+    if (kind === DecoKind.HEART) { return '自定义点赞贴图、弹射或正上方展示动画' }
     if (kind === DecoKind.STARTUP) { return '冷启动图片或视频，可跳过' }
     if (kind === DecoKind.AVATAR_FRAME) { return '个人主页头像外框' }
     if (kind === DecoKind.VIP_CARD) { return '侧边栏会员卡底板' }
@@ -446,6 +446,8 @@ export class HomeBgConfig {
 // ---------------------------------------------------------------------------
 
 export class HeartConfig {
+  /** 自定义粒子贴图，保留 GIF 等动图的原始文件。 */
+  image: string = ''
   color: string = '#ef233c'
   /** 每次点赞喷出的红心数量 1-20。 */
   count: number = 7
@@ -453,16 +455,25 @@ export class HeartConfig {
   size: number = 22
   /** 动画时长（毫秒）。 */
   duration: number = 1200
+  mode: string = 'burst'
+  fadeIn: number = 300
+  hold: number = 1000
+  fadeOut: number = 400
 
   static from(raw: string): HeartConfig {
     const out = new HeartConfig()
     if (!raw) { return out }
     try {
       const src = JSON.parse(raw) as HeartConfig
+      out.image = src.image ?? ''
       out.color = src.color ?? '#ef233c'
       out.count = src.count ?? 7
       out.size = src.size ?? 22
       out.duration = src.duration ?? 1200
+      out.mode = src.mode === 'above' ? 'above' : 'burst'
+      out.fadeIn = Math.max(0, Math.min(5000, src.fadeIn ?? 300))
+      out.hold = Math.max(0, Math.min(10000, src.hold ?? 1000))
+      out.fadeOut = Math.max(0, Math.min(5000, src.fadeOut ?? 400))
     } catch (_error) {
       return new HeartConfig()
     }

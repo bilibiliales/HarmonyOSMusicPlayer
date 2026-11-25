@@ -1,3 +1,4 @@
+import { SongMoreButton } from '../components/SongMoreButton'
 import {
   ArtistPageParam,
   ArtistToplistArtist,
@@ -566,7 +567,7 @@ struct Recommend {
                 }
                 .layoutWeight(1)
                 .alignItems(HorizontalAlign.Start)
-                SymbolGlyph($r('sys.symbol.play_circle_fill')).fontSize(23).fontColor([TC.textQuaternary()])
+                SongMoreButton({ song: item })
               }
               .width(310)
               .height(68)
@@ -617,7 +618,7 @@ struct Recommend {
                         Text(song.author).width('100%').fontSize(9).fontColor(TC.textQuaternary()).maxLines(1)
                           .textOverflow({ overflow: TextOverflow.Ellipsis })
                       }.layoutWeight(1).alignItems(HorizontalAlign.Start)
-                      SymbolGlyph($r('sys.symbol.play_circle_fill')).fontSize(18).fontColor([TC.textSecondary()])
+                      SongMoreButton({ song: song, iconSize: 18 })
                     }.width(184).height(41).onClick(() => this.playRanking(ranking, index))
                   })
                 } else {
@@ -815,8 +816,8 @@ struct Recommend {
                   Column().width(132).height(132).borderRadius(17).backgroundColor('rgba(0,0,0,0.35)')
                   Image(FM_ICON).width(46).height(46).borderRadius(23)
                 }.width(132).height(132)
-                Text('私人FM').width(132).fontSize(14).fontWeight(FontWeight.Bold).fontColor(TC.textBody())
-                Text('为你推荐的下一首').width(132).fontSize(10).fontColor(TC.textTertiary())
+                Text('私人漫游').width(132).fontSize(14).fontWeight(FontWeight.Bold).fontColor(TC.textBody())
+                Text('无限推荐，放到最后一首会继续').width(132).fontSize(10).fontColor(TC.textTertiary()).maxLines(1)
               }.alignItems(HorizontalAlign.Start).onClick(() =>
                 this.pageStack.pushPathByName('PlaylistDetailPage', DiscoveryPlaylistsService.playlist()))
 

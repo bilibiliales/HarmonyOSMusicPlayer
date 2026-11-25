@@ -1,6 +1,13 @@
 import { http } from '@kit.NetworkKit'
 import { ApiParam } from '../models/api'
 
+export interface ApiUploadFile {
+  name: string
+  fileName: string
+  data: ArrayBuffer
+  contentType: string
+}
+
 export class ApiClient {
   /** 出厂默认后端地址，用于「重置后端服务地址」还原。 */
   static readonly DEFAULT_BASE_URL: string = 'https://ncme.scfd.top'
@@ -120,7 +127,8 @@ export class ApiClient {
   }
 
   static async upload<T>(path: string, params: ApiParam[], fileField: string, fileName: string,
-    fileData: ArrayBuffer, contentType: string, readTimeout: number = 30000): Promise<T> {
+    fileData: ArrayBuffer, contentType: string, readTimeout: number = 30000,
+    queryParams: ApiParam[] = [], additionalFiles: ApiUploadFile[] = []): Promise<T> {
     const request = http.createHttp()
     try {
       const formData: http.MultiFormData[] = params
@@ -134,7 +142,10 @@ export class ApiClient {
         remoteFileName: fileName,
         data: fileData
       })
-      const response = await request.request(ApiClient.buildUrl(path), {
+      for (const file of additionalFiles) {
+        formData.push({ name: file.name, remoteFileName: file.fileName, data: file.data, contentType: file.contentType })
+      }
+      const response = await request.request(ApiClient.buildUrl(path, queryParams), {
         method: http.RequestMethod.POST,
         header: { 'Cookie': ApiClient.cookie },
         multiFormDataList: formData,

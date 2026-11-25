@@ -1,6 +1,7 @@
 import { liveViewManager } from '@kit.LiveViewKit'
 import { WantAgent } from '@kit.AbilityKit'
 import { songItemType } from '../models/music'
+import { PlayMode } from '../models/music'
 import { PlaybackControlBridge } from './PlaybackControlBridge'
 import { AppSettings } from './AppSettings'
 
@@ -13,7 +14,17 @@ export class LiveViewController {
   private static lastPlaying: boolean = false
   private static lastPosition: number = 0
   private static lastDuration: number = 0
+  private static playMode: PlayMode = PlayMode.LOOP
   private static updateQueue: Promise<void> = Promise.resolve()
+
+  public static setPlaybackMode(mode: PlayMode): void {
+    if (mode === LiveViewController.playMode) { return }
+    LiveViewController.playMode = mode
+    if (LiveViewController.lastSong) {
+      LiveViewController.sync(LiveViewController.lastSong, LiveViewController.lastPlaying,
+        LiveViewController.lastPosition, LiveViewController.lastDuration).catch(() => {})
+    }
+  }
 
   public static async isLiveViewEnabled(): Promise<boolean> {
     try {
@@ -36,6 +47,14 @@ export class LiveViewController {
     } catch (_error) {
     }
     const safeDuration = Math.max(1, duration || song.duration || 1)
+    const serviceButtons: liveViewManager.ServiceButton[] = []
+    try {
+      serviceButtons.push({ name: LiveViewController.playMode === PlayMode.SINGLE ? '↻¹ 单曲循环' :
+        LiveViewController.playMode === PlayMode.SHUFFLE ? '⤨ 随机播放' : '↻ 顺序播放',
+        clickAction: await PlaybackControlBridge.getPlaybackWantAgent('mode') })
+      serviceButtons.push({ name: AppSettings.desktopLyricsEnabled ? '关闭桌面歌词' : '开启桌面歌词',
+        clickAction: await PlaybackControlBridge.getPlaybackWantAgent('desktopLyrics') })
+    } catch (_error) {}
     const safePosition = Math.max(0, Math.min(position, safeDuration))
     const progressPercent = Math.max(0, Math.min(100, safePosition * 100 / safeDuration))
     const content: liveViewManager.RichText[] = [
@@ -49,6 +68,8 @@ export class LiveViewController {
       clickAction: controlAction,
       layoutData: {
         layoutType: liveViewManager.LayoutType.LAYOUT_TYPE_PROGRESS,
+        serviceButtons: serviceButtons,
+        isServiceButtonsDisplayed: serviceButtons.length > 0,
         progress: progressPercent,
         color: '#FFEF233C',
         backgroundColor: '#FF3A3A42',

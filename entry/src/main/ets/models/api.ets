@@ -517,6 +517,7 @@ export interface ApiUser {
   avatarDetail?: ArtistAvatarDetail
   followed?: boolean
   mutual?: boolean
+  followMe?: boolean
   backgroundUrl?: string
   eventCount?: number
   artistId?: number
@@ -1670,7 +1671,7 @@ export interface EventLikeResponse {
 }
 
 export interface SharePageParam {
-  type: 'song' | 'playlist' | 'album' | 'event' | 'artist' | 'user'
+  type: 'song' | 'playlist' | 'album' | 'event' | 'artist' | 'user' | 'djradio' | 'program'
   id: string
   name: string
   img: string

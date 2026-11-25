@@ -1,7 +1,7 @@
 import { ApiClient } from './ApiClient'
-import { HomepageResponse, HomepageBlock, PersonalFmResponse } from '../models/home'
-import { mapApiSong } from '../models/api'
+import { HomepageResponse, HomepageBlock } from '../models/home'
 import { playlistType, songItemType } from '../models/music'
+import { PrivateFmService } from './PrivateFmService'
 
 export const FM_ICON: string = 'http://p1.music.126.net/Shi7cRT1bDhwpVDM7AOFXg==/109951165265330616.jpg'
 
@@ -25,11 +25,10 @@ export class DiscoveryPlaylistsService {
     return result
   }
   static playlist(): playlistType {
-    return { id: 'privatefm', specialType: 'fm', name: '私人FM', cover: FM_ICON, count: 0, creator: '网易云音乐' }
+    return { id: 'privatefm', specialType: 'fm', name: '私人漫游', cover: FM_ICON, count: 0, creator: '网易云音乐' }
   }
+  /** 私人漫游首批歌单，模式与续歌逻辑都在 PrivateFmService 里。 */
   static async fm(): Promise<songItemType[]> {
-    const response = await ApiClient.get<PersonalFmResponse>('/personal_fm', [{ key: 'timestamp', value: Date.now().toString() }])
-    if (response.code !== 200) { throw new Error('私人FM加载失败') }
-    return (response.data || []).map((item) => mapApiSong(item))
+    return PrivateFmService.load(1)
   }
 }

@@ -3,25 +3,11 @@ import { common } from '@kit.AbilityKit'
 import { deviceInfo } from '@kit.BasicServicesKit'
 import { preferences } from '@kit.ArkData'
 import { fileIo } from '@kit.CoreFileKit'
-import { formBindingData, formProvider } from '@kit.FormKit'
+import { MusicWidgetService, MusicWidgetState } from './MusicWidgetService'
 import { ApiClient } from './ApiClient'
 import { AuthStore } from '../stores/AuthStore'
 import { PlayerStore } from '../stores/PlayerStore'
 import { PlayMode, songItemType } from '../models/music'
-
-interface MusicWidgetState {
-  songName: string
-  artist: string
-  songId: string
-  isPlaying: boolean
-}
-
-class MusicWidgetBindingState {
-  songName: string = ''
-  artist: string = ''
-  songId: string = ''
-  isPlaying: boolean = false
-}
 
 export class AppSettings {
   private static readonly STORE_NAME: string = 'music_player_settings'
@@ -46,15 +32,22 @@ export class AppSettings {
   private static readonly STREAMING_PLAYBACK_KEY: string = 'streaming_playback_enabled'
   private static readonly SCROBBLE_KEY: string = 'scrobble_enabled'
   private static readonly DEVICE_ALIAS_KEY: string = 'device_alias'
+  private static readonly FM_MODE_KEY: string = 'fm_mode'
+  private static readonly FM_SUBMODE_KEY: string = 'fm_submode'
 
   static lyricPreferences: LyricPreferences = new LyricPreferences()
   static desktopLyricsEnabled: boolean = false
   static desktopLyricsLocked: boolean = false
+  static showProfileStatus: boolean = true
   static downloadSaveMode: string = 'download'
   static askDownloadSaveMode: boolean = true
   static effectsEnabled: boolean = true
   /** 是否在本机记录听歌记录（关闭则不调用网易云 V2 打卡，不计入听歌记录/排行）。 */
   static scrobbleEnabled: boolean = true
+  /** 私人漫游模式：DEFAULT / FAMILIAR / EXPLORE / SCENE_RCMD。 */
+  static fmMode: string = 'DEFAULT'
+  /** 场景模式细分：EXERCISE / FOCUS / NIGHT_EMO（仅 SCENE_RCMD 生效）。 */
+  static fmSubmode: string = ''
 
   static async saveFeature(key: string, value: preferences.ValueType): Promise<void> {
     if (!AppSettings.context) { throw new Error('设置存储尚未初始化') }
@@ -66,6 +59,12 @@ export class AppSettings {
   static async saveLyrics(value: LyricPreferences): Promise<void> {
     await AppSettings.saveFeature('lyric_preferences', JSON.stringify(value))
     AppSettings.lyricPreferences = value
+  }
+
+  static async saveProfileStatusVisibility(visible: boolean): Promise<void> {
+    await AppSettings.saveFeature('show_profile_status', visible)
+    AppSettings.showProfileStatus = visible
+    AppStorage.setOrCreate<boolean>('showProfileStatus', visible)
   }
 
   static backgroundPlaybackEnabled: boolean = true
@@ -128,6 +127,8 @@ export class AppSettings {
     }
     AppSettings.desktopLyricsEnabled = await store.get('desktop_lyrics_enabled', false) === true
     AppSettings.desktopLyricsLocked = await store.get('desktop_lyrics_locked', false) === true
+    AppSettings.showProfileStatus = await store.get('show_profile_status', true) === true
+    AppStorage.setOrCreate<boolean>('showProfileStatus', AppSettings.showProfileStatus)
     AppSettings.effectsEnabled = await store.get('effects_enabled', true) === true
     AppSettings.downloadSaveMode = await store.get('download_save_mode', 'download') === 'saveAs' ? 'saveAs' : 'download'
     AppSettings.askDownloadSaveMode = await store.get('ask_download_save_mode', true) === true
@@ -135,6 +136,10 @@ export class AppSettings {
     AppSettings.backgroundPlaybackEnabled = typeof backgroundValue === 'boolean' ? backgroundValue : true
     AppSettings.streamingPlaybackEnabled = await store.get(AppSettings.STREAMING_PLAYBACK_KEY, true) === true
     AppSettings.scrobbleEnabled = await store.get(AppSettings.SCROBBLE_KEY, true) === true
+    const fmModeValue = await store.get(AppSettings.FM_MODE_KEY, 'DEFAULT')
+    const fmSubmodeValue = await store.get(AppSettings.FM_SUBMODE_KEY, '')
+    AppSettings.fmMode = typeof fmModeValue === 'string' && fmModeValue.length > 0 ? fmModeValue : 'DEFAULT'
+    AppSettings.fmSubmode = typeof fmSubmodeValue === 'string' ? fmSubmodeValue : ''
     AppSettings.settingsLoaded = true
     AppSettings.deviceAlias = AppSettings.resolveDeviceAlias(await store.get(AppSettings.DEVICE_ALIAS_KEY,
       AppSettings.LEGACY_DEVICE_ALIAS))
@@ -240,10 +245,10 @@ export class AppSettings {
   static async resetLocalSettings(context: common.Context): Promise<void> {
     const store = await preferences.getPreferences(context, AppSettings.STORE_NAME)
     const keys: string[] = [
-      'lyric_preferences', 'desktop_lyrics_enabled', 'desktop_lyrics_locked', 'effects_enabled',
+      'lyric_preferences', 'desktop_lyrics_enabled', 'desktop_lyrics_locked', 'effects_enabled', 'show_profile_status',
       'download_save_mode', 'ask_download_save_mode', 'background_playback_enabled',
       'streaming_playback_enabled', 'scrobble_enabled', 'default_play_mode',
-      'default_online_quality', 'default_download_quality',
+      'default_online_quality', 'default_download_quality', 'fm_mode', 'fm_submode',
       'ai_base_url', 'ai_api_key', 'ai_model'
     ]
     for (const key of keys) {
@@ -253,6 +258,8 @@ export class AppSettings {
     AppSettings.lyricPreferences = new LyricPreferences()
     AppSettings.desktopLyricsEnabled = false
     AppSettings.desktopLyricsLocked = false
+    AppSettings.showProfileStatus = true
+    AppStorage.setOrCreate<boolean>('showProfileStatus', true)
     AppSettings.effectsEnabled = true
     AppSettings.downloadSaveMode = 'download'
     AppSettings.askDownloadSaveMode = true
@@ -260,6 +267,8 @@ export class AppSettings {
     // 由调用方在重置后按需调用 setBackgroundPlayback(true)，否则开关显示 ON 但会话仍是卸载态。
     AppSettings.streamingPlaybackEnabled = true
     AppSettings.scrobbleEnabled = true
+    AppSettings.fmMode = 'DEFAULT'
+    AppSettings.fmSubmode = ''
     AppSettings.defaultPlayMode = PlayMode.LOOP
     AppSettings.defaultOnlineQuality = 'exhigh'
     AppSettings.defaultDownloadQuality = 'exhigh'
@@ -289,6 +298,14 @@ export class AppSettings {
     await store.put(AppSettings.SCROBBLE_KEY, enabled)
     await store.flush()
     AppSettings.scrobbleEnabled = enabled
+  }
+
+  /** 私人漫游模式（mode + scene 细分）持久化。 */
+  static async saveFmMode(mode: string, submode: string): Promise<void> {
+    AppSettings.fmMode = mode.length > 0 ? mode : 'DEFAULT'
+    AppSettings.fmSubmode = submode
+    await AppSettings.saveFeature(AppSettings.FM_MODE_KEY, AppSettings.fmMode)
+    await AppSettings.saveFeature(AppSettings.FM_SUBMODE_KEY, AppSettings.fmSubmode)
   }
 
   static async saveAiSettings(context: common.Context, baseUrl: string, apiKey: string,
@@ -338,7 +355,7 @@ export class AppSettings {
     try {
       const store = await preferences.getPreferences(AppSettings.context, AppSettings.STORE_NAME)
       const indexValue = await store.get(AppSettings.PLAYER_INDEX_KEY, 0)
-      const modeValue = AppSettings.defaultPlayMode
+      const modeValue = await store.get(AppSettings.PLAYER_MODE_KEY, AppSettings.defaultPlayMode)
       const queuePath = `${AppSettings.context.filesDir}/${AppSettings.PLAYER_QUEUE_FILE}`
       if (fileIo.accessSync(queuePath)) {
         const queueValue = fileIo.readTextSync(queuePath)
@@ -364,7 +381,6 @@ export class AppSettings {
     try {
       const store = await preferences.getPreferences(AppSettings.context, AppSettings.STORE_NAME)
       const queuePath = `${AppSettings.context.filesDir}/${AppSettings.PLAYER_QUEUE_FILE}`
-      const widgetPath = `${AppSettings.context.filesDir}/${AppSettings.PLAYER_WIDGET_FILE}`
       if (playerStore.queue.length > 0) {
         const file = fileIo.openSync(queuePath,
           fileIo.OpenMode.READ_WRITE | fileIo.OpenMode.CREATE | fileIo.OpenMode.TRUNC)
@@ -378,53 +394,19 @@ export class AppSettings {
           songName: playerStore.currentSong.name,
           artist: playerStore.currentSong.author,
           songId: playerStore.currentSong.id,
-          isPlaying: playerStore.isPlaying
+          isPlaying: playerStore.isPlaying,
+          liked: playerStore.currentSong.liked || false,
+          playMode: playerStore.playMode,
+          cover: playerStore.currentSong.img || playerStore.currentSong.remoteImg || ''
         }
-        const widgetFile = fileIo.openSync(widgetPath,
-          fileIo.OpenMode.READ_WRITE | fileIo.OpenMode.CREATE | fileIo.OpenMode.TRUNC)
-        try {
-          fileIo.writeSync(widgetFile.fd, JSON.stringify(widgetState))
-        } finally {
-          fileIo.closeSync(widgetFile)
-        }
-        await AppSettings.updateMusicCards(widgetState)
+        await MusicWidgetService.publish(AppSettings.context, widgetState)
       } else {
-        if (fileIo.accessSync(queuePath)) {
-          fileIo.unlinkSync(queuePath)
-        }
-        if (fileIo.accessSync(widgetPath)) {
-          fileIo.unlinkSync(widgetPath)
-        }
+        try { fileIo.unlinkSync(queuePath) } catch (_error) {}
+        await MusicWidgetService.publish(AppSettings.context, MusicWidgetService.empty())
         await store.delete(AppSettings.PLAYER_INDEX_KEY)
       }
       await store.put(AppSettings.PLAYER_MODE_KEY, playerStore.playMode)
       await store.flush()
-    } catch (_error) {
-    }
-  }
-
-  private static async updateMusicCards(state: MusicWidgetState): Promise<void> {
-    if (!AppSettings.context) {
-      return
-    }
-    try {
-      const idsPath = `${AppSettings.context.filesDir}/${AppSettings.PLAYER_WIDGET_FORM_IDS_FILE}`
-      if (!fileIo.accessSync(idsPath)) {
-        return
-      }
-      const ids = JSON.parse(fileIo.readTextSync(idsPath)) as string[]
-      const bindingState = new MusicWidgetBindingState()
-      bindingState.songName = state.songName
-      bindingState.artist = state.artist
-      bindingState.songId = state.songId
-      bindingState.isPlaying = state.isPlaying
-      const binding = formBindingData.createFormBindingData(bindingState)
-      for (const formId of ids) {
-        try {
-          await formProvider.updateForm(formId, binding)
-        } catch (_error) {
-        }
-      }
     } catch (_error) {
     }
   }

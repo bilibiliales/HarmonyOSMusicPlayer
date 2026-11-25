@@ -1,3 +1,4 @@
+import { HeartLike } from '../components/HeartLike'
 import { SheetSkinFrame } from '../components/SheetSkin'
 import { SkinBackdrop } from '../components/SkinBackdrop'
 import { ShareSheet } from '../components/ShareSheet'
@@ -448,8 +449,7 @@ export struct EventDetailPage {
                   Text(this.song()?.name || '').fontSize(14).fontColor(TC.textPrimary()).maxLines(1)
                   Text(this.song()?.author || '').fontSize(11).fontColor(TC.textTertiary()).maxLines(1)
                 }.layoutWeight(1).alignItems(HorizontalAlign.Start)
-                SymbolGlyph(this.songLiked ? $r('sys.symbol.heart_fill') : $r('sys.symbol.heart'))
-                  .fontSize(21).fontColor([this.songLiked ? TC.accent() : TC.textTertiary()])
+                HeartLike({ liked: this.songLiked, iconSize: 21, iconColor: this.songLiked ? TC.accent() : TC.textTertiary() })
                   .onClick(() => this.toggleSongLike())
                 SymbolGlyph($r('sys.symbol.ellipsis_bubble')).fontSize(21).fontColor([TC.textTertiary()])
                   .onClick(() => this.openSongComments())
@@ -503,8 +503,7 @@ export struct EventDetailPage {
                 Text(`${this.event.info.commentCount}`).fontSize(11).fontColor(TC.textTertiary())
               }.layoutWeight(1).justifyContent(FlexAlign.Center).onClick(() => this.openEventComments())
               Row({ space: 5 }) {
-                SymbolGlyph(this.event.info.liked ? $r('sys.symbol.heart_fill') : $r('sys.symbol.heart'))
-                  .fontSize(18).fontColor([this.event.info.liked ? TC.accent() : TC.textTertiary()])
+                HeartLike({ liked: this.event.info.liked, iconSize: 18, iconColor: this.event.info.liked ? TC.accent() : TC.textTertiary() })
                 Text(`${this.event.info.likedCount}`).fontSize(11)
                   .fontColor(this.event.info.liked ? TC.accent() : TC.textTertiary())
               }.layoutWeight(1).justifyContent(FlexAlign.Center).onClick(() => this.toggleEventLike())

@@ -55,8 +55,13 @@ export class DecoKeys {
   static readonly HOME_BG_FADE: string = 'decoHomeBgFade'
   // 红心 / 启动 / 头像框 / 会员卡 / 等级贴图
   static readonly HEART_COLOR: string = 'decoHeartColor'
+  static readonly HEART_IMAGE: string = 'decoHeartImage'
   static readonly HEART_COUNT: string = 'decoHeartCount'
   static readonly HEART_SIZE: string = 'decoHeartSize'
+  static readonly HEART_MODE: string = 'decoHeartMode'
+  static readonly HEART_FADE_IN: string = 'decoHeartFadeIn'
+  static readonly HEART_HOLD: string = 'decoHeartHold'
+  static readonly HEART_FADE_OUT: string = 'decoHeartFadeOut'
   static readonly HEART_DURATION: string = 'decoHeartDuration'
   static readonly STARTUP_MEDIA: string = 'decoStartupMedia'
   static readonly STARTUP_TYPE: string = 'decoStartupType'
@@ -277,9 +282,14 @@ export class DecorationRuntime {
     const heartRaw = DecorationStore.payload(DecoKind.HEART)
     const heart = heartRaw ? HeartConfig.from(heartRaw) : undefined
     AppStorage.setOrCreate<string>(DecoKeys.HEART_COLOR, heart ? heart.color : '')
+    AppStorage.setOrCreate<string>(DecoKeys.HEART_IMAGE, heart ? heart.image : '')
     AppStorage.setOrCreate<number>(DecoKeys.HEART_COUNT, heart ? heart.count : 0)
     AppStorage.setOrCreate<number>(DecoKeys.HEART_SIZE, heart ? heart.size : 22)
     AppStorage.setOrCreate<number>(DecoKeys.HEART_DURATION, heart ? heart.duration : 1200)
+    AppStorage.setOrCreate<string>(DecoKeys.HEART_MODE, heart ? heart.mode : 'burst')
+    AppStorage.setOrCreate<number>(DecoKeys.HEART_FADE_IN, heart ? heart.fadeIn : 300)
+    AppStorage.setOrCreate<number>(DecoKeys.HEART_HOLD, heart ? heart.hold : 1000)
+    AppStorage.setOrCreate<number>(DecoKeys.HEART_FADE_OUT, heart ? heart.fadeOut : 400)
 
     const startupRaw = DecorationStore.payload(DecoKind.STARTUP)
     const startup = startupRaw ? StartupConfig.from(startupRaw) : undefined

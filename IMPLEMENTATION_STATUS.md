@@ -22,6 +22,14 @@
 - AVSession 隔离性静态依赖扫描 + 门控真值表 + 真实门控代码运行时模拟：`entry/src/test/AvSessionIsolation.regression.cjs`。
 - 顺序播放、列表循环、单曲循环、随机播放。
 - 全局共享播放队列，迷你播放器与详情页状态同步。
+- 私人漫游（原「私人 FM」，`services/PrivateFmService.ets`）：推荐页入口、歌单页标题与文案统一改名。
+  队列放到最后一首（或手动点下一首到队尾）时，`PrivateFmService.refill()` 再取一批并
+  `PlayerController.appendToQueue()` 追加到队尾，实现无限漫游；追加按 id 去重，取不到歌时退回从头循环。
+  续歌由 `PlayerController.setQueueFiller()` 挂载，`setQueue()` / `clearQueue()` 自动摘除，
+  普通歌单不会被污染。
+  歌单页右上角图标（`sys.symbol.wand_and_stars`）打开「私人漫游模式」半屏：默认 / 熟悉 / 探索 /
+  运动 / 专注 / 夜间情绪；选择后写入 `AppSettings.saveFmMode()`，默认模式走 `/personal_fm`，
+  其余走 `/personal/fm/mode`（场景模式带 `submode`）。`AppSettings.resetLocalSettings()` 会一并复位。
 - 播放详情页音质半屏切换、评论半屏、收藏到指定歌单半屏。
 - 喜欢/取消喜欢、应用沙箱下载、系统分享、歌曲百科。
 - 后端服务地址仅在侧边栏“设置”中展示和修改。
@@ -41,7 +49,35 @@
 - 歌手主页新增收藏按钮，走 `/artist/sub`（t=1 收藏 / t=0 取消），已收藏显示「已关注」，不涉及互相关注。
 - 用户等级、听歌时长、指定用户歌单与动态页面。
 - “我的-音乐”三级分栏：创建歌单、收藏歌单、收藏专辑。
+- “我的-播客”改用与音乐页同一套居中胶囊分栏：全部 / 播客 / 创建，不再自绘刷新按钮（交给宿主的
+  下拉刷新，`refreshKey` 推进来才重新加载）。全部 = 我订阅的播客 → 我创建的播客（为空不显示）→
+  近期收听的播客，段落标题沿用「音乐-近期」的小标题样式；播客 = 全部订阅（游标分页）；
+  创建 = 我创建的播客。每行右侧菜单为 订阅/取消订阅、播放全部、分享（自建播客是 播放全部/管理声音）。
+  底部动作改成正方形图标块：全部与播客页是「添加更多播客」，创建页是「创建播客 / 发布声音」。
+  播客分类切换不做转场动画（组件本身已在一个子页面里）。
+- 播客与节目详情按专辑页重做：模糊头图 + `DetailTopBar` 悬浮栏 + 操作行到顶后的毛玻璃吸附
+  （`frozen` 阈值 = 320 - 54）；操作行是 播放全部 / 订阅（`/dj/sub`）/ 评论 / 分享控件。
+  主播名称可进用户主页，节目页的「来自「某播客」」可进播客详情；分享走 `ShareSheet`，
+  `SharePageParam.type` 新增 `djradio` / `program`（系统分享链接 + 动态分享 `/share/resource`）。
+  封面点击进 `PlaylistCoverPreview`（新增 `contentType = podcast / program`，可保存封面）。
+  简介收起态固定三行、展开按钮居左；声音行右侧菜单是 播放节目 / 查看详情 / 分享。
+- 发现-播客页顶部只保留两个入口卡片（音乐电台、精选节目），精选节目点进 `pages/RadioPrograms.ets`
+  （`/program/recommend?limit=20`，含播放全部与同一套三项菜单）。
 - 歌单详情分享/评论/收藏统计操作、歌单内搜索与评论半屏。
+- 歌词本（`pages/LyricBook.ets`，侧边栏「歌词本」在「AI 写歌」之上）：走 `/song/lyrics/mark/user/page`
+  游标分页（`limit` + 后端返回的 `offset`/`hasMore`），卡片依次渲染摘录时间与歌词时间点、歌词原文、
+  译文/音译（`translateType` 1 译文 / 2 音译）、播放组件（封面+歌名+歌手，点击把该歌并入当前队列并播放）。
+  手机一行一张卡片、平板一行两张（`Responsive.itemPercent` + `Flex.wrap`，与装扮中心同一套断点）。
+  卡片右上角三个操作：分享复用 `ShareSheet`（按歌曲分享）、编辑进 `pages/LyricMarkEditor.ets`
+  （原文、译文/音译与时间点，保存走 `/song/lyrics/mark/add` 并带 `markId`）、删除走
+  `/song/lyrics/mark/del` 且先弹确认框。
+- 摘录入口：播放页歌词行**长按**（`LongPressGesture`，480ms）进入 `pages/LyricMarkPick.ets`，
+  版式与铃声制作页一致（顶栏、歌曲信息、带边框的歌词列表、底部操作）。
+  歌词列表点击选中/取消（选中项高亮 + 勾选），`/song/lyrics/mark` 已摘录的句子按时间容差
+  1.2s 自动选中；底部固定「删除歌词 / 复制歌词 / 分享歌词」三个工具（删除先确认、复制走
+  `pasteboard`、分享走 `SystemShareService.showText`），主按钮把选中集合同步到服务端：
+  新增句子批量提交（`saveMany`，10 句一批），取消选中的已摘录句子逐个 `del`。
+  长按打开后 800ms 内忽略该行的 click（避免顺手把歌词页收起）。
 - 听歌识曲：麦克风识曲（3 次 × 5 秒）与本机文件识曲（`AudioViewPicker` 选音频文件）。
   指纹在隐藏的离线网页引擎里用官方 wasm 计算（`rawfile/audiofp/index.html` + `AudioFingerprintWeb`），
   文件由网页侧解码、混单声道、重采样到 8kHz 并挑最响的 3 秒，再查 `/audio/match`。
@@ -50,7 +86,7 @@
 
 - AI 写歌：当前后端没有歌词生成、作曲、演唱合成与任务状态接口。
 - 云贝中心、商城、票务、创作者中心：依赖网易云官方活动页、支付或创作者权限接口。
-- 播客完整页、动态发布与私信：现有骨架没有对应数据模型和完整交互接口。
+- 动态发布与私信：现有骨架没有对应数据模型和完整交互接口。
 - 最近播放持久化：需要增加本地数据库，并定义历史记录清理策略。
 - 系统媒体库中的“本地音乐”扫描：需要媒体库读取授权、格式扫描与去重。
 - 后台播放、锁屏卡片、耳机按键：需要 AVSession 与后台任务配置。
@@ -100,6 +136,26 @@
   `listeningPeriodStart` 兜底，避免标题是 9 月、格子画成 11 月。
 - 下面的整块内容用 `ForEach` + `周期:offset:dataRevision` 做 key 重建，
   避免有参 `@Builder` 复用旧值导致「标题变了、数据没变」。
+
+## 播客：分享面板、分类切换与入口样式
+
+- 分享面板从「模态（`bindContentCover`）」改成**页面内联**：`RadioDetail`/`RadioProgram`、
+  `RadioPrograms`、`PodcastVoices` 都在根 `Stack` 里 `if (shareVisible) { ShareSheet(...) }`。
+  原因：从 `bindMenu` 菜单项里点「分享」时，同时 dismiss 菜单 + present 模态，模态会被吞掉，
+  表现为「点了没反应」。`PodcastLibrary` 是嵌在「我的」滚动区里的组件，改用
+  `onShareRequest` 回调把 `SharePageParam` 交给宿主页（`Mine`/`PodcastLibraryPage`）渲染面板。
+  `ShareSheet` 根节点加了 `zIndex(20)`，内联时能盖住悬浮顶栏和吸附操作行。
+- 发现-播客页不再用 `SecondaryTabContent` 做整页左右滑动：分类、推荐/热门/新晋/节目榜
+  只是换数据 + 列表回到顶部，页头与分类行不重建。播客声音页的状态筛选同样去掉转场。
+- 「我的-播客」底部入口从方形图标块改成整行条目（56 图标 + 一行文字，高 72），
+  与「我的-音乐」的「新建歌单 / 导入外部歌单」一致：添加更多播客 / 创建播客 / 发布声音。
+
+## 用户主页：互关判定与歌手入口
+
+- 互相关注不再信 `/user/mutualfollow/get`：它对歌手类账号会误报 `data: true`（对方并未回关）。
+  改为以 `/user/detail` 的 `profile.followed` / `mutual` / `followMe` 为准，
+  只有列表页传进来的 `followsTarget`/`followedByTarget` 提示才覆盖；接口旧字段缺失时才回落旧逻辑。
+- `profile.artistId > 0` 时主页多一个「歌手主页」按钮，直接跳 `ArtistPage`（此前只能点头像区的昵称）。
 
 ## 联调说明
 

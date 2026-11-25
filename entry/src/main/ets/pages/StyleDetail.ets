@@ -1,5 +1,6 @@
 import { SheetSkinFrame } from '../components/SheetSkin'
 import { SkinBackdrop } from '../components/SkinBackdrop'
+import { SongMoreButton } from '../components/SongMoreButton'
 import {
   AlbumPageParam,
   ApiAlbum,
@@ -29,6 +30,7 @@ import { SystemShareService } from '../services/SystemShareService'
 import { BubbleTip } from '../services/BubbleTip'
 import { resizeImageUrl } from '../services/ImageUrl'
 import { playerController } from '../services/PlayerController'
+import { SecondaryTabContent, SecondaryTabMotion } from '../components/SecondaryTabContent'
 import { TC } from '../services/ThemeColors'
 import { DetailTopBar } from '../components/DetailTopBar'
 import { NoMoreFooter } from '../components/NoMoreFooter'
@@ -59,6 +61,7 @@ export struct StyleDetailPage {
 
   @State detail?: StyleDetailData = undefined
   @State selectedTag: StyleDetailPageParam = { tagId: 0, name: '' }
+  @State tabDirection: number = -1
   @State currentTab: string = 'songs'
   @State songs: songItemType[] = []
   @State albums: ApiAlbum[] = []
@@ -288,7 +291,10 @@ export struct StyleDetailPage {
 
   private async switchTab(tab: string): Promise<void> {
     if (this.currentTab === tab) { return }
-    this.currentTab = tab
+    this.tabDirection = SecondaryTabMotion.direction(this.currentTab, tab, this.availableTabs())
+    this.getUIContext().animateTo({ duration: SecondaryTabMotion.DURATION, curve: Curve.EaseOut }, () => {
+      this.currentTab = tab
+    })
     this.syncResourceState()
     if (!this.resources[tab].loaded) { await this.loadCurrentResources() }
   }
@@ -718,7 +724,7 @@ export struct StyleDetailPage {
           Text(`${song.author}${song.album ? ` · ${song.album}` : ''}`).width('100%').fontSize(10)
             .fontColor(TC.textTertiary()).maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
         }.layoutWeight(1).alignItems(HorizontalAlign.Start)
-        SymbolGlyph($r('sys.symbol.play_circle')).fontSize(22).fontColor([TC.textTertiary()])
+        SongMoreButton({ song: song })
       }.height(66).padding({ left: 12, right: 16 }).onClick(() => this.playSong(index))
     })
   }
@@ -786,6 +792,7 @@ export struct StyleDetailPage {
               // 二级菜单本身就在内容流里（跟随阶段零 JS 参与）
               this.FlowResourceTabs()
               this.ResourceActions()
+              SecondaryTabContent({ value: this.currentTab, motionDirection: this.tabDirection }) {
               if (this.currentTab === 'songs') {
                 this.SongsContent()
               } else if (this.currentTab === 'albums') {
@@ -806,6 +813,7 @@ export struct StyleDetailPage {
                 Text(this.resourceMore ? '加载更多' : '已经到底了').width('100%').height(52)
                   .fontSize(11).fontColor(TC.textTertiary()).textAlign(TextAlign.Center)
                   .onClick(() => this.loadCurrentResources())
+              }
               }
             }
             NoMoreFooter()

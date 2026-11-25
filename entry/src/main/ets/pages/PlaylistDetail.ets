@@ -1,3 +1,5 @@
+import { SongMoreButton } from '../components/SongMoreButton'
+import { HeartLike } from '../components/HeartLike'
 import { SheetSkinFrame } from '../components/SheetSkin'
 import { SkinBackdrop } from '../components/SkinBackdrop'
 import { CommentService } from '../services/CommentService'
@@ -6,6 +8,9 @@ import { CommentResource } from '../models/CommentResource'
 import { common } from '@kit.AbilityKit'
 import { ListeningPlaylistService } from '../services/ListeningPlaylistService'
 import { DiscoveryPlaylistsService, FM_ICON } from '../services/DiscoveryPlaylistsService'
+import { FM_MODE_OPTIONS, FmModeOption, PrivateFmService } from '../services/PrivateFmService'
+import { AppSettings } from '../services/AppSettings'
+import { BubbleTip } from '../services/BubbleTip'
 import {
   mapApiSong,
   OperationResponse,
@@ -61,6 +66,10 @@ export struct PlaylistDetail {
   @State selectedSongName: string = ''
   @State deleting: boolean = false
   @State recordType: 0 | 1 = 1
+  /** 私人漫游模式选择（只在 specialType === 'fm' 时出现）。 */
+  @State fmModeVisible: boolean = false
+  @State fmMode: string = 'DEFAULT'
+  @State fmSubmode: string = ''
   private recordRequest: number = 0
   private shareParam: SharePageParam = { type: 'playlist', id: '', name: '', img: '' }
 
@@ -68,6 +77,8 @@ export struct PlaylistDetail {
     this.playlist = this.initialPlaylist
     this.creatorId = this.initialPlaylist.creatorId || ''
     this.recordType = this.initialPlaylist.recordType === 0 ? 0 : 1
+    this.fmMode = AppSettings.fmMode
+    this.fmSubmode = AppSettings.fmSubmode
     this.loadDetail()
   }
 
@@ -82,12 +93,12 @@ export struct PlaylistDetail {
       this.loading = true
       this.message = ''
       try {
-        this.songList = await DiscoveryPlaylistsService.fm()
+        this.songList = await PrivateFmService.load()
         this.playlist = DiscoveryPlaylistsService.playlist()
         this.playlist.count = this.songList.length
         this.playlist.cover = this.songList[0]?.img || FM_ICON
       } catch (error) {
-        this.message = error instanceof Error ? error.message : '私人FM加载失败'
+        this.message = error instanceof Error ? error.message : '私人漫游加载失败'
       } finally { this.loading = false }
       return
     }
@@ -208,6 +219,12 @@ export struct PlaylistDetail {
 
   private isOwner(): boolean {
     return !this.playlist.specialType && this.authStore.loggedIn && this.creatorId.length > 0 && this.creatorId === this.authStore.userId
+  }
+
+  /** 听歌排行是不是自己的：只有自己的排行接口才返回播放次数。 */
+  private isRecordOwner(): boolean {
+    return this.playlist.specialType === 'record' && this.authStore.loggedIn &&
+      this.creatorId.length > 0 && this.creatorId === this.authStore.userId
   }
 
   private openCreatorProfile(): void {
@@ -361,6 +378,10 @@ export struct PlaylistDetail {
       list.forEach((song: songItemType) => song.sourceId = this.playlist.id)
     }
     await playerController.setQueue(list, index, true)
+    // 私人漫游：队列放到最后一首自动续歌，实现无限漫游
+    if (this.playlist.specialType === 'fm') {
+      playerController.setQueueFiller((isActive: () => boolean) => PrivateFmService.refill(isActive))
+    }
     this.pageStack.pushPathByName('PlayPage', null)
   }
 
@@ -478,6 +499,93 @@ export struct PlaylistDetail {
     }.width('100%').height('100%').padding({ left: 20, right: 20, top: 10, bottom: 24 })
   }
 
+  private isFmModeSelected(option: FmModeOption): boolean {
+    return option.mode === this.fmMode && option.submode === this.fmSubmode
+  }
+
+  /** 头部展示的当前模式名。 */
+  private fmModeTitle(): string {
+    return PrivateFmService.current().title
+  }
+
+  /** 切换漫游模式：记住选择并重新取一批歌，后续续歌也用新模式。 */
+  private async selectFmMode(option: FmModeOption): Promise<void> {
+    this.fmModeVisible = false
+    if (this.isFmModeSelected(option)) {
+      return
+    }
+    this.fmMode = option.mode
+    this.fmSubmode = option.submode
+    try {
+      await PrivateFmService.saveMode(option.mode, option.submode)
+    } catch (_error) {
+    }
+    this.loading = true
+    this.message = ''
+    try {
+      const songs = await PrivateFmService.load()
+      this.songList = songs
+      this.playlist = DiscoveryPlaylistsService.playlist()
+      this.playlist.count = songs.length
+      this.playlist.cover = songs[0]?.img || FM_ICON
+      BubbleTip.show(this.getUIContext(), `已切换为「${option.title}」`)
+    } catch (error) {
+      this.message = error instanceof Error ? error.message : '私人漫游加载失败'
+    } finally {
+      this.loading = false
+    }
+  }
+
+  @Builder
+  private FmModeSheet() {
+    Column({ space: 4 }) {
+      Row() {
+        Column({ space: 3 }) {
+          Text('私人漫游模式').fontSize(18).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary())
+          Text('换一种推荐思路，随时可以改').fontSize(10).fontColor(TC.textTertiary())
+        }.layoutWeight(1).alignItems(HorizontalAlign.Start)
+        SymbolGlyph($r('sys.symbol.xmark_circle_fill')).fontSize(25).fontColor([TC.textQuaternary()])
+          .onClick(() => this.fmModeVisible = false)
+      }.width('100%').height(54)
+
+      ForEach(FM_MODE_OPTIONS, (option: FmModeOption) => {
+        Row({ space: 13 }) {
+          Column({ space: 3 }) {
+            Text(option.title).fontSize(14).fontWeight(FontWeight.Medium).fontColor(TC.textPrimary())
+            Text(option.desc).fontSize(10).fontColor(TC.textTertiary()).maxLines(1)
+              .textOverflow({ overflow: TextOverflow.Ellipsis })
+          }.layoutWeight(1).alignItems(HorizontalAlign.Start)
+          if (this.isFmModeSelected(option)) {
+            SymbolGlyph($r('sys.symbol.checkmark_circle_fill')).fontSize(20).fontColor([TC.accent()])
+          }
+        }
+        .width('100%').height(58).padding({ left: 12, right: 12 })
+        .backgroundColor(this.isFmModeSelected(option) ? TC.accentContainer() : '#00000000')
+        .borderRadius(14)
+        .onClick(() => { this.selectFmMode(option) })
+      }, (option: FmModeOption) => `${option.mode}:${option.submode}`)
+    }.width('100%').height('100%').padding({ left: 16, right: 16, top: 10, bottom: 20 })
+  }
+
+  @Builder
+  private FmModeSheetOverlay() {
+    Stack({ alignContent: Alignment.Bottom }) {
+      Column()
+        .width('100%').height('100%').backgroundColor('rgba(0,0,0,0.58)')
+        .onClick(() => this.fmModeVisible = false)
+      Column() {
+        this.FmModeSheet()
+      }
+      .width('100%')
+      .height(452)
+      .backgroundColor(TC.surfaceCard())
+      .borderRadius({ topLeft: 28, topRight: 28 })
+      .shadow({ radius: 24, color: 'rgba(0,0,0,0.42)', offsetY: -4 })
+      .transition(TransitionEffect.translate({ y: 480 }).animation({ duration: 240, curve: Curve.EaseOut }))
+    }
+    .width('100%').height('100%')
+  }
+
   @Builder
   private SongMenuSheet() {
     Column({ space: 5 }) {
@@ -560,8 +668,7 @@ export struct PlaylistDetail {
       if (!this.playlist.specialType) {
         Button() {
           Row({ space: 4 }) {
-            SymbolGlyph(this.subscribed ? $r('sys.symbol.heart_fill') : $r('sys.symbol.heart'))
-              .fontSize(14).fontColor([this.subscribed ? TC.accent() : TC.textSecondary()])
+            HeartLike({ liked: this.subscribed, iconSize: 14, iconColor: this.subscribed ? TC.accent() : TC.textSecondary() })
             Text(this.formatCount(this.collectCount)).fontSize(10)
               .fontColor(this.subscribed ? TC.accent() : TC.textSecondary())
           }
@@ -684,6 +791,10 @@ export struct PlaylistDetail {
                   Text(this.playlist.specialType ? `${this.playlist.count} 首歌曲` :
                     `${this.playlist.count} 首歌曲 · ${this.formatCount(this.playCount)} 次播放`)
                     .fontSize(11).fontColor(TC.textTertiary())
+                  if (this.playlist.specialType === 'fm') {
+                    Text(`${this.fmModeTitle()} · 播到最后一首自动续歌`).fontSize(10).fontColor(TC.accentSoft())
+                      .maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
+                  }
                   if (this.playlistTags.length > 0) {
                     Text(this.playlistTags.join(' · ')).fontSize(10).fontColor(TC.accentSoft()).maxLines(1)
                   }
@@ -745,16 +856,15 @@ export struct PlaylistDetail {
                         .textOverflow({ overflow: TextOverflow.Ellipsis })
                     }
                     .layoutWeight(1).alignItems(HorizontalAlign.Start).onClick(() => this.playAt(index))
-                    if (this.playlist.specialType === 'record') {
+                    // 别人的听歌排行不返回播放次数，显示 0 很难看，只在看自己的排行时才展示。
+                    if (this.isRecordOwner()) {
                       Row({ space: 4 }) {
                         SymbolGlyph($r('sys.symbol.play_fill')).fontSize(12).fontColor([TC.textTertiary()])
                         Text(`${item.playCount || 0}`).fontSize(12).fontColor(TC.textTertiary())
                       }
                     }
-                    if (this.isOwner()) {
-                      SymbolGlyph($r('sys.symbol.ellipsis_circle')).fontSize(19).fontColor([TC.textQuaternary()])
-                      .onClick(() => this.openSongMenu(item))
-                    }
+                    SongMoreButton({ song: item, canRemove: this.isOwner(),
+                      onRemove: () => this.openSongMenu(item) })
                   }
                   .height(62).padding({ left: 14, right: 16 })
                 }
@@ -795,7 +905,7 @@ export struct PlaylistDetail {
         })
 
         DetailTopBar({
-          title: '歌单',
+          title: this.playlist.specialType === 'fm' ? '私人漫游' : '歌单',
           scrollOffset: this.scrollOffset,
           shareEnabled: !this.playlist.specialType,
           showSearch: true,
@@ -811,6 +921,16 @@ export struct PlaylistDetail {
           onSearchTextChange: (value: string) => this.keyword = value,
           onShare: () => this.sharePlaylist()
         }) {
+          if (this.playlist.specialType === 'fm') {
+            // 私人漫游：右上角切换漫游模式（默认 / 熟悉 / 探索 / 场景）
+            Row() {
+              SymbolGlyph($r('sys.symbol.wand_and_stars')).fontSize(18).fontColor([TC.textOnMedia()])
+            }
+            .width(36).height(36).borderRadius(18)
+            .backgroundColor('rgba(0,0,0,0.35)')
+            .justifyContent(FlexAlign.Center)
+            .onClick(() => this.fmModeVisible = true)
+          }
           if (!this.playlist.specialType && this.isOwner()) {
             Row() {
               SymbolGlyph($r('sys.symbol.ellipsis_circle')).fontSize(18).fontColor([TC.textOnMedia()])
@@ -835,6 +955,9 @@ export struct PlaylistDetail {
         }
         if (this.deleteConfirmVisible) {
           this.MenuSheetOverlay('delete')
+        }
+        if (this.fmModeVisible) {
+          this.FmModeSheetOverlay()
         }
 
 

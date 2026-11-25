@@ -1,3 +1,4 @@
+import { HeartLike } from './HeartLike'
 import { CommentResource, ResourceComment } from '../models/CommentResource'
 import { UserProfilePageParam } from '../models/api'
 import { AuthStore } from '../stores/AuthStore'
@@ -363,6 +364,7 @@ export struct ResourceComments {
       const updated = this.copyComment(current)
       updated.liked = liked
       updated.likedCount = Math.max(0, (current.likedCount || 0) + (liked ? 1 : -1))
+      this.heartStamps.set(item.commentId, liked ? Date.now() : 0)
       this.patch(updated)
       this.notify(liked ? '已点赞' : '已取消点赞')
       await this.readLikeState(resource, item, location, generation, account)
@@ -496,6 +498,8 @@ export struct ResourceComments {
       `${item.likedCount || 0}:${this.replies(item)}`
   }
 
+  private heartStamps: Map<number, number> = new Map()
+
   @Builder
   private SortOption(label: string, sort: number) {
     Column({ space: 5 }) {
@@ -518,8 +522,9 @@ export struct ResourceComments {
               .padding(4).enabled(!this.deleting && !this.submitting).onClick(() => this.confirmDelete(item))
           }
           Row({ space: 4 }) {
-            SymbolGlyph(item.liked ? $r('sys.symbol.heart_fill') : $r('sys.symbol.heart'))
-              .fontSize(17).fontColor([item.liked ? TC.accent() : TC.textTertiary()])
+            HeartLike({ liked: item.liked || false, iconSize: 17,
+              iconColor: item.liked ? TC.accent() : TC.textTertiary(), useStamp: true,
+              burstStamp: this.heartStamps.get(item.commentId) || 0 })
             Text((item.likedCount || 0).toString()).fontSize(11).fontColor(item.liked ? TC.accent() : TC.textTertiary())
           }.padding(4).enabled(!this.liking.includes(item.commentId)).onClick(() => this.toggleLike(item))
         }.width('100%')

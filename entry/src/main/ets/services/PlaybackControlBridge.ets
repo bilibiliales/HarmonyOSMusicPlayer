@@ -1,9 +1,9 @@
 import { WantAgent, wantAgent } from '@kit.AbilityKit'
 
-export type PlaybackAction = 'play' | 'pause'
+export type PlaybackAction = 'play' | 'pause' | 'favorite' | 'desktopLyrics' | 'mode'
 
 export class PlaybackControlBridge {
-  private static readonly BUNDLE_NAME: string = 'com.harmonyos.cloudmusic'
+  private static readonly BUNDLE_NAME: string = 'com.hmos.cloudmusic'
   static readonly CONTROL_ACTION: string = 'com.harmonyos.cloudmusic.event.PLAYBACK_CONTROL'
   private static handler?: (action: PlaybackAction) => void
   private static playAgent?: WantAgent
@@ -50,12 +50,13 @@ export class PlaybackControlBridge {
         }
       }],
       actionType: wantAgent.OperationType.START_ABILITY,
-      requestCode: action === 'play' ? 10002 : 10003,
+      requestCode: action === 'play' ? 10002 : action === 'pause' ? 10003 : action === 'favorite' ? 10004 :
+        action === 'desktopLyrics' ? 10005 : 10006,
       actionFlags: [wantAgent.WantAgentFlags.UPDATE_PRESENT_FLAG]
     })
     if (action === 'play') {
       PlaybackControlBridge.playAgent = agent
-    } else {
+    } else if (action === 'pause') {
       PlaybackControlBridge.pauseAgent = agent
     }
     return agent

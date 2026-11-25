@@ -128,9 +128,14 @@ export struct DecorationEditorPage {
 
   // ---- 红心 ----
   @State private heartColor: string = '#ef233c'
+  @State private heartImage: string = ''
   @State private heartCount: number = 7
   @State private heartSize: number = 22
   @State private heartDuration: number = 1200
+  @State private heartMode: string = 'burst'
+  @State private heartFadeIn: number = 300
+  @State private heartHold: number = 1000
+  @State private heartFadeOut: number = 400
 
   // ---- 启动资源 ----
   @State private startupMedia: string = ''
@@ -261,9 +266,14 @@ export struct DecorationEditorPage {
     this.homeFade = 100
 
     this.heartColor = '#ef233c'
+    this.heartImage = ''
     this.heartCount = 7
     this.heartSize = 22
     this.heartDuration = 1200
+    this.heartMode = 'burst'
+    this.heartFadeIn = 300
+    this.heartHold = 1000
+    this.heartFadeOut = 400
 
     this.startupMedia = ''
     this.startupType = 'image'
@@ -375,9 +385,14 @@ export struct DecorationEditorPage {
     if (this.kind === DecoKind.HEART) {
       const cfg = HeartConfig.from(raw)
       this.heartColor = cfg.color
+      this.heartImage = cfg.image
       this.heartCount = cfg.count
       this.heartSize = cfg.size
       this.heartDuration = cfg.duration
+      this.heartMode = cfg.mode
+      this.heartFadeIn = cfg.fadeIn
+      this.heartHold = cfg.hold
+      this.heartFadeOut = cfg.fadeOut
       return
     }
     if (this.kind === DecoKind.STARTUP) {
@@ -512,9 +527,14 @@ export struct DecorationEditorPage {
     if (this.kind === DecoKind.HEART) {
       const cfg = new HeartConfig()
       cfg.color = this.heartColor
+      cfg.image = this.heartImage
       cfg.count = this.heartCount
       cfg.size = this.heartSize
       cfg.duration = this.heartDuration
+      cfg.mode = this.heartMode
+      cfg.fadeIn = this.heartFadeIn
+      cfg.hold = this.heartHold
+      cfg.fadeOut = this.heartFadeOut
       return JSON.stringify(cfg)
     }
     if (this.kind === DecoKind.STARTUP) {
@@ -1724,23 +1744,40 @@ export struct DecorationEditorPage {
 
   @Builder
   private HeartForm() {
-    DecoCard({ title: '红心特效', hint: '点赞时从红心处上飘后回落渐隐' }) {
+    DecoCard({ title: '红心特效', hint: '用于播放器、评论、MV、动态等红心。可自定义弹射或正上方展示。动图裁剪为静态首帧，跳过裁剪保留动画。' }) {
+      DecoMediaPicker({
+        label: '特效贴图（支持动图）', value: this.heartImage, cropAspect: DecoRatio.SQUARE,
+        onChange: (path: string) => this.heartImage = path
+      })
+      Row({ space: 8 }) {
+        Button('弹射').backgroundColor(this.heartMode === 'burst' ? TC.accent() : TC.surfaceCard()).onClick(() => this.heartMode = 'burst')
+        Button('正上方展示').backgroundColor(this.heartMode === 'above' ? TC.accent() : TC.surfaceCard()).onClick(() => this.heartMode = 'above')
+      }
+      if (this.heartMode === 'above') {
+        DecoSlider({ label: '渐显时长', value: this.heartFadeIn, min: 0, max: 5000, step: 100, unit: 'ms', onChange: (v: number) => this.heartFadeIn = v })
+        DecoSlider({ label: '展示时长', value: this.heartHold, min: 0, max: 10000, step: 100, unit: 'ms', onChange: (v: number) => this.heartHold = v })
+        DecoSlider({ label: '渐隐时长', value: this.heartFadeOut, min: 0, max: 5000, step: 100, unit: 'ms', onChange: (v: number) => this.heartFadeOut = v })
+      }
       DecoColorPicker({
-        label: '红心颜色', value: this.heartColor,
+        label: '默认红心颜色', value: this.heartColor,
         onChange: (v: string) => this.heartColor = v
       })
+      if (this.heartMode === 'burst') {
       DecoSlider({
         label: '每次数量', value: this.heartCount, min: 1, max: 20, step: 1, unit: '个',
         onChange: (v: number) => this.heartCount = v
       })
+      }
       DecoSlider({
-        label: '红心大小', value: this.heartSize, min: 10, max: 40, step: 1, unit: 'vp',
+        label: '贴图大小', value: this.heartSize, min: 10, max: 120, step: 1, unit: 'vp',
         onChange: (v: number) => this.heartSize = v
       })
+      if (this.heartMode === 'burst') {
       DecoSlider({
         label: '动画时长', value: this.heartDuration, min: 600, max: 3000, step: 100, unit: 'ms',
         onChange: (v: number) => this.heartDuration = v
       })
+      }
     }
   }
 

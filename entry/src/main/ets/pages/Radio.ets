@@ -16,7 +16,6 @@ export struct RadioPage {
   @Consume('topAvoidHeight') topAvoidHeight: number
   embedded: boolean = false
   @State categories: RadioCategory[] = []
-  @State recommendations: ProgramItem[] = []
   @State stations: DjRadioItem[] = []
   @State ranked: ProgramItem[] = []
   @State category: number = 0
@@ -33,6 +32,7 @@ export struct RadioPage {
   private token: number = 0
   private homeToken: number = 0
   private listOffset: number = 0
+  private listScroller: Scroller = new Scroller()
 
   aboutToAppear(): void { this.loadHome() }
   aboutToDisappear(): void { this.token++; this.homeToken++ }
@@ -44,9 +44,6 @@ export struct RadioPage {
       RadioService.categories().then((items: RadioCategory[]) => {
         if (generation === this.homeToken) { this.categories = items }
       }).catch(() => { if (generation === this.homeToken) { this.homeMessage = '分类加载失败，可下拉重试' } }),
-      RadioService.recommendedPrograms().then((items: ProgramItem[]) => {
-        if (generation === this.homeToken) { this.recommendations = items }
-      }).catch(() => { if (generation === this.homeToken) { this.recommendations = [] } }),
       this.loadList(true)
     ])
   }
@@ -81,20 +78,29 @@ export struct RadioPage {
     }
   }
 
+  /** 切换推荐/热门/新晋/节目榜：只换数据，不重建页面。 */
   private chooseMode(mode: string): void {
     if (mode === this.mode) { return }
     this.mode = mode
     this.query = ''
+    this.scrollToTop()
     this.loadList(true)
   }
 
+  /** 切换分类：同样只刷新列表数据。 */
   private chooseCategory(id: number, name: string): void {
     this.categoryVisible = false
+    if (id === this.category && name === this.categoryName) { return }
     this.category = id
     this.categoryName = name
     if (this.mode === 'new' || this.mode === 'programs') { this.mode = 'recommend' }
     this.query = ''
+    this.scrollToTop()
     this.loadList(true)
+  }
+
+  private scrollToTop(): void {
+    try { this.listScroller.scrollToIndex(0) } catch (_error) {}
   }
 
   private openStation(id: number, name: string = '', cover: string = ''): void {
@@ -151,22 +157,39 @@ export struct RadioPage {
   }
 
   @Builder
+  private EntryCard(icon: Resource, title: string, subtitle: string, action: () => void) {
+    Column({ space: 6 }) {
+      Row() {
+        SymbolGlyph(icon).fontSize(22).fontColor([TC.accentSoft()])
+        Blank()
+        SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(12).fontColor([TC.textTertiary()])
+      }.width('100%')
+      Text(title).width('100%').fontSize(16).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary())
+      Text(subtitle).width('100%').fontSize(10).fontColor(TC.textQuaternary()).maxLines(1)
+        .textOverflow({ overflow: TextOverflow.Ellipsis })
+    }
+    .layoutWeight(1)
+    .padding(14)
+    .borderRadius(18)
+    .backgroundColor(TC.surfaceCard())
+    .alignItems(HorizontalAlign.Start)
+    .onClick(action)
+  }
+
+  @Builder
   private Header() {
     if (!this.embedded) {
       Row({ space: 12 }) {
         SymbolGlyph($r('sys.symbol.chevron_left')).fontSize(24).fontColor([TC.textPrimary()]).onClick(() => this.pageStack.pop())
-        Text('电台').fontSize(23).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary())
+        Text('播客').fontSize(23).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary())
       }.width('100%').height(56 + this.topAvoidHeight).padding({ left: 17, top: this.topAvoidHeight })
     }
     Row({ space: 12 }) {
-      Column({ space: 5 }) {
-        Text('音乐电台').fontSize(18).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary())
-        Text('DIFM · 电音 / 古典 / 爵士').fontSize(12).fontColor(TC.textQuaternary())
-      }.layoutWeight(1).alignItems(HorizontalAlign.Start)
-      SymbolGlyph($r('sys.symbol.podcast')).fontSize(28).fontColor([TC.accentSoft()])
-      SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(13).fontColor([TC.textSecondary()])
-    }.width('92%').padding(18).borderRadius(18).backgroundColor(TC.surfaceCard()).margin({ top: 12, bottom: 16 })
-      .onClick(() => this.pageStack.pushPathByName('DifmPage', null))
+      this.EntryCard($r('sys.symbol.podcast'), '音乐电台', 'DIFM · 电音 / 古典 / 爵士',
+        () => this.pageStack.pushPathByName('DifmPage', null))
+      this.EntryCard($r('sys.symbol.mic_fill'), '精选节目', '编辑精选 · 每期都值得一听',
+        () => this.pageStack.pushPathByName('RadioProgramsPage', null))
+    }.width('92%').margin({ top: 12, bottom: 16 })
     Scroll() {
       Row({ space: 22 }) {
         Text(this.categoryName + ' ▾').fontSize(13).fontColor(TC.accentSoft()).onClick(() => this.categoryVisible = true)
@@ -180,25 +203,17 @@ export struct RadioPage {
   }
 
   @Builder
-  private RecommendedPrograms() {
-    if (this.category === 0 && this.mode === 'recommend' && this.recommendations.length > 0) {
-      Row() {
-        Text('精选节目').fontSize(19).fontWeight(FontWeight.Bold).fontColor(TC.textPrimary()).layoutWeight(1)
-        Text(this.playing ? '准备播放…' : '播放全部').fontSize(12).fontColor(TC.accentSoft())
-          .enabled(!this.playing).onClick(() => this.play(this.recommendations))
-      }.width('100%').padding({ left: 17, right: 17, top: 18, bottom: 8 })
-      ForEach(this.recommendations, (program: ProgramItem, index: number) => {
-        RadioProgramRow({ program: program, onPlay: () => this.play(this.recommendations, index),
-          onDetails: () => this.openProgram(program) })
-      }, (program: ProgramItem) => String(program.id))
-    }
+  private Content() {
+    Column() {
+      this.RadioFeed()
+    }.width('100%').height('100%')
   }
 
   @Builder
-  private Content() {
+  private RadioFeed() {
     Refresh({ refreshing: this.refreshing }) {
-      List() {
-        ListItem() { Column() { this.Header(); this.RecommendedPrograms() }.width('100%') }
+      List({ scroller: this.listScroller }) {
+        ListItem() { Column() { this.Header() }.width('100%') }
         ListItem() {
           Row({ space: 24 }) {
             ForEach(this.category > 0 ? ['recommend', 'hot'] : ['recommend', 'hot', 'new', 'programs'], (mode: string) => {

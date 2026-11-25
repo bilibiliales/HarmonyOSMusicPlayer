@@ -165,15 +165,23 @@ export struct PlaylistCoverPreview {
                 }.margin({ top: 12 })
               } else {
                 Row({ space: 20 }) {
-                  if (this.pageParam.contentType !== 'album') {
+                  if (this.pageParam.contentType === 'program') {
+                    Row({ space: 6 }) {
+                      SymbolGlyph($r('sys.symbol.play_fill')).fontSize(16).fontColor([TC.textBody()])
+                      Text(`${this.formatCount(this.playCount)} 收听`).fontSize(12).fontColor(TC.textBody())
+                    }
+                  } else if (this.pageParam.contentType !== 'album' && this.pageParam.contentType !== 'podcast') {
                   Row({ space: 6 }) {
                     SymbolGlyph($r('sys.symbol.play_fill')).fontSize(16).fontColor([TC.textBody()])
                     Text(`${this.formatCount(this.playCount)} 播放`).fontSize(12).fontColor(TC.textBody())
                   }
                   }
+                  if (this.pageParam.contentType !== 'program') {
                   Row({ space: 6 }) {
                     SymbolGlyph($r('sys.symbol.heart')).fontSize(16).fontColor([TC.textBody()])
-                    Text(`${this.formatCount(this.collectCount)} 收藏`).fontSize(12).fontColor(TC.textBody())
+                    Text(`${this.formatCount(this.collectCount)} ${this.pageParam.contentType === 'podcast' ? '订阅' : '收藏'}`)
+                      .fontSize(12).fontColor(TC.textBody())
+                  }
                   }
                   Row({ space: 6 }) {
                     SymbolGlyph($r('sys.symbol.ellipsis_bubble')).fontSize(16).fontColor([TC.textBody()])

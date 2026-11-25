@@ -1,3 +1,4 @@
+import { SongMoreButton } from '../components/SongMoreButton'
 import { SkinBackdrop } from '../components/SkinBackdrop'
 import {
   ApiSong,
@@ -137,7 +138,7 @@ export struct ArtistSongsPage {
                       .textOverflow({ overflow: TextOverflow.Ellipsis })
                   }
                   .layoutWeight(1).alignItems(HorizontalAlign.Start)
-                  SymbolGlyph($r('sys.symbol.play_circle')).fontSize(21).fontColor([TC.textTertiary()])
+                  SongMoreButton({ song: song })
                 }
                 .height(62).padding({ left: 12, right: 16 })
                 .onClick(() => this.playAt(index))

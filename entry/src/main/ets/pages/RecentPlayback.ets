@@ -1,3 +1,4 @@
+import { SongMoreButton } from '../components/SongMoreButton'
 import { SkinBackdrop } from '../components/SkinBackdrop'
 import { AuthStore } from '../stores/AuthStore'
 import { ListeningPlaylistService } from '../services/ListeningPlaylistService'
@@ -5,6 +6,7 @@ import { RecentPlaybackService, RecentEntry } from '../services/RecentPlaybackSe
 import { playerController } from '../services/PlayerController'
 import { AlbumPageParam, MvPlayerPageParam } from '../models/api'
 import { playlistType, songItemType } from '../models/music'
+import { SecondaryTabContent, SecondaryTabMotion } from '../components/SecondaryTabContent'
 import { TC } from '../services/ThemeColors'
 
 export interface RecentPlaybackParam { djId?: string; title?: string }
@@ -16,6 +18,7 @@ export struct RecentPlaybackPage {
   @Consume('topAvoidHeight') topAvoidHeight: number
   @Consume('authStore') authStore: AuthStore
   pageParam: RecentPlaybackParam = {}
+  @State tabDirection: number = -1
   @State tab: number = 0
   @State entries: RecentEntry[] = []
   @State songs: songItemType[] = []
@@ -95,12 +98,18 @@ export struct RecentPlaybackPage {
                     .fontWeight(this.tab === index ? FontWeight.Bold : FontWeight.Regular)
                   Column().width(24).height(3).borderRadius(2).backgroundColor(this.tab === index ? TC.accent() : 'transparent')
                 }.height(46).justifyContent(FlexAlign.Center).onClick(() => {
-                  if (this.tab !== index) { this.tab = index; this.load() }
+                  if (this.tab !== index) {
+                    this.tabDirection = index > this.tab ? -1 : 1
+                    this.getUIContext().animateTo({ duration: SecondaryTabMotion.DURATION, curve: Curve.EaseOut }, () => this.tab = index)
+                    this.load()
+                  }
                 })
               })
             }.padding({ left: 18, right: 18 })
           }.width('100%').height(46).scrollable(ScrollDirection.Horizontal).scrollBar(BarState.Off)
         }
+        Column() {
+        SecondaryTabContent({ value: String(this.tab), motionDirection: this.tabDirection, fill: true }) {
         if (this.canPlayAll()) {
           Row() {
             Row({ space: 8 }) {
@@ -136,6 +145,7 @@ export struct RecentPlaybackPage {
                       Text(song.name).fontColor(TC.textBody()).maxLines(1)
                       Text(song.author).fontColor(TC.textTertiary()).fontSize(12).maxLines(1)
                     }.layoutWeight(1).alignItems(HorizontalAlign.Start)
+                    SongMoreButton({ song: song })
                   }.height(68).padding({ left: 18, right: 18 }).onClick(() => this.play(index))
                 }
               })
@@ -155,6 +165,8 @@ export struct RecentPlaybackPage {
             }
           }.layoutWeight(1)
         }
+        }
+        }.width('100%').layoutWeight(1)
       }.width('100%').height('100%').backgroundColor(TC.pageBackground())
     }.hideTitleBar(true)
   }

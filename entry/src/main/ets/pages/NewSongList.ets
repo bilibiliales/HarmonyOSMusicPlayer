@@ -1,3 +1,4 @@
+import { SongMoreButton } from '../components/SongMoreButton'
 import { SkinBackdrop } from '../components/SkinBackdrop'
 import { mapApiSong, NewSongPageParam, songItemType, TopSongResponse } from '../models'
 import { ApiClient } from '../services/ApiClient'
@@ -166,7 +167,7 @@ export struct NewSongListPage {
                       }
                       .layoutWeight(1).alignItems(HorizontalAlign.Start)
                       Text(this.formatDuration(item.duration || 0)).fontSize(10).fontColor(TC.textQuaternary())
-                      SymbolGlyph($r('sys.symbol.ellipsis_circle')).fontSize(18).fontColor([TC.textTertiary()])
+                      SongMoreButton({ song: item })
                     }
                     .height(68).padding({ left: 12, right: 16 })
                     .onClick(() => this.playAt(index))
