@@ -150,7 +150,8 @@ export struct VoiceUploadPage {
                 .enabled(!this.uploading).onClick(() => this.select(list))
             }, (list: VoiceList) => String(list.voiceListId))
             Button(this.fileName || '选择音频文件').width('100%').height(44)
-              .enabled(!this.uploading && !this.picking).onClick(() => this.pickAudio())
+              .enabled(!this.uploading && !this.picking)
+              .backgroundColor(TC.accent()).fontColor(TC.textOnAccent()).onClick(() => this.pickAudio())
             DecoMediaPicker({ label: '声音封面（可选，默认使用播客封面）', value: this.cover, cropAspect: DecoRatio.SQUARE,
               onChange: (path: string) => this.cover = path }).enabled(!this.uploading)
             TextInput({ text: this.nameText, placeholder: '声音名称' }).width('100%')
