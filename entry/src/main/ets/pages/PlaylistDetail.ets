@@ -221,6 +221,12 @@ export struct PlaylistDetail {
     return !this.playlist.specialType && this.authStore.loggedIn && this.creatorId.length > 0 && this.creatorId === this.authStore.userId
   }
 
+  /** 听歌排行是不是自己的：只有自己的排行接口才返回播放次数。 */
+  private isRecordOwner(): boolean {
+    return this.playlist.specialType === 'record' && this.authStore.loggedIn &&
+      this.creatorId.length > 0 && this.creatorId === this.authStore.userId
+  }
+
   private openCreatorProfile(): void {
     const uid = this.creatorId || this.playlist.creatorId || ''
     if (!uid) {
@@ -850,7 +856,8 @@ export struct PlaylistDetail {
                         .textOverflow({ overflow: TextOverflow.Ellipsis })
                     }
                     .layoutWeight(1).alignItems(HorizontalAlign.Start).onClick(() => this.playAt(index))
-                    if (this.playlist.specialType === 'record') {
+                    // 别人的听歌排行不返回播放次数，显示 0 很难看，只在看自己的排行时才展示。
+                    if (this.isRecordOwner()) {
                       Row({ space: 4 }) {
                         SymbolGlyph($r('sys.symbol.play_fill')).fontSize(12).fontColor([TC.textTertiary()])
                         Text(`${item.playCount || 0}`).fontSize(12).fontColor(TC.textTertiary())
