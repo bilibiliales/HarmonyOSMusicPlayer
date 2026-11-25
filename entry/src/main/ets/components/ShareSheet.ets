@@ -230,5 +230,7 @@ export struct ShareSheet {
       .transition(TransitionEffect.translate({ y: 400 }).animation({ duration: 260, curve: Curve.EaseOut }))
     }
     .width('100%').height('100%')
+    // 内联在页面 Stack 里时（播客/节目页）要盖住悬浮顶栏与吸附操作行。
+    .zIndex(20)
   }
 }

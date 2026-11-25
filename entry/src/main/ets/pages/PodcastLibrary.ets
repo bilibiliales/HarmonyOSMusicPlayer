@@ -1,5 +1,7 @@
 import { PodcastLibrary } from '../components/PodcastLibrary'
+import { ShareSheet } from '../components/ShareSheet'
 import { SkinBackdrop } from '../components/SkinBackdrop'
+import { SharePageParam } from '../models/api'
 import { PodcastLibraryParam } from '../models/podcast'
 import { TC } from '../services/ThemeColors'
 
@@ -11,10 +13,23 @@ export struct PodcastLibraryPage {
   pageParam: PodcastLibraryParam = {}
   @State refreshKey: number = 0
   @State refreshing: boolean = false
+  @State shareVisible: boolean = false
+  @State shareParam: SharePageParam = { type: 'djradio', id: '', name: '', img: '' }
+
+  private openShare(param: SharePageParam): void {
+    this.shareParam = param
+    this.shareVisible = true
+  }
+
+  @Builder
+  private ShareOptions() {
+    ShareSheet({ shareParam: this.shareParam, visible: true, onClose: () => this.shareVisible = false })
+  }
 
   build() {
     NavDestination() {
       SkinBackdrop()
+      Stack({ alignContent: Alignment.TopStart }) {
       Column() {
         Row({ space: 14 }) {
           SymbolGlyph($r('sys.symbol.chevron_left')).fontSize(24).fontColor([TC.textPrimary()]).onClick(() => this.pageStack.pop())
@@ -22,7 +37,8 @@ export struct PodcastLibraryPage {
         }.width('100%').height(56 + this.topAvoidHeight).padding({ left: 17, top: this.topAvoidHeight })
         Refresh({ refreshing: $$this.refreshing }) {
           Scroll() {
-            PodcastLibrary({ initialSection: this.pageParam.section || 'all', refreshKey: this.refreshKey })
+            PodcastLibrary({ initialSection: this.pageParam.section || 'all', refreshKey: this.refreshKey,
+              onShareRequest: (param: SharePageParam) => this.openShare(param) })
               .width('100%').padding({ bottom: 40 })
           }.width('100%').height('100%').scrollBar(BarState.Off)
         }
@@ -32,6 +48,8 @@ export struct PodcastLibraryPage {
           setTimeout(() => { this.refreshing = false }, 800)
         })
       }.width('100%').height('100%').backgroundColor(TC.pageBackground())
+      if (this.shareVisible) { this.ShareOptions() }
+      }.width('100%').height('100%')
     }.hideTitleBar(true).onShown(() => this.refreshKey++)
   }
 }

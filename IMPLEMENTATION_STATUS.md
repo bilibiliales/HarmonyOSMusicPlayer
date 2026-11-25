@@ -137,6 +137,26 @@
 - 下面的整块内容用 `ForEach` + `周期:offset:dataRevision` 做 key 重建，
   避免有参 `@Builder` 复用旧值导致「标题变了、数据没变」。
 
+## 播客：分享面板、分类切换与入口样式
+
+- 分享面板从「模态（`bindContentCover`）」改成**页面内联**：`RadioDetail`/`RadioProgram`、
+  `RadioPrograms`、`PodcastVoices` 都在根 `Stack` 里 `if (shareVisible) { ShareSheet(...) }`。
+  原因：从 `bindMenu` 菜单项里点「分享」时，同时 dismiss 菜单 + present 模态，模态会被吞掉，
+  表现为「点了没反应」。`PodcastLibrary` 是嵌在「我的」滚动区里的组件，改用
+  `onShareRequest` 回调把 `SharePageParam` 交给宿主页（`Mine`/`PodcastLibraryPage`）渲染面板。
+  `ShareSheet` 根节点加了 `zIndex(20)`，内联时能盖住悬浮顶栏和吸附操作行。
+- 发现-播客页不再用 `SecondaryTabContent` 做整页左右滑动：分类、推荐/热门/新晋/节目榜
+  只是换数据 + 列表回到顶部，页头与分类行不重建。播客声音页的状态筛选同样去掉转场。
+- 「我的-播客」底部入口从方形图标块改成整行条目（56 图标 + 一行文字，高 72），
+  与「我的-音乐」的「新建歌单 / 导入外部歌单」一致：添加更多播客 / 创建播客 / 发布声音。
+
+## 用户主页：互关判定与歌手入口
+
+- 互相关注不再信 `/user/mutualfollow/get`：它对歌手类账号会误报 `data: true`（对方并未回关）。
+  改为以 `/user/detail` 的 `profile.followed` / `mutual` / `followMe` 为准，
+  只有列表页传进来的 `followsTarget`/`followedByTarget` 提示才覆盖；接口旧字段缺失时才回落旧逻辑。
+- `profile.artistId > 0` 时主页多一个「歌手主页」按钮，直接跳 `ArtistPage`（此前只能点头像区的昵称）。
+
 ## 联调说明
 
 后端默认端口为 `3000`。电脑本机预览可尝试 `http://127.0.0.1:3000`，模拟器通常使用

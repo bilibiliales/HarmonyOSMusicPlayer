@@ -26,6 +26,8 @@ export struct PodcastLibrary {
   @Consume('pageStack') pageStack: NavPathStack
   @Prop initialSection: string = 'all'
   @Prop @Watch('refresh') refreshKey: number = 0
+  /** 宿主页提供的分享入口：把分享面板放在页面根 Stack 上，避免模态被列表菜单吞掉。 */
+  onShareRequest?: (param: SharePageParam) => void
   @State tab: string = 'all'
   @State subscribed: PodcastStation[] = []
   @State created: PodcastStation[] = []
@@ -209,8 +211,13 @@ export struct PodcastLibrary {
 
   private shareStation(station: PodcastStation): void {
     if (station.list) { return }
-    this.shareParam = { type: 'djradio', id: station.id, name: station.name, img: station.cover,
-      author: station.author || '' }
+    const param: SharePageParam = { type: 'djradio', id: station.id, name: station.name,
+      img: station.cover, author: station.author || '' }
+    if (this.onShareRequest) {
+      this.onShareRequest(param)
+      return
+    }
+    this.shareParam = param
     this.sharing = true
   }
 
@@ -373,31 +380,39 @@ export struct PodcastLibrary {
     .width('100%').height(200).justifyContent(FlexAlign.Center)
   }
 
+  /** 与「我的 - 音乐」里的「新建歌单」一致的整行入口：56 图标 + 一行文字。 */
   @Builder
-  private ActionTile(icon: Resource, label: string, action: () => void) {
-    Column({ space: 7 }) {
+  private ActionRow(icon: Resource, label: string, action: () => void) {
+    Row({ space: 12 }) {
       Stack() {
-        SymbolGlyph(icon).fontSize(22).fontColor([TC.textBody()])
+        SymbolGlyph(icon).fontSize(28).fontColor([TC.textTertiary()])
       }
       .width(56).height(56).borderRadius(8).backgroundColor(TC.surfaceRaised())
       .alignContent(Alignment.Center)
-      Text(label).fontSize(10).fontColor(TC.textTertiary()).maxLines(1)
+      Column() {
+        Text(label).fontSize(14).fontColor(TC.textBody())
+      }
+      .layoutWeight(1).alignItems(HorizontalAlign.Start).justifyContent(FlexAlign.Center)
     }
+    .width('100%')
+    .height(72)
+    .alignItems(VerticalAlign.Center)
+    .padding({ left: 16, right: 16 })
     .onClick(action)
   }
 
   @Builder
   private BottomActions() {
-    Row({ space: 16 }) {
+    Column({ space: 0 }) {
       if (this.tab === 'created') {
-        this.ActionTile($r('sys.symbol.plus_circle'), '创建播客', () => { this.create() })
-        this.ActionTile($r('sys.symbol.arrow_up_circle'), '发布声音', () => { this.upload() })
+        this.ActionRow($r('sys.symbol.plus_circle'), '创建播客', () => { this.create() })
+        this.ActionRow($r('sys.symbol.arrow_up_circle'), '发布声音', () => { this.upload() })
       } else {
-        this.ActionTile($r('sys.symbol.magnifyingglass'), '添加更多播客', () => this.openDiscover())
+        this.ActionRow($r('sys.symbol.magnifyingglass'), '添加更多播客', () => this.openDiscover())
       }
     }
     .width('100%')
-    .padding({ left: 16, right: 16, top: 16, bottom: 8 })
+    .padding({ top: 12 })
   }
 
   @Builder

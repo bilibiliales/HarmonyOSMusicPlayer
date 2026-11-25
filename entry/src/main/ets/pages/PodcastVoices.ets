@@ -2,7 +2,6 @@ import { SkinBackdrop } from '../components/SkinBackdrop'
 import { SheetSkinFrame } from '../components/SheetSkin'
 import { ShareSheet } from '../components/ShareSheet'
 import { SharePageParam } from '../models/api'
-import { SecondaryTabContent, SecondaryTabMotion } from '../components/SecondaryTabContent'
 import { PodcastVoice, PodcastVoicesParam } from '../models/podcast'
 import { AuthStore } from '../stores/AuthStore'
 import { PodcastService } from '../services/PodcastService'
@@ -22,7 +21,6 @@ export struct PodcastVoicesPage {
   pageParam: PodcastVoicesParam = { list: { voiceListId: '', voiceListName: '' }, owner: '' }
   @State voices: PodcastVoice[] = []
   @State status: string = ''
-  @State motionDirection: number = -1
   @State query: string = ''
   @State loading: boolean = false
   @State more: boolean = true
@@ -67,10 +65,10 @@ export struct PodcastVoicesPage {
     } finally { if (request === this.requestId) { this.loading = false } }
   }
 
+  /** 状态筛选只换数据，不做整页切换动画。 */
   private switchStatus(status: string): void {
     if (status === this.status) { return }
-    this.motionDirection = SecondaryTabMotion.direction(this.status, status, this.statuses)
-    this.getUIContext().animateTo({ duration: SecondaryTabMotion.DURATION, curve: Curve.EaseOut }, () => this.status = status)
+    this.status = status
     this.load(true)
   }
 
@@ -190,6 +188,7 @@ export struct PodcastVoicesPage {
   build() {
     NavDestination() {
       SkinBackdrop()
+      Stack({ alignContent: Alignment.TopStart }) {
       Column() {
         Row({ space: 12 }) {
           SymbolGlyph($r('sys.symbol.chevron_left')).fontSize(24).fontColor([TC.textPrimary()]).onClick(() => this.pageStack.pop())
@@ -214,15 +213,14 @@ export struct PodcastVoicesPage {
           SymbolGlyph($r('sys.symbol.arrow_clockwise')).fontSize(18).fontColor([TC.textSecondary()]).onClick(() => this.load(true))
         }.width('100%').height(36).padding({ left: 16, right: 16 })
         Column() {
-        SecondaryTabContent({ value: this.status, motionDirection: this.motionDirection, fill: true }) { this.VoicesList() }
+          this.VoicesList()
         }.width('100%').layoutWeight(1)
       }.width('100%').height('100%').backgroundColor(TC.pageBackground())
         .bindSheet(this.detailsVisible, this.DetailsSheet(), { height: '55%', showClose: false,
           backgroundColor: TC.sheetBackground(), onDisappear: () => { this.detailsVisible = false; this.detailRequestId++ } })
-        .bindContentCover(this.sharing, this.ShareOptions(), {
-          modalTransition: ModalTransition.NONE, backgroundColor: Color.Transparent,
-          onDisappear: () => this.sharing = false
-        })
+      // 分享面板直接铺在页面上：列表菜单里点分享时，弹出的半模态/全屏模态会被菜单收起动作吞掉。
+      if (this.sharing) { this.ShareOptions() }
+      }.width('100%').height('100%')
     }.hideTitleBar(true).onShown(() => this.load(true))
   }
 }

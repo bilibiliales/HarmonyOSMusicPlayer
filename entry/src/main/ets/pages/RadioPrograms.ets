@@ -67,6 +67,7 @@ export struct RadioProgramsPage {
   build() {
     NavDestination() {
       SkinBackdrop()
+      Stack({ alignContent: Alignment.TopStart }) {
       Column() {
         Row({ space: 12 }) {
           SymbolGlyph($r('sys.symbol.chevron_left')).fontSize(24).fontColor([TC.textPrimary()])
@@ -117,10 +118,9 @@ export struct RadioProgramsPage {
       .width('100%')
       .height('100%')
       .backgroundColor(TC.pageBackground())
-      .bindContentCover(this.sharing, this.ShareOptions(), {
-        modalTransition: ModalTransition.NONE, backgroundColor: Color.Transparent,
-        onDisappear: () => this.sharing = false
-      })
+      // 菜单里点分享时用页面内联面板，避免模态被菜单收起动作吞掉。
+      if (this.sharing) { this.ShareOptions() }
+      }.width('100%').height('100%')
     }.hideTitleBar(true)
   }
 }

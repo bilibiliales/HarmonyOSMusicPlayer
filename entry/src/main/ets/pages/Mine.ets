@@ -11,6 +11,7 @@ import { ShareLink, SystemShareService } from '../services/SystemShareService'
 import { BubbleTip } from '../services/BubbleTip'
 import { SharePageParam } from '../models/api'
 import { PodcastLibrary } from '../components/PodcastLibrary'
+import { ShareSheet } from '../components/ShareSheet'
 import { SecondaryTabContent, SecondaryTabMotion } from '../components/SecondaryTabContent'
 import { ListeningPlaylistService } from '../services/ListeningPlaylistService'
 import { playlistType, songItemType } from '../models'
@@ -115,6 +116,8 @@ export struct Mine {
   @State tabDirection: number = -1
   @State musicDirection: number = -1
   @State podcastRefreshKey: number = 0
+  @State podcastShareVisible: boolean = false
+  @State podcastShareParam: SharePageParam = { type: 'djradio', id: '', name: '', img: '' }
   @State viewMode: string = 'list'
   @State eventViewMode: string = 'list'
   @State playlists: playlistType[] = []
@@ -861,6 +864,8 @@ export struct Mine {
         .shadow({ radius: 18, color: 'rgba(239,35,60,0.38)', offsetY: 7 })
         .position({ right: 20, bottom: 84 }).zIndex(6).onClick(() => this.openPublishEvent())
       }
+
+      if (this.podcastShareVisible) { this.PodcastShareSheet() }
     }
     .width('100%')
     .height('100%')
@@ -1852,8 +1857,20 @@ export struct Mine {
 
   @Builder
   PodcastContent() {
-    PodcastLibrary({ refreshKey: this.podcastRefreshKey })
+    PodcastLibrary({ refreshKey: this.podcastRefreshKey,
+      onShareRequest: (param: SharePageParam) => this.openPodcastShare(param) })
       .width('100%').padding({ bottom: 145 })
+  }
+
+  private openPodcastShare(param: SharePageParam): void {
+    this.podcastShareParam = param
+    this.podcastShareVisible = true
+  }
+
+  @Builder
+  PodcastShareSheet() {
+    ShareSheet({ shareParam: this.podcastShareParam, visible: true,
+      onClose: () => this.podcastShareVisible = false })
   }
 
   @Builder

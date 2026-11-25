@@ -8,7 +8,6 @@ import { RadioPlayback } from '../services/RadioPlayback'
 import { BubbleTip } from '../services/BubbleTip'
 import { RadioStationCard, RadioProgramRow } from '../components/RadioCards'
 import { TC } from '../services/ThemeColors'
-import { SecondaryTabContent, SecondaryTabMotion } from '../components/SecondaryTabContent'
 
 @Component
 export struct RadioPage {
@@ -22,7 +21,6 @@ export struct RadioPage {
   @State category: number = 0
   @State categoryName: string = '全部分类'
   @State mode: string = 'recommend'
-  @State motionDirection: number = -1
   @State loading: boolean = false
   @State refreshing: boolean = false
   @State more: boolean = true
@@ -34,6 +32,7 @@ export struct RadioPage {
   private token: number = 0
   private homeToken: number = 0
   private listOffset: number = 0
+  private listScroller: Scroller = new Scroller()
 
   aboutToAppear(): void { this.loadHome() }
   aboutToDisappear(): void { this.token++; this.homeToken++ }
@@ -79,24 +78,29 @@ export struct RadioPage {
     }
   }
 
+  /** 切换推荐/热门/新晋/节目榜：只换数据，不重建页面。 */
   private chooseMode(mode: string): void {
     if (mode === this.mode) { return }
-    this.motionDirection = SecondaryTabMotion.direction(this.mode, mode, ['recommend', 'hot', 'new', 'programs'])
-    this.getUIContext().animateTo({ duration: SecondaryTabMotion.DURATION, curve: Curve.EaseOut }, () => this.mode = mode)
+    this.mode = mode
     this.query = ''
+    this.scrollToTop()
     this.loadList(true)
   }
 
+  /** 切换分类：同样只刷新列表数据。 */
   private chooseCategory(id: number, name: string): void {
     this.categoryVisible = false
-    this.motionDirection = id > this.category ? -1 : 1
-    this.getUIContext().animateTo({ duration: SecondaryTabMotion.DURATION, curve: Curve.EaseOut }, () => {
-      this.category = id
-      this.categoryName = name
-      if (this.mode === 'new' || this.mode === 'programs') { this.mode = 'recommend' }
-    })
+    if (id === this.category && name === this.categoryName) { return }
+    this.category = id
+    this.categoryName = name
+    if (this.mode === 'new' || this.mode === 'programs') { this.mode = 'recommend' }
     this.query = ''
+    this.scrollToTop()
     this.loadList(true)
+  }
+
+  private scrollToTop(): void {
+    try { this.listScroller.scrollToIndex(0) } catch (_error) {}
   }
 
   private openStation(id: number, name: string = '', cover: string = ''): void {
@@ -201,16 +205,14 @@ export struct RadioPage {
   @Builder
   private Content() {
     Column() {
-    SecondaryTabContent({ value: `${this.mode}:${this.category}`, motionDirection: this.motionDirection, fill: true }) {
       this.RadioFeed()
-    }
     }.width('100%').height('100%')
   }
 
   @Builder
   private RadioFeed() {
     Refresh({ refreshing: this.refreshing }) {
-      List() {
+      List({ scroller: this.listScroller }) {
         ListItem() { Column() { this.Header() }.width('100%') }
         ListItem() {
           Row({ space: 24 }) {

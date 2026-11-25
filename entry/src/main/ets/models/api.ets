@@ -517,6 +517,7 @@ export interface ApiUser {
   avatarDetail?: ArtistAvatarDetail
   followed?: boolean
   mutual?: boolean
+  followMe?: boolean
   backgroundUrl?: string
   eventCount?: number
   artistId?: number

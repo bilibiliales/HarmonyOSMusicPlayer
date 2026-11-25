@@ -262,6 +262,15 @@ export struct UserProfilePage {
     }
     this.followsTarget = false
     this.followedByTarget = false
+    // /user/mutualfollow/get 对歌手类账号会误报 true（对方并未回关），
+    // 所以以 /user/detail 返回的 followed / mutual / followMe 为准。
+    const profile = this.detail.profile
+    if (typeof profile.followed === 'boolean') {
+      this.followsTarget = profile.followed
+      this.followedByTarget = profile.mutual === true || profile.followMe === true
+      this.syncRelationDetail()
+      return
+    }
     try {
       const response = await ApiClient.get<MutualFollowResponse>('/user/mutualfollow/get', [
         { key: 'uid', value: this.pageParam.uid }
@@ -449,7 +458,7 @@ export struct UserProfilePage {
   }
 
   private openArtist(): void {
-    const artistId = this.detail?.profile.artistId || 0
+    const artistId = this.artistId()
     if (artistId <= 0) {
       return
     }
@@ -459,6 +468,11 @@ export struct UserProfilePage {
       picUrl: this.detail?.profile.avatarUrl || ''
     }
     this.pageStack.pushPathByName('ArtistPage', param)
+  }
+
+  /** 歌手账号的 /user/detail 会带 artistId，用来直接跳歌手主页。 */
+  private artistId(): number {
+    return this.detail?.profile.artistId || 0
   }
 
   /** 统一走 ShareSheet（与专辑/歌单/歌手一致：系统分享 + 私信 + 碰一碰）。 */
@@ -557,18 +571,34 @@ export struct UserProfilePage {
           }
         }
         .margin({ top: 2 })
-        if (this.pageParam.uid !== this.authStore.userId) {
+        if (this.pageParam.uid !== this.authStore.userId || this.artistId() > 0) {
           Row({ space: 10 }) {
-            Button(this.followButtonText())
-              .width(112).height(36).fontSize(12)
-              .fontColor(this.isFollowActive() ? TC.accent() : TC.textOnAccent())
-              .backgroundColor(this.isFollowActive() ? '#00ffffff' : TC.accent())
-              .border({ width: this.isFollowActive() ? 1 : 0, color: TC.accent() })
-              .borderRadius(18).onClick(() => this.follow())
-            Button('私聊')
-              .height(36).fontSize(12)
-              .fontColor(TC.textPrimary()).backgroundColor(TC.surfaceRaised())
-              .borderRadius(18).onClick(() => this.openChat())
+            if (this.pageParam.uid !== this.authStore.userId) {
+              Button(this.followButtonText())
+                .width(112).height(36).fontSize(12)
+                .fontColor(this.isFollowActive() ? TC.accent() : TC.textOnAccent())
+                .backgroundColor(this.isFollowActive() ? '#00ffffff' : TC.accent())
+                .border({ width: this.isFollowActive() ? 1 : 0, color: TC.accent() })
+                .borderRadius(18).onClick(() => this.follow())
+              Button('私聊')
+                .height(36).fontSize(12)
+                .fontColor(TC.textPrimary()).backgroundColor(TC.surfaceRaised())
+                .borderRadius(18).onClick(() => this.openChat())
+            }
+            if (this.artistId() > 0) {
+              Button() {
+                Row({ space: 4 }) {
+                  SymbolGlyph($r('sys.symbol.mic_fill')).fontSize(13).fontColor([TC.textPrimary()])
+                  Text('歌手主页').fontSize(12).fontColor(TC.textPrimary())
+                }
+              }
+              .height(36)
+              .backgroundColor(TC.surfaceRaised())
+              .borderRadius(18)
+              .type(ButtonType.Normal)
+              .padding({ left: 14, right: 14 })
+              .onClick(() => this.openArtist())
+            }
           }
         }
       }

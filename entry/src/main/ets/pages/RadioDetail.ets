@@ -419,16 +419,16 @@ export struct RadioDetailPage {
           if (this.frozen) {
             this.FrozenActionBar()
           }
+          // 分享面板内联在页面上：节目行菜单里点分享时，弹出的模态会被菜单收起动作吞掉。
+          if (this.shareVisible) {
+            this.ShareOptions()
+          }
         }
         .width('100%')
         .height('100%')
         .bindSheet(this.commentsVisible, this.skin_CommentsSheet(), {
           height: '72%', backgroundColor: TC.sheetBackground(), showClose: false, dragBar: true,
           onDisappear: () => this.commentsVisible = false
-        })
-        .bindContentCover(this.shareVisible, this.ShareOptions(), {
-          modalTransition: ModalTransition.NONE, backgroundColor: Color.Transparent,
-          onDisappear: () => this.shareVisible = false
         })
       }
     }.hideTitleBar(true).backgroundColor(TC.pageBackground())
@@ -732,16 +732,16 @@ export struct RadioProgramPage {
           if (this.frozen) {
             this.FrozenActionBar()
           }
+          // 分享面板内联在页面上：节目行菜单里点分享时，弹出的模态会被菜单收起动作吞掉。
+          if (this.shareVisible) {
+            this.ShareOptions()
+          }
         }
         .width('100%')
         .height('100%')
         .bindSheet(this.commentsVisible, this.skin_CommentsSheet(), {
           height: '72%', backgroundColor: TC.sheetBackground(), showClose: false, dragBar: true,
           onDisappear: () => this.commentsVisible = false
-        })
-        .bindContentCover(this.shareVisible, this.ShareOptions(), {
-          modalTransition: ModalTransition.NONE, backgroundColor: Color.Transparent,
-          onDisappear: () => this.shareVisible = false
         })
       }
     }.hideTitleBar(true).backgroundColor(TC.pageBackground())
