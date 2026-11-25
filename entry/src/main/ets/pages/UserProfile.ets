@@ -588,7 +588,6 @@ export struct UserProfilePage {
             if (this.artistId() > 0) {
               Button() {
                 Row({ space: 4 }) {
-                  SymbolGlyph($r('sys.symbol.mic_fill')).fontSize(13).fontColor([TC.textPrimary()])
                   Text('歌手主页').fontSize(12).fontColor(TC.textPrimary())
                 }
               }
